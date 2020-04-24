@@ -6,15 +6,25 @@
 
 ## Context
 
-Currently [baseapp](https://github.com/cosmos/cosmos-sdk/blob/bad4ca75f58b182f600396ca350ad844c18fc80b/baseapp/baseapp.go#L55)
-runTx method only [handles](https://github.com/cosmos/cosmos-sdk/blob/bad4ca75f58b182f600396ca350ad844c18fc80b/baseapp/baseapp.go#L538)
-`OutOfGas` specific error (adding error context to it)
-and provides a default handling mechanism (failing the Tx and logging an error).
-That limits Cosmos SDK based project developers to add custom handling for their specific panic sources.
+Current implementation of BaseApp does not allow developers to write custom error handlers in `runTx()` method. We think
+that this method can be more flexible and can give SDK users more options for customizations without need to rewrite whole
+BaseApp. Also there's one special case for `sdk.ErrorOutOfGas` error which feels like dirty hack in non-flexible environment.
+
+We propose middleware-solution, which could help developers implement following cases:
+
+- add external logging (let's say sending reports to external services like Sentry)
+- call panic for specific error cases
+
+It will also make OutOfGas case one of the middlewares.
 
 ## Decision
 
-We would like to design a mechanism to add custom handlers (middlewares) to `baseapp`'s `runTx()` panic processing.
+### Design
+
+Instead of hardcoding custom error handling into BaseApp we suggest using set of middlewares which can be customized
+externally and will allow developers use as many custom error handlers as they want.
+
+Implementation is already proposed [here](https://github.com/cosmos/cosmos-sdk/pull/6053).
 
 ## Status
 
@@ -28,7 +38,7 @@ Proposed
     * add error context for custom panic sources (panic inside of custom keepers);
     * emit `panic()`: passthrough recovery object to the Tendermint core;
     * other necessary handling;
-- Developers can use standard Cosmos SDK `baseapp` implementation, rather that injecting it to their project;
+- Developers can use standard Cosmos SDK `baseapp` implementation, rather that rewriting it in their projects;
 
 ### Negative
 
@@ -36,7 +46,7 @@ Proposed
 
 ### Neutral
 
-
+- OutOfGas error handler becomes one of the middlewares.
 
 ## References
 
