@@ -146,9 +146,10 @@ func SimulateMsgCreateValidator(ak types.AccountKeeper, k keeper.Keeper) simulat
 			maxCommission,
 			simulation.RandomDecAmount(r, maxCommission),
 		)
+		minSelfDelegation := sdk.NewInt(types.DefaultMinSelfDelegationLvl)
 
 		msg := types.NewMsgCreateValidator(address, simAccount.PubKey,
-			selfDelegation, description, commission, sdk.OneInt())
+			selfDelegation, description, commission, minSelfDelegation)
 
 		tx := helpers.GenTx(
 			[]sdk.Msg{msg},
