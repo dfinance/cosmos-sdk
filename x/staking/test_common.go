@@ -25,11 +25,13 @@ var (
 	)
 
 	commissionRates = NewCommissionRates(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec())
+
+	minSelfDelegation = sdk.NewInt(types.DefaultMinSelfDelegationLvl)
 )
 
 func NewTestMsgCreateValidator(address sdk.ValAddress, pubKey crypto.PubKey, amt sdk.Int) MsgCreateValidator {
 	return types.NewMsgCreateValidator(
-		address, pubKey, sdk.NewCoin(sdk.DefaultBondDenom, amt), Description{}, commissionRates, sdk.OneInt(),
+		address, pubKey, sdk.NewCoin(sdk.DefaultBondDenom, amt), Description{}, commissionRates, minSelfDelegation,
 	)
 }
 
@@ -39,7 +41,7 @@ func NewTestMsgCreateValidatorWithCommission(address sdk.ValAddress, pubKey cryp
 	commission := NewCommissionRates(commissionRate, sdk.OneDec(), sdk.ZeroDec())
 
 	return types.NewMsgCreateValidator(
-		address, pubKey, sdk.NewCoin(sdk.DefaultBondDenom, amt), Description{}, commission, sdk.OneInt(),
+		address, pubKey, sdk.NewCoin(sdk.DefaultBondDenom, amt), Description{}, commission, minSelfDelegation,
 	)
 }
 
