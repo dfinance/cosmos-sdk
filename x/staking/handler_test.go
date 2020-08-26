@@ -355,7 +355,7 @@ func TestIncrementsMsgDelegate(t *testing.T) {
 }
 
 func TestEditValidatorDecreaseMinSelfDelegation(t *testing.T) {
-	initPower := int64(100)
+	initPower := int64(types.DefaultMinSelfDelegationLvl)
 	initBond := sdk.TokensFromConsensusPower(100)
 	app, ctx, _, valAddrs := bootstrapHandlerGenesisTest(t, initPower, 1, sdk.TokensFromConsensusPower(initPower))
 
@@ -386,7 +386,7 @@ func TestEditValidatorDecreaseMinSelfDelegation(t *testing.T) {
 }
 
 func TestEditValidatorIncreaseMinSelfDelegationBeyondCurrentBond(t *testing.T) {
-	initPower := int64(100)
+	initPower := int64(types.DefaultMinSelfDelegationLvl)
 	initBond := sdk.TokensFromConsensusPower(100)
 
 	app, ctx, _, valAddrs := bootstrapHandlerGenesisTest(t, initPower, 2, sdk.TokensFromConsensusPower(initPower))
@@ -1197,7 +1197,7 @@ func TestInvalidCoinDenom(t *testing.T) {
 	require.NoError(t, err)
 	tstaking.Handle(msgCreate, true)
 
-	msgCreate, err = types.NewMsgCreateValidator(valB, PKs[1], validCoin, types.Description{}, commission, sdk.OneInt())
+	msgCreate, err = types.NewMsgCreateValidator(valB, PKs[1], validCoin, types.Description{}, commission, minSelfDelegation)
 	require.NoError(t, err)
 	tstaking.Handle(msgCreate, true)
 
@@ -1218,4 +1218,30 @@ func TestInvalidCoinDenom(t *testing.T) {
 
 	msgRedelegate = types.NewMsgBeginRedelegate(delAddr, valA, valB, oneCoin)
 	tstaking.Handle(msgRedelegate, true)
+}
+
+func TestInvalidMinSelfDelegation(t *testing.T) {
+	//ctx, _, keeper, _ := keep.CreateTestInput(t, false, 1000)
+	//valA := sdk.ValAddress(keep.Addrs[0])
+	//
+	//commission := types.NewCommissionRates(sdk.OneDec(), sdk.OneDec(), sdk.ZeroDec())
+	//
+	//validMinSelfDelegation := minSelfDelegation
+	//invalidMinSelfDelegation := minSelfDelegation.SubRaw(1)
+	//
+	//validTokens := sdk.TokensFromConsensusPower(100)
+	//validCoin := sdk.NewCoin(sdk.DefaultBondDenom, validTokens)
+	//
+	//// invalid: minSelfDelegation < default
+	//msgCreate := types.NewMsgCreateValidator(valA, keep.PKs[0], validCoin, Description{}, commission, invalidMinSelfDelegation)
+	//res, err := handleMsgCreateValidator(ctx, msgCreate, keeper)
+	//require.Error(t, err)
+	//require.Nil(t, res)
+	//require.True(t, types.ErrInvalidMinSelfDelegation.Is(err))
+	//
+	//// valid
+	//msgCreate = types.NewMsgCreateValidator(valA, keep.PKs[0], validCoin, Description{}, commission, validMinSelfDelegation)
+	//res, err = handleMsgCreateValidator(ctx, msgCreate, keeper)
+	//require.NoError(t, err)
+	//require.NotNil(t, res)
 }
