@@ -147,8 +147,9 @@ func SimulateMsgCreateValidator(ak types.AccountKeeper, bk types.BankKeeper, k k
 			maxCommission,
 			simtypes.RandomDecAmount(r, maxCommission),
 		)
+		minSelfDelegation := sdk.NewInt(types.DefaultMinSelfDelegationLvl)
 
-		msg, err := types.NewMsgCreateValidator(address, simAccount.ConsKey.PubKey(), selfDelegation, description, commission, sdk.OneInt())
+		msg, err := types.NewMsgCreateValidator(address, simAccount.ConsKey.PubKey(), selfDelegation, description, commission, minSelfDelegation)
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, msg.Type(), "unable to create CreateValidator message"), nil, err
 		}
