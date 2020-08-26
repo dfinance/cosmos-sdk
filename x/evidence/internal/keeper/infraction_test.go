@@ -12,9 +12,10 @@ import (
 
 func newTestMsgCreateValidator(address sdk.ValAddress, pubKey crypto.PubKey, amt sdk.Int) staking.MsgCreateValidator {
 	commission := staking.NewCommissionRates(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec())
+	minSelfDelegation := sdk.NewInt(staking.DefaultMinSelfDelegationLvl)
 	return staking.NewMsgCreateValidator(
 		address, pubKey, sdk.NewCoin(sdk.DefaultBondDenom, amt),
-		staking.Description{}, commission, sdk.OneInt(),
+		staking.Description{}, commission, minSelfDelegation,
 	)
 }
 

@@ -130,9 +130,10 @@ func TestSlashingMsgs(t *testing.T) {
 
 	description := staking.NewDescription("foo_moniker", "", "", "", "")
 	commission := staking.NewCommissionRates(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec())
+	minSelfDelegation := sdk.NewInt(staking.DefaultMinSelfDelegationLvl)
 
 	createValidatorMsg := staking.NewMsgCreateValidator(
-		sdk.ValAddress(addr1), priv1.PubKey(), bondCoin, description, commission, sdk.OneInt(),
+		sdk.ValAddress(addr1), priv1.PubKey(), bondCoin, description, commission, minSelfDelegation,
 	)
 
 	header := abci.Header{Height: mapp.LastBlockHeight() + 1}
