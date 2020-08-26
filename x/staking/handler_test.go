@@ -1219,3 +1219,28 @@ func TestInvalidCoinDenom(t *testing.T) {
 	msgRedelegate = types.NewMsgBeginRedelegate(delAddr, valA, valB, oneCoin)
 	tstaking.Handle(msgRedelegate, true)
 }
+
+func TestInvalidMinSelfDelegation(t *testing.T) {
+	initPower := int64(1000)
+	app, ctx, _, valAddrs := bootstrapHandlerGenesisTest(t, initPower, 3, sdk.TokensFromConsensusPower(initPower))
+	valA := valAddrs[0]
+	tstaking := teststaking.NewHelper(t, ctx, app.StakingKeeper)
+
+	commission := types.NewCommissionRates(sdk.OneDec(), sdk.OneDec(), sdk.ZeroDec())
+
+	validMinSelfDelegation := sdk.NewInt(types.DefaultMinSelfDelegationLvl)
+	invalidMinSelfDelegation := validMinSelfDelegation.SubRaw(1)
+
+	validTokens := sdk.TokensFromConsensusPower(100)
+	validCoin := sdk.NewCoin(sdk.DefaultBondDenom, validTokens)
+
+	// invalid: minSelfDelegation < default
+	msgCreate, err := types.NewMsgCreateValidator(valA, PKs[0], validCoin, types.Description{}, commission, invalidMinSelfDelegation)
+	require.NoError(t, err)
+	tstaking.Handle(msgCreate, true)
+
+	// valid
+	msgCreateInvalid, err := types.NewMsgCreateValidator(valA, PKs[0], validCoin, types.Description{}, commission, validMinSelfDelegation)
+	require.NoError(t, err)
+	tstaking.Handle(msgCreateInvalid, false)
+}
