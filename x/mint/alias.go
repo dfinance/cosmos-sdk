@@ -40,7 +40,7 @@ var (
 	KeyInflationMax        = types.KeyInflationMax
 	KeyInflationMin        = types.KeyInflationMin
 	KeyGoalBonded          = types.KeyGoalBonded
-	KeyBlocksPerYear       = types.KeyBlocksPerYear
+	KeyAvgBlockTimeWindow  = types.KeyAvgBlockTimeWindow
 )
 
 type (

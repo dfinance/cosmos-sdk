@@ -3,16 +3,21 @@ package types
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
+const (
+	BlocksPerYearMock = uint64(AvgYearDur / (5 * time.Second))
+)
+
 func TestNextInflation(t *testing.T) {
 	minter := DefaultInitialMinter()
 	params := DefaultParams()
-	blocksPerYr := sdk.NewDec(int64(params.BlocksPerYear))
+	blocksPerYr := sdk.NewDec(int64(BlocksPerYearMock))
 
 	// Governing Mechanism:
 	//    inflationRateChangePerYear = (1- BondedRatio/ GoalBonded) * MaxInflationRateChange
@@ -46,7 +51,7 @@ func TestNextInflation(t *testing.T) {
 	for i, tc := range tests {
 		minter.Inflation = tc.setInflation
 
-		inflation := minter.NextInflationRate(params, tc.bondedRatio)
+		inflation := minter.NextInflationRate(params, tc.bondedRatio, BlocksPerYearMock)
 		diffInflation := inflation.Sub(tc.setInflation)
 
 		require.True(t, diffInflation.Equal(tc.expChange),
@@ -71,7 +76,7 @@ func TestBlockProvision(t *testing.T) {
 	}
 	for i, tc := range tests {
 		minter.AnnualProvisions = sdk.NewDec(tc.annualProvisions)
-		provisions := minter.BlockProvision(params)
+		provisions := minter.BlockProvision(params, BlocksPerYearMock)
 
 		expProvisions := sdk.NewCoin(params.MintDenom,
 			sdk.NewInt(tc.expProvisions))
@@ -98,7 +103,7 @@ func BenchmarkBlockProvision(b *testing.B) {
 
 	// run the BlockProvision function b.N times
 	for n := 0; n < b.N; n++ {
-		minter.BlockProvision(params)
+		minter.BlockProvision(params, BlocksPerYearMock)
 	}
 }
 
@@ -111,7 +116,7 @@ func BenchmarkNextInflation(b *testing.B) {
 
 	// run the NextInflationRate function b.N times
 	for n := 0; n < b.N; n++ {
-		minter.NextInflationRate(params, bondedRatio)
+		minter.NextInflationRate(params, bondedRatio, BlocksPerYearMock)
 	}
 
 }

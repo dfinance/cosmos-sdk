@@ -1,7 +1,11 @@
 package types
 
-// MinterKey is used for the keeper store
-var MinterKey = []byte{0x00}
+var (
+	// MinterKey is used for the keeper store
+	MinterKey         = []byte{0x00}
+	// BlockDurFilterKey is used to store avg block duration filter
+	BlockDurFilterKey = []byte("BlockDurFilter")
+)
 
 // nolint
 const (

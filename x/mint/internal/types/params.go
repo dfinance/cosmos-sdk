@@ -16,7 +16,7 @@ var (
 	KeyInflationMax        = []byte("InflationMax")
 	KeyInflationMin        = []byte("InflationMin")
 	KeyGoalBonded          = []byte("GoalBonded")
-	KeyBlocksPerYear       = []byte("BlocksPerYear")
+	KeyAvgBlockTimeWindow  = []byte("AvgBlockTimeWindow")
 )
 
 // mint parameters
@@ -26,7 +26,7 @@ type Params struct {
 	InflationMax        sdk.Dec `json:"inflation_max" yaml:"inflation_max"`                 // maximum inflation rate
 	InflationMin        sdk.Dec `json:"inflation_min" yaml:"inflation_min"`                 // minimum inflation rate
 	GoalBonded          sdk.Dec `json:"goal_bonded" yaml:"goal_bonded"`                     // goal of percent bonded atoms
-	BlocksPerYear       uint64  `json:"blocks_per_year" yaml:"blocks_per_year"`             // expected blocks per year
+	AvgBlockTimeWindow  uint16  `json:"avg_block_time_window" yaml:"avg_block_time_window"` // avg block time filter window size
 }
 
 // ParamTable for minting module.
@@ -35,16 +35,17 @@ func ParamKeyTable() params.KeyTable {
 }
 
 func NewParams(
-	mintDenom string, inflationRateChange, inflationMax, inflationMin, goalBonded sdk.Dec, blocksPerYear uint64,
+	mintDenom string,
+	inflationRateChange, inflationMax, inflationMin, goalBonded sdk.Dec,
+	avgBlockTimeWindow uint16,
 ) Params {
-
 	return Params{
 		MintDenom:           mintDenom,
 		InflationRateChange: inflationRateChange,
 		InflationMax:        inflationMax,
 		InflationMin:        inflationMin,
 		GoalBonded:          goalBonded,
-		BlocksPerYear:       blocksPerYear,
+		AvgBlockTimeWindow:  avgBlockTimeWindow,
 	}
 }
 
@@ -56,7 +57,7 @@ func DefaultParams() Params {
 		InflationMax:        sdk.NewDecWithPrec(20, 2),
 		InflationMin:        sdk.NewDecWithPrec(7, 2),
 		GoalBonded:          sdk.NewDecWithPrec(67, 2),
-		BlocksPerYear:       uint64(60 * 60 * 8766 / 5), // assuming 5 second block times
+		AvgBlockTimeWindow:  100,
 	}
 }
 
@@ -77,7 +78,7 @@ func (p Params) Validate() error {
 	if err := validateGoalBonded(p.GoalBonded); err != nil {
 		return err
 	}
-	if err := validateBlocksPerYear(p.BlocksPerYear); err != nil {
+	if err := validateAvgBlockTimeWindow(p.AvgBlockTimeWindow); err != nil {
 		return err
 	}
 	if p.InflationMax.LT(p.InflationMin) {
@@ -88,20 +89,19 @@ func (p Params) Validate() error {
 	}
 
 	return nil
-
 }
 
 func (p Params) String() string {
 	return fmt.Sprintf(`Minting Params:
-  Mint Denom:             %s
-  Inflation Rate Change:  %s
-  Inflation Max:          %s
-  Inflation Min:          %s
-  Goal Bonded:            %s
-  Blocks Per Year:        %d
+  Mint Denom:               %s
+  Inflation Rate Change:    %s
+  Inflation Max:            %s
+  Inflation Min:            %s
+  Goal Bonded:              %s
+  Avg blocksPerYear Window: %d
 `,
 		p.MintDenom, p.InflationRateChange, p.InflationMax,
-		p.InflationMin, p.GoalBonded, p.BlocksPerYear,
+		p.InflationMin, p.GoalBonded, p.AvgBlockTimeWindow,
 	)
 }
 
@@ -113,7 +113,7 @@ func (p *Params) ParamSetPairs() params.ParamSetPairs {
 		params.NewParamSetPair(KeyInflationMax, &p.InflationMax, validateInflationMax),
 		params.NewParamSetPair(KeyInflationMin, &p.InflationMin, validateInflationMin),
 		params.NewParamSetPair(KeyGoalBonded, &p.GoalBonded, validateGoalBonded),
-		params.NewParamSetPair(KeyBlocksPerYear, &p.BlocksPerYear, validateBlocksPerYear),
+		params.NewParamSetPair(KeyAvgBlockTimeWindow, &p.AvgBlockTimeWindow, validateAvgBlockTimeWindow),
 	}
 }
 
@@ -197,14 +197,14 @@ func validateGoalBonded(i interface{}) error {
 	return nil
 }
 
-func validateBlocksPerYear(i interface{}) error {
-	v, ok := i.(uint64)
+func validateAvgBlockTimeWindow(i interface{}) error {
+	v, ok := i.(uint16)
 	if !ok {
 		return fmt.Errorf("invalid parameter type: %T", i)
 	}
 
-	if v == 0 {
-		return fmt.Errorf("blocks per year must be positive: %d", v)
+	if v < 2 {
+		return fmt.Errorf("avg blockTime window must be GTE than 2: %d", v)
 	}
 
 	return nil
