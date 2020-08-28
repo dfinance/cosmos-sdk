@@ -55,6 +55,8 @@ var (
 	}
 
 	distrAcc = supply.NewEmptyModuleAccount(types.ModuleName)
+
+	minSelfDelegation = sdk.NewInt(staking.DefaultMinSelfDelegationLvl)
 )
 
 // create a codec used only for testing

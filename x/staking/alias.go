@@ -18,6 +18,7 @@ const (
 	DefaultUnbondingTime               = types.DefaultUnbondingTime
 	DefaultMaxValidators               = types.DefaultMaxValidators
 	DefaultMaxEntries                  = types.DefaultMaxEntries
+	DefaultMinSelfDelegationLvl        = types.DefaultMinSelfDelegationLvl
 	NotBondedPoolName                  = types.NotBondedPoolName
 	BondedPoolName                     = types.BondedPoolName
 	QueryValidators                    = types.QueryValidators
@@ -123,6 +124,7 @@ var (
 	ErrNeitherShareMsgsGiven           = types.ErrNeitherShareMsgsGiven
 	ErrInvalidHistoricalInfo           = types.ErrInvalidHistoricalInfo
 	ErrNoHistoricalInfo                = types.ErrNoHistoricalInfo
+	ErrInvalidMinSelfDelegation        = types.ErrInvalidMinSelfDelegation
 	NewGenesisState                    = types.NewGenesisState
 	DefaultGenesisState                = types.DefaultGenesisState
 	NewMultiStakingHooks               = types.NewMultiStakingHooks

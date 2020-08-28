@@ -107,18 +107,23 @@ func SimulateMsgCreateValidator(ak types.AccountKeeper, k keeper.Keeper) simulat
 			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
 
+		minSelfDelegation := sdk.NewInt(types.DefaultMinSelfDelegationLvl)
+
 		denom := k.GetParams(ctx).BondDenom
 		amount := ak.GetAccount(ctx, simAccount.Address).GetCoins().AmountOf(denom)
 		if !amount.IsPositive() {
 			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
+		if amount.LT(minSelfDelegation) {
+			return simulation.NoOpMsg(types.ModuleName), nil, nil
+		}
 
-		amount, err := simulation.RandPositiveInt(r, amount)
+		amount, err := simulation.RandPositiveInt(r, amount.Sub(minSelfDelegation))
 		if err != nil {
 			return simulation.NoOpMsg(types.ModuleName), nil, err
 		}
 
-		selfDelegation := sdk.NewCoin(denom, amount)
+		selfDelegation := sdk.NewCoin(denom, minSelfDelegation.Add(amount))
 
 		account := ak.GetAccount(ctx, simAccount.Address)
 		coins := account.SpendableCoins(ctx.BlockTime())
@@ -148,7 +153,7 @@ func SimulateMsgCreateValidator(ak types.AccountKeeper, k keeper.Keeper) simulat
 		)
 
 		msg := types.NewMsgCreateValidator(address, simAccount.PubKey,
-			selfDelegation, description, commission, sdk.OneInt())
+			selfDelegation, description, commission, minSelfDelegation)
 
 		tx := helpers.GenTx(
 			[]sdk.Msg{msg},
