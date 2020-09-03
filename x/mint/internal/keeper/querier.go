@@ -25,6 +25,9 @@ func NewQuerier(k Keeper) sdk.Querier {
 		case types.QueryBlocksPerYear:
 			return queryBlocksPerYear(ctx, k)
 
+		case types.QueryNextAnnualParamsUpdate:
+			return queryNextAnnualParamsUpdate(ctx, k)
+
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unknown query path: %s", path[0])
 		}
@@ -68,6 +71,16 @@ func queryBlocksPerYear(ctx sdk.Context, k Keeper) ([]byte, error) {
 	minter := k.GetMinter(ctx)
 
 	res, err := codec.MarshalJSONIndent(k.cdc, minter.BlocksPerYear)
+	if err != nil {
+		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
+	}
+
+	return res, nil
+}
+
+func queryNextAnnualParamsUpdate(ctx sdk.Context, k Keeper) ([]byte, error) {
+	ts := k.GetAnnualUpdateTimestamp(ctx)
+	res, err := codec.MarshalJSONIndent(k.cdc, ts)
 	if err != nil {
 		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
 	}
