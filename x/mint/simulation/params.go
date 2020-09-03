@@ -11,21 +11,16 @@ import (
 )
 
 const (
-	keyInflationRateChange = "InflationRateChange"
-	keyInflationMax        = "InflationMax"
-	keyInflationMin        = "InflationMin"
-	keyGoalBonded          = "GoalBonded"
+	keyInflationMax            = "InflationMax"
+	keyInflationMin            = "InflationMin"
+	keyFeeBurningRatio         = "FeeBurningRatio"
+	keyInfPwrBondedLockedRatio = "InfPwrBondedLockedRatio"
 )
 
 // ParamChanges defines the parameters that can be modified by param change proposals
 // on the simulation
 func ParamChanges(r *rand.Rand) []simulation.ParamChange {
 	return []simulation.ParamChange{
-		simulation.NewSimParamChange(types.ModuleName, keyInflationRateChange,
-			func(r *rand.Rand) string {
-				return fmt.Sprintf("\"%s\"", GenInflationRateChange(r))
-			},
-		),
 		simulation.NewSimParamChange(types.ModuleName, keyInflationMax,
 			func(r *rand.Rand) string {
 				return fmt.Sprintf("\"%s\"", GenInflationMax(r))
@@ -36,9 +31,14 @@ func ParamChanges(r *rand.Rand) []simulation.ParamChange {
 				return fmt.Sprintf("\"%s\"", GenInflationMin(r))
 			},
 		),
-		simulation.NewSimParamChange(types.ModuleName, keyGoalBonded,
+		simulation.NewSimParamChange(types.ModuleName, keyFeeBurningRatio,
 			func(r *rand.Rand) string {
-				return fmt.Sprintf("\"%s\"", GenGoalBonded(r))
+				return fmt.Sprintf("\"%s\"", GenFeeBurningRatio(r))
+			},
+		),
+		simulation.NewSimParamChange(types.ModuleName, keyInfPwrBondedLockedRatio,
+			func(r *rand.Rand) string {
+				return fmt.Sprintf("\"%s\"", GenInfPwrBondedLockedRatio(r))
 			},
 		),
 	}

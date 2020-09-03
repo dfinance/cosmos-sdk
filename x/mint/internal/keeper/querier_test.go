@@ -76,5 +76,20 @@ func TestQueryAnnualProvisions(t *testing.T) {
 	err := app.Codec().UnmarshalJSON(res, &annualProvisions)
 	require.NoError(t, err)
 
-	require.Equal(t, app.MintKeeper.GetMinter(ctx).AnnualProvisions, annualProvisions)
+	require.Equal(t, app.MintKeeper.GetMinter(ctx).Provisions, annualProvisions)
+}
+
+func TestQueryBlocksPerYear(t *testing.T) {
+	app, ctx := createTestApp(true)
+	querier := keep.NewQuerier(app.MintKeeper)
+
+	var estimation uint64
+
+	res, sdkErr := querier(ctx, []string{types.QueryBlocksPerYear}, abci.RequestQuery{})
+	require.NoError(t, sdkErr)
+
+	err := app.Codec().UnmarshalJSON(res, &estimation)
+	require.NoError(t, err)
+
+	require.Equal(t, app.MintKeeper.GetMinter(ctx).BlocksPerYear, estimation)
 }

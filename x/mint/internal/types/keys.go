@@ -2,9 +2,11 @@ package types
 
 var (
 	// MinterKey is used for the keeper store
-	MinterKey         = []byte{0x00}
+	MinterKey = []byte{0x00}
 	// BlockDurFilterKey is used to store avg block duration filter
 	BlockDurFilterKey = []byte("BlockDurFilter")
+	// AnnualUpdateTimestampKey is used to store timestamp of the next annual params update (new year)
+	AnnualUpdateTimestampKey = []byte("AnnualUpdateTimestamp")
 )
 
 // nolint
@@ -25,4 +27,5 @@ const (
 	QueryParameters       = "parameters"
 	QueryInflation        = "inflation"
 	QueryAnnualProvisions = "annual_provisions"
+	QueryBlocksPerYear    = "blocks_per_year"
 )

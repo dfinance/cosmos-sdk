@@ -95,6 +95,14 @@ func (k Keeper) BondedRatio(ctx sdk.Context) sdk.Dec {
 	return k.sk.BondedRatio(ctx)
 }
 
+// LockedRatio implements an alias call to the underlying staking keeper's
+// LockedRatio to be used in BeginBlocker.
+// LockedRatio = LockedAmount / BondedAmount.
+func (k Keeper) LockedRatio(ctx sdk.Context) sdk.Dec {
+	// TODO: update on locking mechanism implementation
+	return sdk.ZeroDec()
+}
+
 // MintCoins implements an alias call to the underlying supply keeper's
 // MintCoins to be used in BeginBlocker.
 func (k Keeper) MintCoins(ctx sdk.Context, newCoins sdk.Coins) error {
@@ -106,8 +114,24 @@ func (k Keeper) MintCoins(ctx sdk.Context, newCoins sdk.Coins) error {
 	return k.supplyKeeper.MintCoins(ctx, types.ModuleName, newCoins)
 }
 
-// AddCollectedFees implements an alias call to the underlying supply keeper's
-// AddCollectedFees to be used in BeginBlocker.
-func (k Keeper) AddCollectedFees(ctx sdk.Context, fees sdk.Coins) error {
-	return k.supplyKeeper.SendCoinsFromModuleToModule(ctx, types.ModuleName, k.feeCollectorName, fees)
+// BurnFeeCoins burns collected fees withing FeeCollector pool by params.FeeBurningRatio.
+func (k Keeper) BurnFeeCoins(ctx sdk.Context) {
+	params := k.GetParams(ctx)
+	mintDenom, burnRatio := params.MintDenom, params.FeeBurningRatio
+
+	// calculate the burning amount
+	feesCollected := k.supplyKeeper.GetModuleAccount(ctx, k.feeCollectorName).GetCoins()
+	feesBurnAmt := sdk.NewDecFromInt(feesCollected.AmountOf(mintDenom)).Mul(burnRatio).TruncateInt()
+	burnCoin := sdk.NewCoin(mintDenom, feesBurnAmt)
+
+	// burn
+	err := k.supplyKeeper.BurnCoins(ctx, k.feeCollectorName, sdk.NewCoins(burnCoin))
+	if err != nil {
+		panic(fmt.Errorf("burning fees %s for %s: %v", burnCoin.String(),k.feeCollectorName,  err))
+	}
+}
+
+// TransferCoinsToFeeCollector transfers coins from the Mint to the FeeCollector module account.
+func (k Keeper) TransferCoinsToFeeCollector(ctx sdk.Context, coins sdk.Coins) error {
+	return k.supplyKeeper.SendCoinsFromModuleToModule(ctx, types.ModuleName, k.feeCollectorName, coins)
 }

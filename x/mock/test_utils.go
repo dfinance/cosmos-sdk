@@ -113,3 +113,44 @@ func SignCheckDeliver(
 
 	return gInfo, res, err
 }
+
+// SignCheckDeliverWithFee is the same as SignCheckDeliver but adding a fixed fee.
+func SignCheckDeliverWithFee(
+	t *testing.T, cdc *codec.Codec, app *baseapp.BaseApp, header abci.Header, msgs []sdk.Msg, feeCoin sdk.Coin,
+	accNums, seq []uint64, expSimPass, expPass bool, priv ...crypto.PrivKey,
+) (sdk.GasInfo, *sdk.Result, error) {
+
+	tx := GenTxWithFee(msgs, feeCoin, accNums, seq, priv...)
+
+	txBytes, err := cdc.MarshalBinaryLengthPrefixed(tx)
+	require.Nil(t, err)
+
+	// Must simulate now as CheckTx doesn't run Msgs anymore
+	_, res, err := app.Simulate(txBytes, tx)
+
+	if expSimPass {
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	} else {
+		require.Error(t, err)
+		require.Nil(t, res)
+	}
+
+	// Simulate a sending a transaction and committing a block
+	app.BeginBlock(abci.RequestBeginBlock{Header: header})
+
+	gInfo, res, err := app.Deliver(tx)
+
+	if expPass {
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	} else {
+		require.Error(t, err)
+		require.Nil(t, res)
+	}
+
+	app.EndBlock(abci.RequestEndBlock{})
+	app.Commit()
+
+	return gInfo, res, err
+}
