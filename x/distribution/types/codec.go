@@ -11,6 +11,7 @@ func RegisterCodec(cdc *codec.Codec) {
 	cdc.RegisterConcrete(MsgSetWithdrawAddress{}, "cosmos-sdk/MsgModifyWithdrawAddress", nil)
 	cdc.RegisterConcrete(PublicTreasuryPoolSpendProposal{}, "cosmos-sdk/PublicTreasuryPoolSpendProposal", nil)
 	cdc.RegisterConcrete(MsgFundPublicTreasuryPool{}, "cosmos-sdk/MsgFundPublicTreasuryPool", nil)
+	cdc.RegisterConcrete(MsgWithdrawFoundationPool{}, "cosmos-sdk/MsgWithdrawFoundationPool", nil)
 }
 
 // ModuleCdc is a generic sealed codec to be used throughout module

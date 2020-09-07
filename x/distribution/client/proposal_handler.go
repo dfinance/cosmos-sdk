@@ -8,5 +8,5 @@ import (
 
 // param change proposal handler
 var (
-	ProposalHandler = govclient.NewProposalHandler(cli.GetCmdSubmitProposal, rest.ProposalRESTHandler)
+	ProposalHandler = govclient.NewProposalHandler(cli.GetCmdSubmitPublicTreasurySpendProposal, rest.ProposalRESTHandler)
 )

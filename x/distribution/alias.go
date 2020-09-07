@@ -83,6 +83,7 @@ var (
 	NewMsgWithdrawDelegatorReward              = types.NewMsgWithdrawDelegatorReward
 	NewMsgWithdrawValidatorCommission          = types.NewMsgWithdrawValidatorCommission
 	NewMsgFundPublicTreasuryPool               = types.NewMsgFundPublicTreasuryPool
+	NewMsgWithdrawFoundationPool               = types.NewMsgWithdrawFoundationPool
 	NewPublicTreasuryPoolSpendProposal         = types.NewPublicTreasuryPoolSpendProposal
 	NewQueryValidatorOutstandingRewardsParams  = types.NewQueryValidatorOutstandingRewardsParams
 	NewQueryValidatorCommissionParams          = types.NewQueryValidatorCommissionParams
@@ -143,6 +144,7 @@ type (
 	MsgSetWithdrawAddress                  = types.MsgSetWithdrawAddress
 	MsgWithdrawDelegatorReward             = types.MsgWithdrawDelegatorReward
 	MsgWithdrawValidatorCommission         = types.MsgWithdrawValidatorCommission
+	MsgWithdrawFoundationPool              = types.MsgWithdrawFoundationPool
 	PublicTreasuryPoolSpendProposal        = types.PublicTreasuryPoolSpendProposal
 	QueryValidatorOutstandingRewardsParams = types.QueryValidatorOutstandingRewardsParams
 	QueryValidatorCommissionParams         = types.QueryValidatorCommissionParams

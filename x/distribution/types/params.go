@@ -27,6 +27,7 @@ var (
 	ParamKeyBonusProposerReward = []byte("BonusProposerReward")
 	//
 	ParamKeyWithdrawAddrEnabled = []byte("WithdrawAddrEnabled")
+	ParamKeyFoundationNominees  = []byte("FoundationNominees")
 )
 
 // Params defines the set of distribution parameters.
@@ -49,7 +50,8 @@ type Params struct {
 	BonusProposerReward sdk.Dec `json:"bonus_proposer_reward" yaml:"bonus_proposer_reward"`
 
 	//
-	WithdrawAddrEnabled bool `json:"withdraw_addr_enabled" yaml:"withdraw_addr_enabled"`
+	WithdrawAddrEnabled bool             `json:"withdraw_addr_enabled" yaml:"withdraw_addr_enabled"`
+	FoundationNominees  []sdk.AccAddress `json:"foundation_nominees" yaml:"foundation_nominees"`
 }
 
 // ParamKeyTable returns the parameter key table.
@@ -71,6 +73,7 @@ func DefaultParams() Params {
 		BonusProposerReward: sdk.NewDecWithPrec(4, 2), // 4%
 		//
 		WithdrawAddrEnabled: true,
+		FoundationNominees: make([]sdk.AccAddress, 0),
 	}
 }
 
@@ -90,6 +93,7 @@ func (p *Params) ParamSetPairs() params.ParamSetPairs {
 		params.NewParamSetPair(ParamKeyBaseProposerReward, &p.BaseProposerReward, validateBaseProposerReward),
 		params.NewParamSetPair(ParamKeyBonusProposerReward, &p.BonusProposerReward, validateBonusProposerReward),
 		params.NewParamSetPair(ParamKeyWithdrawAddrEnabled, &p.WithdrawAddrEnabled, validateWithdrawAddrEnabled),
+		params.NewParamSetPair(ParamKeyFoundationNominees, &p.FoundationNominees, validateFoundationNominees),
 	}
 }
 
@@ -114,6 +118,9 @@ func (p Params) ValidateBasic() error {
 		return err
 	}
 	if err := validateWithdrawAddrEnabled(p.BonusProposerReward); err != nil {
+		return err
+	}
+	if err := validateFoundationNominees(p.FoundationNominees); err != nil {
 		return err
 	}
 
@@ -177,6 +184,23 @@ func validateWithdrawAddrEnabled(i interface{}) error {
 	_, ok := i.(bool)
 	if !ok {
 		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	return nil
+}
+
+func validateFoundationNominees(i interface{}) error {
+	const paramName = "foundation nominees"
+
+	v, ok := i.([]sdk.AccAddress)
+	if !ok {
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	for i, vv := range v {
+		if vv.Empty() {
+			return fmt.Errorf("%s: address [%d]: empty", paramName, i)
+		}
 	}
 
 	return nil

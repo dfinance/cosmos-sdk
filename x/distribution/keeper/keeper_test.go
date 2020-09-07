@@ -3,12 +3,9 @@ package keeper
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 )
 
 func TestSetWithdrawAddr(t *testing.T) {
@@ -94,21 +91,4 @@ func TestGetTotalRewards(t *testing.T) {
 	totalRewards := keeper.GetTotalRewards(ctx)
 
 	require.Equal(t, expectedRewards, totalRewards)
-}
-
-func TestFundCommunityPool(t *testing.T) {
-	// nolint dogsled
-	ctx, _, bk, keeper, _, _, _ := CreateTestInputAdvanced(t, false, 1000, types.DefaultParams())
-
-	amount := sdk.NewCoins(sdk.NewInt64Coin("stake", 100))
-	_ = bk.SetCoins(ctx, delAddr1, amount)
-
-	initPool := keeper.GetRewardPools(ctx)
-	assert.Empty(t, initPool.PublicTreasuryPool)
-
-	err := keeper.FundPublicTreasuryPool(ctx, amount, delAddr1)
-	assert.Nil(t, err)
-
-	assert.Equal(t, initPool.PublicTreasuryPool.Add(sdk.NewDecCoinsFromCoins(amount...)...), keeper.GetRewardPools(ctx).PublicTreasuryPool)
-	assert.Empty(t, bk.GetCoins(ctx, delAddr1))
 }

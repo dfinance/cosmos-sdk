@@ -3,19 +3,10 @@ package distribution
 import (
 	"testing"
 
-	"github.com/tendermint/tendermint/crypto/ed25519"
-
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
-)
-
-var (
-	delPk1   = ed25519.GenPrivKey().PubKey()
-	delAddr1 = sdk.AccAddress(delPk1.Address())
-
-	amount = sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(1)))
 )
 
 func testProposal(recipient sdk.AccAddress, amount sdk.Coins) types.PublicTreasuryPoolSpendProposal {

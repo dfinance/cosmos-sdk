@@ -6,6 +6,26 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
+// RewardPoolName defines reward pool name.
+type RewardPoolName string
+
+const (
+	LiquidityProvidersPoolName RewardPoolName = "LiquidityProvidersPool"
+	FoundationPoolName         RewardPoolName = "FoundationPool"
+	PublicTreasuryPoolName     RewardPoolName = "PublicTreasuryPool"
+	HARPName                   RewardPoolName = "HARP"
+)
+
+// IsValid checks RewardPoolName enum.
+func (n RewardPoolName) IsValid() bool {
+	switch n {
+	case LiquidityProvidersPoolName, FoundationPoolName, PublicTreasuryPoolName, HARPName:
+		return true
+	default:
+		return false
+	}
+}
+
 // RewardPools contains collected rewards distributed by pools.
 // RewardPools aren't module accounts, however its coins are held in the distribution module account.
 // Thus the RewardPools must be reduced separately from the SendCoinsFromModuleToAccount call.

@@ -2,6 +2,7 @@ package keeper
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 )
 
@@ -50,4 +51,60 @@ func (k Keeper) AppendToPublicTreasuryPool(ctx sdk.Context, coins sdk.DecCoins) 
 	pools := k.GetRewardPools(ctx)
 	pools.PublicTreasuryPool = pools.PublicTreasuryPool.Add(coins...)
 	k.SetRewardPools(ctx, pools)
+}
+
+// DistributeFromFoundationPoolToWallet distributes funds from the distribution module account to
+// a receiver address while updating the FoundationPool.
+func (k Keeper) DistributeFromFoundationPoolToWallet(ctx sdk.Context, amount sdk.Coins, receiveAddr sdk.AccAddress) error {
+	pools := k.GetRewardPools(ctx)
+
+	newPool, negative := pools.FoundationPool.SafeSub(sdk.NewDecCoinsFromCoins(amount...))
+	if negative {
+		return sdkerrors.Wrap(types.ErrBadDistribution, "FoundationPool sub")
+	}
+	pools.FoundationPool = newPool
+
+	err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, receiveAddr, amount)
+	if err != nil {
+		return err
+	}
+
+	k.SetRewardPools(ctx, pools)
+
+	return nil
+}
+
+// DistributeFromFoundationPoolToPool transfers FoundationPool funds to an other distribution pool.
+func (k Keeper) DistributeFromFoundationPoolToPool(ctx sdk.Context, amount sdk.Coins, receivePool types.RewardPoolName) error {
+	if amount.IsAnyNegative() {
+		return sdkerrors.Wrapf(types.ErrBadDistribution, "negative amount: %s", amount)
+	}
+
+	pools := k.GetRewardPools(ctx)
+	poolsSupply := pools.TotalCoins()
+
+	amountDecCoins := sdk.NewDecCoinsFromCoins(amount...)
+	newPool, negative := pools.FoundationPool.SafeSub(amountDecCoins)
+	if negative {
+		return sdkerrors.Wrap(types.ErrBadDistribution, "FoundationPool sub")
+	}
+	pools.FoundationPool = newPool
+
+	switch receivePool {
+	case types.LiquidityProvidersPoolName:
+		pools.LiquidityProvidersPool = pools.LiquidityProvidersPool.Add(amountDecCoins...)
+	case types.PublicTreasuryPoolName:
+		pools.PublicTreasuryPool = pools.PublicTreasuryPool.Add(amountDecCoins...)
+	case types.HARPName:
+		pools.HARP = pools.HARP.Add(amountDecCoins...)
+	default:
+		return sdkerrors.Wrapf(types.ErrBadDistribution, "unknown receivePool: %s", receivePool)
+	}
+
+	if !pools.TotalCoins().IsEqual(poolsSupply) {
+		return sdkerrors.Wrap(types.ErrBadDistribution, "sanity check failed")
+	}
+	k.SetRewardPools(ctx, pools)
+
+	return nil
 }

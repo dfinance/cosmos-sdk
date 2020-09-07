@@ -49,6 +49,7 @@ func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
 		GetCmdSetWithdrawAddr(cdc),
 		GetCmdWithdrawAllRewards(cdc, storeKey),
 		GetCmdFundPublicTreasuryPool(cdc),
+		GetCmdFoundationPoolWithdraw(cdc),
 	)...)
 
 	return distTxCmd
@@ -201,8 +202,8 @@ $ %s tx distribution set-withdraw-addr cosmos1gghjut3ccd8ay0zduzj64hwre2fxs9ld75
 	}
 }
 
-// GetCmdSubmitProposal implements the command to submit a public-treasury-pool-spend proposal
-func GetCmdSubmitProposal(cdc *codec.Codec) *cobra.Command {
+// GetCmdSubmitPublicTreasurySpendProposal implements the command to submit a public-treasury-pool-spend proposal
+func GetCmdSubmitPublicTreasurySpendProposal(cdc *codec.Codec) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "public-treasury-pool-spend [proposal-file]",
 		Args:  cobra.ExactArgs(1),
@@ -296,4 +297,55 @@ $ %s tx distribution fund-public-treasury-pool 100uatom --from mykey
 			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}
+}
+
+// GetCmdFoundationPoolWithdraw implements the command to transfer funds from the foundation-pool to wallet/other pool.
+func GetCmdFoundationPoolWithdraw(cdc *codec.Codec) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "foundation-pool-withdraw [amount] [recipient]",
+		Args:  cobra.ExactArgs(2),
+		Short: "Transfers specified amount of foundation pool funds to the recipient (wallet address / other pool name)",
+		Long: strings.TrimSpace(
+			fmt.Sprintf(`Transfers specified amount of foundation pool funds to the recipient (wallet address / other pool name)
+
+Example:
+$ %s tx distribution foundation-pool-withdraw 100uatom cosmos1s5afhd6gxevu37mkqcvvsj8qeylhn0rz46zdlq --from nomineeKey
+$ %s tx distribution foundation-pool-withdraw 100uatom [LiquidityProvidersPool|PublicTreasuryPool|HARP] --from nomineeKey
+`,
+				version.ClientName, version.ClientName,
+			),
+		),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := auth.NewTxBuilderFromCLI(inBuf).WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := context.NewCLIContextWithInput(inBuf).WithCodec(cdc)
+
+			nomineeAddr := cliCtx.GetFromAddress()
+
+			amount, err := sdk.ParseCoins(args[0])
+			if err != nil {
+				return err
+			}
+
+			recipientAddr, recipientPoolName := sdk.AccAddress{}, types.RewardPoolName("")
+			if poolName := types.RewardPoolName(args[1]); poolName.IsValid() {
+				recipientPoolName = poolName
+			} else {
+				accAddr, err := sdk.AccAddressFromBech32(args[1])
+				if err != nil {
+					return err
+				}
+				recipientAddr = accAddr
+			}
+
+			msg := types.NewMsgWithdrawFoundationPool(nomineeAddr, recipientAddr, recipientPoolName, amount)
+			if err := msg.ValidateBasic(); err != nil {
+				return err
+			}
+
+			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+		},
+	}
+
+	return cmd
 }

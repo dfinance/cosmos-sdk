@@ -1,6 +1,8 @@
 package distribution
 
 import (
+	"fmt"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/distribution/keeper"
@@ -24,6 +26,9 @@ func NewHandler(k keeper.Keeper) sdk.Handler {
 
 		case types.MsgFundPublicTreasuryPool:
 			return handleMsgFundPublicTreasuryPool(ctx, msg, k)
+
+		case types.MsgWithdrawFoundationPool:
+			return handleMsgWithdrawFoundationPool(ctx, msg, k)
 
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distribution message type: %T", msg)
@@ -98,6 +103,36 @@ func handleMsgFundPublicTreasuryPool(ctx sdk.Context, msg types.MsgFundPublicTre
 	)
 
 	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
+}
+
+func handleMsgWithdrawFoundationPool(ctx sdk.Context, msg types.MsgWithdrawFoundationPool, k keeper.Keeper) (*sdk.Result, error) {
+	params := k.GetParams(ctx)
+
+	isNominee := false
+	for _, nominee := range params.FoundationNominees {
+		if msg.NomineeAddr.Equals(nominee) {
+			isNominee = true
+			break
+		}
+	}
+	if !isNominee {
+		return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "signer is not a nominee account: %s", msg.NomineeAddr)
+	}
+
+	if !msg.RecipientAddr.Empty() {
+		if err := k.DistributeFromFoundationPoolToWallet(ctx, msg.Amount, msg.RecipientAddr); err != nil {
+			return nil, err
+		}
+		k.Logger(ctx).Info(fmt.Sprintf("transferred %s from the foundation pool to recipient %s (authorized by %s)", msg.Amount, msg.RecipientAddr, msg.NomineeAddr))
+		return nil, nil
+	}
+
+	if err := k.DistributeFromFoundationPoolToPool(ctx, msg.Amount, msg.RecipientPool); err != nil {
+		return nil, err
+	}
+	k.Logger(ctx).Info(fmt.Sprintf("transferred %s from the foundation pool to recipient %s (authorized by %s)", msg.Amount, msg.RecipientPool, msg.NomineeAddr))
+
+	return nil, nil
 }
 
 func NewPublicTreasuryPoolSpendProposalHandler(k Keeper) govtypes.Handler {
