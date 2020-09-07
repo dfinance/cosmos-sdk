@@ -76,6 +76,7 @@ func (k Keeper) AllocateTokens(
 			pools.PublicTreasuryPool[i] = treasuryCoin
 		}
 	}
+	k.SetRewardPools(ctx, pools)
 
 	// distribute validatorsPool
 
