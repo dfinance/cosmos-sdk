@@ -18,6 +18,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/distribution/client/rest"
 	"github.com/cosmos/cosmos-sdk/x/distribution/simulation"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
+	"github.com/cosmos/cosmos-sdk/x/mint"
 	sim "github.com/cosmos/cosmos-sdk/x/simulation"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 )
@@ -82,17 +83,20 @@ type AppModule struct {
 	accountKeeper types.AccountKeeper
 	stakingKeeper stakingkeeper.Keeper
 	supplyKeeper  types.SupplyKeeper
+	mintKeeper    mint.Keeper
 }
 
 // NewAppModule creates a new AppModule object
 func NewAppModule(keeper Keeper, accountKeeper types.AccountKeeper,
-	supplyKeeper types.SupplyKeeper, stakingKeeper stakingkeeper.Keeper) AppModule {
+	supplyKeeper types.SupplyKeeper, stakingKeeper stakingkeeper.Keeper,
+	mintKeeper mint.Keeper) AppModule {
 	return AppModule{
 		AppModuleBasic: AppModuleBasic{},
 		keeper:         keeper,
 		accountKeeper:  accountKeeper,
 		supplyKeeper:   supplyKeeper,
 		stakingKeeper:  stakingKeeper,
+		mintKeeper:     mintKeeper,
 	}
 }
 
@@ -144,7 +148,7 @@ func (am AppModule) ExportGenesis(ctx sdk.Context) json.RawMessage {
 
 // BeginBlock returns the begin blocker for the distribution module.
 func (am AppModule) BeginBlock(ctx sdk.Context, req abci.RequestBeginBlock) {
-	BeginBlocker(ctx, req, am.keeper)
+	BeginBlocker(ctx, req, am.keeper, am.mintKeeper)
 }
 
 // EndBlock returns the end blocker for the distribution module. It returns no validator

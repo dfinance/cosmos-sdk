@@ -48,7 +48,7 @@ func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
 		GetCmdWithdrawRewards(cdc),
 		GetCmdSetWithdrawAddr(cdc),
 		GetCmdWithdrawAllRewards(cdc, storeKey),
-		GetCmdFundCommunityPool(cdc),
+		GetCmdFundPublicTreasuryPool(cdc),
 	)...)
 
 	return distTxCmd
@@ -201,23 +201,23 @@ $ %s tx distribution set-withdraw-addr cosmos1gghjut3ccd8ay0zduzj64hwre2fxs9ld75
 	}
 }
 
-// GetCmdSubmitProposal implements the command to submit a community-pool-spend proposal
+// GetCmdSubmitProposal implements the command to submit a public-treasury-pool-spend proposal
 func GetCmdSubmitProposal(cdc *codec.Codec) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "community-pool-spend [proposal-file]",
+		Use:   "public-treasury-pool-spend [proposal-file]",
 		Args:  cobra.ExactArgs(1),
-		Short: "Submit a community pool spend proposal",
+		Short: "Submit a public treasury pool spend proposal",
 		Long: strings.TrimSpace(
-			fmt.Sprintf(`Submit a community pool spend proposal along with an initial deposit.
+			fmt.Sprintf(`Submit a public treasury pool spend proposal along with an initial deposit.
 The proposal details must be supplied via a JSON file.
 
 Example:
-$ %s tx gov submit-proposal community-pool-spend <path/to/proposal.json> --from=<key_or_address>
+$ %s tx gov submit-proposal public-treasury-pool-spend <path/to/proposal.json> --from=<key_or_address>
 
 Where proposal.json contains:
 
 {
-  "title": "Community Pool Spend",
+  "title": "PublicTreasury Pool Spend",
   "description": "Pay me some Atoms!",
   "recipient": "cosmos1s5afhd6gxevu37mkqcvvsj8qeylhn0rz46zdlq",
   "amount": [
@@ -248,7 +248,7 @@ Where proposal.json contains:
 			}
 
 			from := cliCtx.GetFromAddress()
-			content := types.NewCommunityPoolSpendProposal(proposal.Title, proposal.Description, proposal.Recipient, proposal.Amount)
+			content := types.NewPublicTreasuryPoolSpendProposal(proposal.Title, proposal.Description, proposal.Recipient, proposal.Amount)
 
 			msg := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
 			if err := msg.ValidateBasic(); err != nil {
@@ -262,18 +262,17 @@ Where proposal.json contains:
 	return cmd
 }
 
-// GetCmdFundCommunityPool returns a command implementation that supports directly
-// funding the community pool.
-func GetCmdFundCommunityPool(cdc *codec.Codec) *cobra.Command {
+// GetCmdFundPublicTreasuryPool returns a command implementation that supports directly funding the public treasury pool.
+func GetCmdFundPublicTreasuryPool(cdc *codec.Codec) *cobra.Command {
 	return &cobra.Command{
-		Use:   "fund-community-pool [amount]",
+		Use:   "fund-public-treasury-pool [amount]",
 		Args:  cobra.ExactArgs(1),
-		Short: "Funds the community pool with the specified amount",
+		Short: "Funds the public treasury pool with the specified amount",
 		Long: strings.TrimSpace(
-			fmt.Sprintf(`Funds the community pool with the specified amount
+			fmt.Sprintf(`Funds the public treasury pool with the specified amount
 
 Example:
-$ %s tx distribution fund-community-pool 100uatom --from mykey
+$ %s tx distribution fund-public-treasury-pool 100uatom --from mykey
 `,
 				version.ClientName,
 			),
@@ -289,7 +288,7 @@ $ %s tx distribution fund-community-pool 100uatom --from mykey
 				return err
 			}
 
-			msg := types.NewMsgFundCommunityPool(amount, depositorAddr)
+			msg := types.NewMsgFundPublicTreasuryPool(amount, depositorAddr)
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}

@@ -11,18 +11,18 @@ import (
 )
 
 const (
-	keyCommunityTax        = "communitytax"
-	keyBaseProposerReward  = "baseproposerreward"
-	keyBonusProposerReward = "bonusproposerreward"
+	keyPublicTreasuryCapacity = "PublicTreasuryPoolCapacity"
+	keyBaseProposerReward     = "BaseProposerReward"
+	keyBonusProposerReward    = "BonusProposerReward"
 )
 
 // ParamChanges defines the parameters that can be modified by param change proposals
 // on the simulation
 func ParamChanges(r *rand.Rand) []simulation.ParamChange {
 	return []simulation.ParamChange{
-		simulation.NewSimParamChange(types.ModuleName, keyCommunityTax,
+		simulation.NewSimParamChange(types.ModuleName, keyPublicTreasuryCapacity,
 			func(r *rand.Rand) string {
-				return fmt.Sprintf("\"%s\"", GenCommunityTax(r))
+				return fmt.Sprintf("\"%s\"", GenPublicTreasuryCapacity(r))
 			},
 		),
 		simulation.NewSimParamChange(types.ModuleName, keyBaseProposerReward,

@@ -23,7 +23,7 @@ func RegisterRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute string)
 // ProposalRESTHandler returns a ProposalRESTHandler that exposes the community pool spend REST handler with a given sub-route.
 func ProposalRESTHandler(cliCtx context.CLIContext) govrest.ProposalRESTHandler {
 	return govrest.ProposalRESTHandler{
-		SubRoute: "community_pool_spend",
+		SubRoute: "public_treasury_pool_spend",
 		Handler:  postProposalHandlerFn(cliCtx),
 	}
 }
@@ -40,7 +40,7 @@ func postProposalHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		content := types.NewCommunityPoolSpendProposal(req.Title, req.Description, req.Recipient, req.Amount)
+		content := types.NewPublicTreasuryPoolSpendProposal(req.Title, req.Description, req.Recipient, req.Amount)
 
 		msg := gov.NewMsgSubmitProposal(content, req.Deposit, req.Proposer)
 		if err := msg.ValidateBasic(); err != nil {

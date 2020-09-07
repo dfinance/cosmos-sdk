@@ -9,22 +9,23 @@ import (
 // nolint
 
 const (
-	ModuleName                       = types.ModuleName
-	StoreKey                         = types.StoreKey
-	RouterKey                        = types.RouterKey
-	QuerierRoute                     = types.QuerierRoute
-	ProposalTypeCommunityPoolSpend   = types.ProposalTypeCommunityPoolSpend
-	QueryParams                      = types.QueryParams
-	QueryValidatorOutstandingRewards = types.QueryValidatorOutstandingRewards
-	QueryValidatorCommission         = types.QueryValidatorCommission
-	QueryValidatorSlashes            = types.QueryValidatorSlashes
-	QueryDelegationRewards           = types.QueryDelegationRewards
-	QueryDelegatorTotalRewards       = types.QueryDelegatorTotalRewards
-	QueryDelegatorValidators         = types.QueryDelegatorValidators
-	QueryWithdrawAddr                = types.QueryWithdrawAddr
-	QueryCommunityPool               = types.QueryCommunityPool
-	DefaultParamspace                = types.DefaultParamspace
-	TypeMsgFundCommunityPool         = types.TypeMsgFundCommunityPool
+	ModuleName                          = types.ModuleName
+	StoreKey                            = types.StoreKey
+	RouterKey                           = types.RouterKey
+	QuerierRoute                        = types.QuerierRoute
+	ProposalTypePublicTreasuryPoolSpend = types.ProposalTypePublicTreasuryPoolSpend
+	QueryParams                         = types.QueryParams
+	QueryValidatorOutstandingRewards    = types.QueryValidatorOutstandingRewards
+	QueryValidatorCommission            = types.QueryValidatorCommission
+	QueryValidatorSlashes               = types.QueryValidatorSlashes
+	QueryDelegationRewards              = types.QueryDelegationRewards
+	QueryDelegatorTotalRewards          = types.QueryDelegatorTotalRewards
+	QueryDelegatorValidators            = types.QueryDelegatorValidators
+	QueryWithdrawAddr                   = types.QueryWithdrawAddr
+	QueryPublicTreasury                 = types.QueryPublicTreasury
+	QueryFoundationPool                 = types.QueryFoundationPool
+	DefaultParamspace                   = types.DefaultParamspace
+	TypeMsgFundPublicTreasuryPool       = types.TypeMsgFundPublicTreasuryPool
 )
 
 var (
@@ -53,7 +54,7 @@ var (
 	GetValidatorSlashEventPrefix               = types.GetValidatorSlashEventPrefix
 	GetValidatorSlashEventKeyPrefix            = types.GetValidatorSlashEventKeyPrefix
 	GetValidatorSlashEventKey                  = types.GetValidatorSlashEventKey
-	HandleCommunityPoolSpendProposal           = keeper.HandleCommunityPoolSpendProposal
+	HandlePublicTreasuryPoolSpendProposal      = keeper.HandlePublicTreasuryPoolSpendProposal
 	NewQuerier                                 = keeper.NewQuerier
 	MakeTestCodec                              = keeper.MakeTestCodec
 	CreateTestInputDefault                     = keeper.CreateTestInputDefault
@@ -74,15 +75,15 @@ var (
 	ErrBadDistribution                         = types.ErrBadDistribution
 	ErrInvalidProposalAmount                   = types.ErrInvalidProposalAmount
 	ErrEmptyProposalRecipient                  = types.ErrEmptyProposalRecipient
-	InitialFeePool                             = types.InitialFeePool
+	InitialRewardPools                         = types.InitialRewardPools
 	NewGenesisState                            = types.NewGenesisState
 	DefaultGenesisState                        = types.DefaultGenesisState
 	ValidateGenesis                            = types.ValidateGenesis
 	NewMsgSetWithdrawAddress                   = types.NewMsgSetWithdrawAddress
 	NewMsgWithdrawDelegatorReward              = types.NewMsgWithdrawDelegatorReward
 	NewMsgWithdrawValidatorCommission          = types.NewMsgWithdrawValidatorCommission
-	MsgFundCommunityPool                       = types.NewMsgFundCommunityPool
-	NewCommunityPoolSpendProposal              = types.NewCommunityPoolSpendProposal
+	NewMsgFundPublicTreasuryPool               = types.NewMsgFundPublicTreasuryPool
+	NewPublicTreasuryPoolSpendProposal         = types.NewPublicTreasuryPoolSpendProposal
 	NewQueryValidatorOutstandingRewardsParams  = types.NewQueryValidatorOutstandingRewardsParams
 	NewQueryValidatorCommissionParams          = types.NewQueryValidatorCommissionParams
 	NewQueryValidatorSlashesParams             = types.NewQueryValidatorSlashesParams
@@ -97,7 +98,7 @@ var (
 	NewValidatorSlashEvent                     = types.NewValidatorSlashEvent
 
 	// variable aliases
-	FeePoolKey                           = types.FeePoolKey
+	RewardPoolsKey                       = types.RewardPoolsKey
 	ProposerKey                          = types.ProposerKey
 	ValidatorOutstandingRewardsPrefix    = types.ValidatorOutstandingRewardsPrefix
 	DelegatorWithdrawAddrPrefix          = types.DelegatorWithdrawAddrPrefix
@@ -106,10 +107,12 @@ var (
 	ValidatorCurrentRewardsPrefix        = types.ValidatorCurrentRewardsPrefix
 	ValidatorAccumulatedCommissionPrefix = types.ValidatorAccumulatedCommissionPrefix
 	ValidatorSlashEventPrefix            = types.ValidatorSlashEventPrefix
-	ParamStoreKeyCommunityTax            = types.ParamStoreKeyCommunityTax
-	ParamStoreKeyBaseProposerReward      = types.ParamStoreKeyBaseProposerReward
-	ParamStoreKeyBonusProposerReward     = types.ParamStoreKeyBonusProposerReward
-	ParamStoreKeyWithdrawAddrEnabled     = types.ParamStoreKeyWithdrawAddrEnabled
+	ParamKeyLiquidityProvidersPoolTax    = types.ParamKeyLiquidityProvidersPoolTax
+	ParamKeyPublicTreasuryPoolTax        = types.ParamKeyPublicTreasuryPoolTax
+	ParamKeyHARPTax                      = types.ParamKeyHARPTax
+	ParamKeyBaseProposerReward           = types.ParamKeyBaseProposerReward
+	ParamKeyBonusProposerReward          = types.ParamKeyBonusProposerReward
+	ParamKeyWithdrawAddrEnabled          = types.ParamKeyWithdrawAddrEnabled
 	ModuleCdc                            = types.ModuleCdc
 	EventTypeSetWithdrawAddress          = types.EventTypeSetWithdrawAddress
 	EventTypeRewards                     = types.EventTypeRewards
@@ -127,7 +130,7 @@ type (
 	Hooks                                  = keeper.Hooks
 	Keeper                                 = keeper.Keeper
 	DelegatorStartingInfo                  = types.DelegatorStartingInfo
-	FeePool                                = types.FeePool
+	RewardPools                            = types.RewardPools
 	DelegatorWithdrawInfo                  = types.DelegatorWithdrawInfo
 	ValidatorOutstandingRewardsRecord      = types.ValidatorOutstandingRewardsRecord
 	ValidatorAccumulatedCommissionRecord   = types.ValidatorAccumulatedCommissionRecord
@@ -140,7 +143,7 @@ type (
 	MsgSetWithdrawAddress                  = types.MsgSetWithdrawAddress
 	MsgWithdrawDelegatorReward             = types.MsgWithdrawDelegatorReward
 	MsgWithdrawValidatorCommission         = types.MsgWithdrawValidatorCommission
-	CommunityPoolSpendProposal             = types.CommunityPoolSpendProposal
+	PublicTreasuryPoolSpendProposal        = types.PublicTreasuryPoolSpendProposal
 	QueryValidatorOutstandingRewardsParams = types.QueryValidatorOutstandingRewardsParams
 	QueryValidatorCommissionParams         = types.QueryValidatorCommissionParams
 	QueryValidatorSlashesParams            = types.QueryValidatorSlashesParams

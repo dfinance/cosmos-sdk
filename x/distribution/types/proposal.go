@@ -9,45 +9,47 @@ import (
 )
 
 const (
-	// ProposalTypeCommunityPoolSpend defines the type for a CommunityPoolSpendProposal
-	ProposalTypeCommunityPoolSpend = "CommunityPoolSpend"
+	// ProposalTypePublicTreasuryPoolSpend defines the type for a PublicTreasuryPoolSpendProposal
+	ProposalTypePublicTreasuryPoolSpend = "PublicTreasuryPoolSpend"
 )
 
-// Assert CommunityPoolSpendProposal implements govtypes.Content at compile-time
-var _ govtypes.Content = CommunityPoolSpendProposal{}
+// Assert PublicTreasuryPoolSpendProposal implements govtypes.Content at compile-time
+var _ govtypes.Content = PublicTreasuryPoolSpendProposal{}
 
 func init() {
-	govtypes.RegisterProposalType(ProposalTypeCommunityPoolSpend)
-	govtypes.RegisterProposalTypeCodec(CommunityPoolSpendProposal{}, "cosmos-sdk/CommunityPoolSpendProposal")
+	govtypes.RegisterProposalType(ProposalTypePublicTreasuryPoolSpend)
+	govtypes.RegisterProposalTypeCodec(PublicTreasuryPoolSpendProposal{}, "cosmos-sdk/PublicTreasuryPoolSpendProposal")
 }
 
-// CommunityPoolSpendProposal spends from the community pool
-type CommunityPoolSpendProposal struct {
+// PublicTreasuryPoolSpendProposal spends from the PublicTreasury pool to any account.
+type PublicTreasuryPoolSpendProposal struct {
 	Title       string         `json:"title" yaml:"title"`
 	Description string         `json:"description" yaml:"description"`
 	Recipient   sdk.AccAddress `json:"recipient" yaml:"recipient"`
 	Amount      sdk.Coins      `json:"amount" yaml:"amount"`
 }
 
-// NewCommunityPoolSpendProposal creates a new community pool spned proposal.
-func NewCommunityPoolSpendProposal(title, description string, recipient sdk.AccAddress, amount sdk.Coins) CommunityPoolSpendProposal {
-	return CommunityPoolSpendProposal{title, description, recipient, amount}
+// NewPublicTreasuryPoolSpendProposal creates a new PublicTreasury pool spend proposal.
+func NewPublicTreasuryPoolSpendProposal(title, description string, recipient sdk.AccAddress, amount sdk.Coins) PublicTreasuryPoolSpendProposal {
+	return PublicTreasuryPoolSpendProposal{title, description, recipient, amount}
 }
 
-// GetTitle returns the title of a community pool spend proposal.
-func (csp CommunityPoolSpendProposal) GetTitle() string { return csp.Title }
+// GetTitle returns the title of a PublicTreasury pool spend proposal.
+func (csp PublicTreasuryPoolSpendProposal) GetTitle() string { return csp.Title }
 
-// GetDescription returns the description of a community pool spend proposal.
-func (csp CommunityPoolSpendProposal) GetDescription() string { return csp.Description }
+// GetDescription returns the description of a PublicTreasury pool spend proposal.
+func (csp PublicTreasuryPoolSpendProposal) GetDescription() string { return csp.Description }
 
-// GetDescription returns the routing key of a community pool spend proposal.
-func (csp CommunityPoolSpendProposal) ProposalRoute() string { return RouterKey }
+// GetDescription returns the routing key of a PublicTreasury pool spend proposal.
+func (csp PublicTreasuryPoolSpendProposal) ProposalRoute() string { return RouterKey }
 
-// ProposalType returns the type of a community pool spend proposal.
-func (csp CommunityPoolSpendProposal) ProposalType() string { return ProposalTypeCommunityPoolSpend }
+// ProposalType returns the type of a PublicTreasury pool spend proposal.
+func (csp PublicTreasuryPoolSpendProposal) ProposalType() string {
+	return ProposalTypePublicTreasuryPoolSpend
+}
 
 // ValidateBasic runs basic stateless validity checks
-func (csp CommunityPoolSpendProposal) ValidateBasic() error {
+func (csp PublicTreasuryPoolSpendProposal) ValidateBasic() error {
 	err := govtypes.ValidateAbstract(csp)
 	if err != nil {
 		return err
@@ -63,9 +65,9 @@ func (csp CommunityPoolSpendProposal) ValidateBasic() error {
 }
 
 // String implements the Stringer interface.
-func (csp CommunityPoolSpendProposal) String() string {
+func (csp PublicTreasuryPoolSpendProposal) String() string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf(`Community Pool Spend Proposal:
+	b.WriteString(fmt.Sprintf(`PublicTreasuryPool Spend Proposal:
   Title:       %s
   Description: %s
   Recipient:   %s

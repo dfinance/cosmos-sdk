@@ -159,47 +159,19 @@ func validateMintDenom(i interface{}) error {
 }
 
 func validateInflationMax(i interface{}) error {
-	const paramName = "max inflation"
-
-	v, ok := i.(sdk.Dec)
-	if !ok {
-		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
-	}
-
-	return CheckRatioVariable(paramName, v)
+	return CheckRatioVariable("max inflation", i)
 }
 
 func validateInflationMin(i interface{}) error {
-	const paramName = "min inflation"
-
-	v, ok := i.(sdk.Dec)
-	if !ok {
-		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
-	}
-
-	return CheckRatioVariable(paramName, v)
+	return CheckRatioVariable("min inflation", i)
 }
 
 func validateFeeBurningRatio(i interface{}) error {
-	const paramName = "fee burning ratio"
-
-	v, ok := i.(sdk.Dec)
-	if !ok {
-		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
-	}
-
-	return CheckRatioVariable(paramName, v)
+	return CheckRatioVariable("fee burning ratio", i)
 }
 
 func validateInfPwrBondedLockedRatio(i interface{}) error {
-	const paramName = "inflation power bonded/locked ratio"
-
-	v, ok := i.(sdk.Dec)
-	if !ok {
-		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
-	}
-
-	return CheckRatioVariable(paramName, v)
+	return CheckRatioVariable("inflation power bonded/locked ratio", i)
 }
 
 func validateFoundationAllocationRatio(i interface{}) error {

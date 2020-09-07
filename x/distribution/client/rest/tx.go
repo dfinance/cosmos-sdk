@@ -41,8 +41,8 @@ func registerTxRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute strin
 
 	// Fund the community pool
 	r.HandleFunc(
-		"/distribution/community_pool",
-		fundCommunityPoolHandlerFn(cliCtx),
+		"/distribution/public_treasury_pool",
+		fundPublicTreasuryPoolHandlerFn(cliCtx),
 	).Methods("POST")
 
 }
@@ -188,7 +188,7 @@ func withdrawValidatorRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerFu
 	}
 }
 
-func fundCommunityPoolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func fundPublicTreasuryPoolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req fundCommunityPoolReq
 		if !rest.ReadRESTReq(w, r, cliCtx.Codec, &req) {
@@ -206,7 +206,7 @@ func fundCommunityPoolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		msg := types.NewMsgFundCommunityPool(req.Amount, fromAddr)
+		msg := types.NewMsgFundPublicTreasuryPool(req.Amount, fromAddr)
 		if err := msg.ValidateBasic(); err != nil {
 			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
 			return

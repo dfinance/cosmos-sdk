@@ -22,8 +22,8 @@ func NewHandler(k keeper.Keeper) sdk.Handler {
 		case types.MsgWithdrawValidatorCommission:
 			return handleMsgWithdrawValidatorCommission(ctx, msg, k)
 
-		case types.MsgFundCommunityPool:
-			return handleMsgFundCommunityPool(ctx, msg, k)
+		case types.MsgFundPublicTreasuryPool:
+			return handleMsgFundPublicTreasuryPool(ctx, msg, k)
 
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distribution message type: %T", msg)
@@ -84,8 +84,8 @@ func handleMsgWithdrawValidatorCommission(ctx sdk.Context, msg types.MsgWithdraw
 	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
 }
 
-func handleMsgFundCommunityPool(ctx sdk.Context, msg types.MsgFundCommunityPool, k keeper.Keeper) (*sdk.Result, error) {
-	if err := k.FundCommunityPool(ctx, msg.Amount, msg.Depositor); err != nil {
+func handleMsgFundPublicTreasuryPool(ctx sdk.Context, msg types.MsgFundPublicTreasuryPool, k keeper.Keeper) (*sdk.Result, error) {
+	if err := k.FundPublicTreasuryPool(ctx, msg.Amount, msg.Depositor); err != nil {
 		return nil, err
 	}
 
@@ -100,11 +100,11 @@ func handleMsgFundCommunityPool(ctx sdk.Context, msg types.MsgFundCommunityPool,
 	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
 }
 
-func NewCommunityPoolSpendProposalHandler(k Keeper) govtypes.Handler {
+func NewPublicTreasuryPoolSpendProposalHandler(k Keeper) govtypes.Handler {
 	return func(ctx sdk.Context, content govtypes.Content) error {
 		switch c := content.(type) {
-		case types.CommunityPoolSpendProposal:
-			return keeper.HandleCommunityPoolSpendProposal(ctx, k, c)
+		case types.PublicTreasuryPoolSpendProposal:
+			return keeper.HandlePublicTreasuryPoolSpendProposal(ctx, k, c)
 
 		default:
 			return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distr proposal content type: %T", c)

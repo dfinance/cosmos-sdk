@@ -144,8 +144,8 @@ func ModuleAccountInvariant(k Keeper) sdk.Invariant {
 			return false
 		})
 
-		communityPool := k.GetFeePoolCommunityCoins(ctx)
-		expectedInt, _ := expectedCoins.Add(communityPool...).TruncateDecimal()
+		poolCoins := k.GetRewardPoolsCoins(ctx)
+		expectedInt, _ := expectedCoins.Add(poolCoins...).TruncateDecimal()
 
 		macc := k.GetDistributionAccount(ctx)
 

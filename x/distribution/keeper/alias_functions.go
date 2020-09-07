@@ -6,17 +6,19 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/supply/exported"
 )
 
-// get outstanding rewards
+// GetValidatorOutstandingRewardsCoins returns outstanding rewards for a validator.
 func (k Keeper) GetValidatorOutstandingRewardsCoins(ctx sdk.Context, val sdk.ValAddress) sdk.DecCoins {
 	return k.GetValidatorOutstandingRewards(ctx, val)
 }
 
-// get the community coins
-func (k Keeper) GetFeePoolCommunityCoins(ctx sdk.Context) sdk.DecCoins {
-	return k.GetFeePool(ctx).CommunityPool
+// GetRewardPoolsCoins returns sum of reward pools coins.
+func (k Keeper) GetRewardPoolsCoins(ctx sdk.Context) sdk.DecCoins {
+	pools := k.GetRewardPools(ctx)
+
+	return pools.TotalCoins()
 }
 
-// GetDistributionAccount returns the distribution ModuleAccount
+// GetDistributionAccount returns the distribution ModuleAccount.
 func (k Keeper) GetDistributionAccount(ctx sdk.Context) exported.ModuleAccountI {
 	return k.supplyKeeper.GetModuleAccount(ctx, types.ModuleName)
 }

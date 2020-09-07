@@ -83,7 +83,7 @@ func SimulateMsgSetWithdrawAddress(ak types.AccountKeeper, k keeper.Keeper) simu
 	return func(
 		r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simulation.Account, chainID string,
 	) (simulation.OperationMsg, []simulation.FutureOperation, error) {
-		if !k.GetWithdrawAddrEnabled(ctx) {
+		if !k.GetParams(ctx).WithdrawAddrEnabled {
 			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
 
@@ -242,7 +242,7 @@ func SimulateMsgFundCommunityPool(ak types.AccountKeeper, k keeper.Keeper, sk st
 			}
 		}
 
-		msg := types.NewMsgFundCommunityPool(fundAmount, funder.Address)
+		msg := types.NewMsgFundPublicTreasuryPool(fundAmount, funder.Address)
 		tx := helpers.GenTx(
 			[]sdk.Msg{msg},
 			fees,

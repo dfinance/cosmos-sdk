@@ -33,8 +33,8 @@ func TestDecodeDistributionStore(t *testing.T) {
 	cdc := makeTestCodec()
 
 	decCoins := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.OneDec())}
-	feePool := types.InitialFeePool()
-	feePool.CommunityPool = decCoins
+	feePool := types.InitialRewardPools()
+	feePool.FoundationPool = decCoins
 	info := types.NewDelegatorStartingInfo(2, sdk.OneDec(), 200)
 	outstanding := types.ValidatorOutstandingRewards{decCoins[0]}
 	commission := types.ValidatorAccumulatedCommission{decCoins[0]}
@@ -43,7 +43,7 @@ func TestDecodeDistributionStore(t *testing.T) {
 	slashEvent := types.NewValidatorSlashEvent(10, sdk.OneDec())
 
 	kvPairs := tmkv.Pairs{
-		tmkv.Pair{Key: types.FeePoolKey, Value: cdc.MustMarshalBinaryLengthPrefixed(feePool)},
+		tmkv.Pair{Key: types.RewardPoolsKey, Value: cdc.MustMarshalBinaryLengthPrefixed(feePool)},
 		tmkv.Pair{Key: types.ProposerKey, Value: consAddr1.Bytes()},
 		tmkv.Pair{Key: types.GetValidatorOutstandingRewardsKey(valAddr1), Value: cdc.MustMarshalBinaryLengthPrefixed(outstanding)},
 		tmkv.Pair{Key: types.GetDelegatorWithdrawAddrKey(delAddr1), Value: delAddr1.Bytes()},

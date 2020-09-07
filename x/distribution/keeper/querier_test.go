@@ -94,11 +94,11 @@ func getQueriedDelegatorTotalRewards(t *testing.T, ctx sdk.Context, cdc *codec.C
 
 func getQueriedCommunityPool(t *testing.T, ctx sdk.Context, cdc *codec.Codec, querier sdk.Querier) (ptr []byte) {
 	query := abci.RequestQuery{
-		Path: strings.Join([]string{custom, types.QuerierRoute, types.QueryCommunityPool}, ""),
+		Path: strings.Join([]string{custom, types.QuerierRoute, types.QueryPublicTreasury}, ""),
 		Data: []byte{},
 	}
 
-	cp, err := querier(ctx, []string{types.QueryCommunityPool}, query)
+	cp, err := querier(ctx, []string{types.QueryPublicTreasury}, query)
 	require.Nil(t, err)
 	require.Nil(t, cdc.UnmarshalJSON(cp, &ptr))
 
@@ -113,17 +113,16 @@ func TestQueries(t *testing.T) {
 	querier := NewQuerier(keeper)
 
 	// test param queries
-	params := types.Params{
-		CommunityTax:        sdk.NewDecWithPrec(3, 1),
-		BaseProposerReward:  sdk.NewDecWithPrec(2, 1),
-		BonusProposerReward: sdk.NewDecWithPrec(1, 1),
-		WithdrawAddrEnabled: true,
-	}
+	params := types.DefaultParams()
 
 	keeper.SetParams(ctx, params)
 
 	paramsRes := getQueriedParams(t, ctx, cdc, querier)
-	require.Equal(t, params.CommunityTax, paramsRes.CommunityTax)
+	require.Equal(t, params.ValidatorsPoolTax, paramsRes.ValidatorsPoolTax)
+	require.Equal(t, params.LiquidityProvidersPoolTax, paramsRes.LiquidityProvidersPoolTax)
+	require.Equal(t, params.PublicTreasuryPoolTax, paramsRes.PublicTreasuryPoolTax)
+	require.Equal(t, params.PublicTreasuryPoolCapacity, paramsRes.PublicTreasuryPoolCapacity)
+	require.Equal(t, params.HARPTax, paramsRes.HARPTax)
 	require.Equal(t, params.BaseProposerReward, paramsRes.BaseProposerReward)
 	require.Equal(t, params.BonusProposerReward, paramsRes.BonusProposerReward)
 	require.Equal(t, params.WithdrawAddrEnabled, paramsRes.WithdrawAddrEnabled)
