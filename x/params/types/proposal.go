@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 )
 
@@ -111,6 +112,25 @@ func ValidateChanges(changes []ParamChange) error {
 		}
 		if len(pc.Value) == 0 {
 			return ErrEmptyValue
+		}
+	}
+
+	return nil
+}
+
+// RestrictedParams defines a parameter which can't be changed.
+type RestrictedParams []RestrictedParam
+
+type RestrictedParam struct {
+	Subspace string `json:"subspace" yaml:"subspace"`
+	Key      string `json:"key" yaml:"key"`
+}
+
+// CheckRestrictions checks if a parameter is available for proposal.
+func (rc RestrictedParams) CheckRestrictions(subspace, key string) error {
+	for _, param := range rc {
+		if param.Subspace == subspace && param.Key == key {
+			return sdkerrors.Wrapf(ErrDisallowedParameter, "subspace: %s, key: %s", param.Subspace, param.Key)
 		}
 	}
 
