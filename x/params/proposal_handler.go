@@ -28,7 +28,7 @@ func handleParameterChangeProposal(ctx sdk.Context, k Keeper, p ParameterChangeP
 			return sdkerrors.Wrap(ErrUnknownSubspace, c.Subspace)
 		}
 
-		if err := k.restrictedParams.CheckRestrictions(c.Subspace, c.Key); err != nil {
+		if err := k.CheckRestrictions(c.Subspace, c.Key); err != nil {
 			return err
 		}
 
