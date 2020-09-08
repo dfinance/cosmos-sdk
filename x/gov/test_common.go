@@ -229,7 +229,7 @@ func createValidators(t *testing.T, stakingHandler sdk.Handler, ctx sdk.Context,
 		valTokens := sdk.TokensFromConsensusPower(powerAmt[i])
 		valCreateMsg := staking.NewMsgCreateValidator(
 			addrs[i], pubkeys[i], sdk.NewCoin(sdk.DefaultBondDenom, valTokens),
-			keep.TestDescription, keep.TestCommissionRates, sdk.OneInt(),
+			keep.TestDescription, keep.TestCommissionRates, keep.TestMinSelfDelegation,
 		)
 
 		res, err := stakingHandler(ctx, valCreateMsg)

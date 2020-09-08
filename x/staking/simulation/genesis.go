@@ -50,7 +50,13 @@ func RandomizedGenState(simState *module.SimulationState) {
 	// NewSimulationManager constructor for this to work
 	simState.UnbondTime = unbondTime
 
-	params := types.NewParams(simState.UnbondTime, maxValidators, 7, 3, sdk.DefaultBondDenom)
+	params := types.NewParams(
+		simState.UnbondTime,
+		maxValidators,
+		7,
+		3, sdk.DefaultBondDenom,
+		sdk.NewInt(types.DefaultMinSelfDelegationLvl),
+	)
 
 	// validators & delegations
 	var (

@@ -17,7 +17,7 @@ func TestCalculateRewardsBasic(t *testing.T) {
 	// create validator with 50% commission
 	commission := staking.NewCommissionRates(sdk.NewDecWithPrec(5, 1), sdk.NewDecWithPrec(5, 1), sdk.NewDec(0))
 	msg := staking.NewMsgCreateValidator(
-		valOpAddr1, valConsPk1, sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, sdk.OneInt(),
+		valOpAddr1, valConsPk1, sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, minSelfDelegation,
 	)
 
 	res, err := sh(ctx, msg)
@@ -77,7 +77,7 @@ func TestCalculateRewardsAfterSlash(t *testing.T) {
 	valPower := int64(100)
 	valTokens := sdk.TokensFromConsensusPower(valPower)
 	msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
-		sdk.NewCoin(sdk.DefaultBondDenom, valTokens), staking.Description{}, commission, sdk.OneInt())
+		sdk.NewCoin(sdk.DefaultBondDenom, valTokens), staking.Description{}, commission, minSelfDelegation)
 
 	res, err := sh(ctx, msg)
 	require.NoError(t, err)
@@ -143,7 +143,7 @@ func TestCalculateRewardsAfterManySlashes(t *testing.T) {
 	valTokens := sdk.TokensFromConsensusPower(power)
 	commission := staking.NewCommissionRates(sdk.NewDecWithPrec(5, 1), sdk.NewDecWithPrec(5, 1), sdk.NewDec(0))
 	msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
-		sdk.NewCoin(sdk.DefaultBondDenom, valTokens), staking.Description{}, commission, sdk.OneInt())
+		sdk.NewCoin(sdk.DefaultBondDenom, valTokens), staking.Description{}, commission, minSelfDelegation)
 
 	res, err := sh(ctx, msg)
 	require.NoError(t, err)
@@ -219,7 +219,7 @@ func TestCalculateRewardsMultiDelegator(t *testing.T) {
 	// create validator with 50% commission
 	commission := staking.NewCommissionRates(sdk.NewDecWithPrec(5, 1), sdk.NewDecWithPrec(5, 1), sdk.NewDec(0))
 	msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
-		sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, sdk.OneInt())
+		sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, minSelfDelegation)
 
 	res, err := sh(ctx, msg)
 	require.NoError(t, err)
@@ -299,7 +299,7 @@ func TestWithdrawDelegationRewardsBasic(t *testing.T) {
 	msg := staking.NewMsgCreateValidator(
 		valOpAddr1, valConsPk1,
 		sdk.NewCoin(sdk.DefaultBondDenom, valTokens),
-		staking.Description{}, commission, sdk.OneInt(),
+		staking.Description{}, commission, minSelfDelegation,
 	)
 
 	res, err := sh(ctx, msg)
@@ -367,7 +367,7 @@ func TestCalculateRewardsAfterManySlashesInSameBlock(t *testing.T) {
 	valTokens := sdk.TokensFromConsensusPower(power)
 	commission := staking.NewCommissionRates(sdk.NewDecWithPrec(5, 1), sdk.NewDecWithPrec(5, 1), sdk.NewDec(0))
 	msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
-		sdk.NewCoin(sdk.DefaultBondDenom, valTokens), staking.Description{}, commission, sdk.OneInt())
+		sdk.NewCoin(sdk.DefaultBondDenom, valTokens), staking.Description{}, commission, minSelfDelegation)
 
 	res, err := sh(ctx, msg)
 	require.NoError(t, err)
@@ -437,7 +437,7 @@ func TestCalculateRewardsMultiDelegatorMultiSlash(t *testing.T) {
 	power := int64(100)
 	valTokens := sdk.TokensFromConsensusPower(power)
 	msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
-		sdk.NewCoin(sdk.DefaultBondDenom, valTokens), staking.Description{}, commission, sdk.OneInt())
+		sdk.NewCoin(sdk.DefaultBondDenom, valTokens), staking.Description{}, commission, minSelfDelegation)
 
 	res, err := sh(ctx, msg)
 	require.NoError(t, err)
@@ -525,7 +525,7 @@ func TestCalculateRewardsMultiDelegatorMultWithdraw(t *testing.T) {
 	// create validator with 50% commission
 	commission := staking.NewCommissionRates(sdk.NewDecWithPrec(5, 1), sdk.NewDecWithPrec(5, 1), sdk.NewDec(0))
 	msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
-		sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, sdk.OneInt())
+		sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, minSelfDelegation)
 
 	res, err := sh(ctx, msg)
 	require.NoError(t, err)
