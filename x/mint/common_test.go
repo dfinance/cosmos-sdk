@@ -113,6 +113,7 @@ func getInitChainer(mApp *mock.App,
 		supply.InitGenesis(ctx, supplyKeeper, accountKeeper, supplyGenesis)
 
 		stakingGenesis := staking.DefaultGenesisState()
+		stakingGenesis.Params.MinSelfDelegationLvl = sdk.OneInt()
 		validators := staking.InitGenesis(ctx, stakingKeeper, accountKeeper, supplyKeeper, stakingGenesis)
 
 		mintGenesis := GenesisState{

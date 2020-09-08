@@ -117,7 +117,10 @@ func (p Params) ValidateBasic() error {
 	if err := validateBaseProposerReward(p.BaseProposerReward); err != nil {
 		return err
 	}
-	if err := validateWithdrawAddrEnabled(p.BonusProposerReward); err != nil {
+	if err := validateBonusProposerReward(p.BonusProposerReward); err != nil {
+		return err
+	}
+	if err := validateWithdrawAddrEnabled(p.WithdrawAddrEnabled); err != nil {
 		return err
 	}
 	if err := validateFoundationNominees(p.FoundationNominees); err != nil {
