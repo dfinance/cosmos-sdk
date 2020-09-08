@@ -138,21 +138,28 @@ func ReferenceCountInvariant(k Keeper) sdk.Invariant {
 func ModuleAccountInvariant(k Keeper) sdk.Invariant {
 	return func(ctx sdk.Context) (string, bool) {
 
-		var expectedCoins sdk.DecCoins
+		var outstandingRewardCoins sdk.DecCoins
 		k.IterateValidatorOutstandingRewards(ctx, func(_ sdk.ValAddress, rewards types.ValidatorOutstandingRewards) (stop bool) {
-			expectedCoins = expectedCoins.Add(rewards...)
+			outstandingRewardCoins = outstandingRewardCoins.Add(rewards...)
 			return false
 		})
 
 		poolCoins := k.GetRewardPoolsCoins(ctx)
-		expectedInt, _ := expectedCoins.Add(poolCoins...).TruncateDecimal()
+		expectedCoins := outstandingRewardCoins.Add(poolCoins...)
+		expectedInt, _ := expectedCoins.TruncateDecimal()
 
 		macc := k.GetDistributionAccount(ctx)
 
 		broken := !macc.GetCoins().IsEqual(expectedInt)
 		return sdk.FormatInvariant(types.ModuleName, "ModuleAccount coins",
-			fmt.Sprintf("\texpected ModuleAccount coins:     %s\n"+
-				"\tdistribution ModuleAccount coins: %s\n",
-				expectedInt, macc.GetCoins())), broken
+				fmt.Sprintf(""+
+					"\texpected ModuleAccount coins:     %s\n"+
+					"\tdistribution ModuleAccount coins: %s\n"+
+					"\toutstanding reward dec coins:     %s\n"+
+					"\treward pools dec coins:           %s\n"+
+					"\texpected dec coins:               %s\n",
+					expectedInt, macc.GetCoins(), outstandingRewardCoins, poolCoins, expectedCoins,
+				)),
+			broken
 	}
 }

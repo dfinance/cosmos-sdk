@@ -50,13 +50,22 @@ func (k Keeper) AllocateTokens(
 	pools := k.GetRewardPools(ctx)
 	feesFoundationPart := feesCollected.MulDec(dynamicFoundationPoolTax)
 	pools.FoundationPool = pools.FoundationPool.Add(feesFoundationPart...)
-	feesCollected = feesCollected.Sub(feesFoundationPart)
+	rewardCoins := feesCollected.Sub(feesFoundationPart)
 
 	// distribute collected fees (sub Foundation part) between pools
-	pools.LiquidityProvidersPool = pools.LiquidityProvidersPool.Add(feesCollected.MulDec(params.LiquidityProvidersPoolTax)...)
-	pools.PublicTreasuryPool = pools.PublicTreasuryPool.Add(feesCollected.MulDec(params.PublicTreasuryPoolTax)...)
-	pools.HARP = pools.HARP.Add(feesCollected.MulDec(params.HARPTax)...)
-	validatorsPool := feesCollected.MulDec(params.ValidatorsPoolTax)
+	validatorsPool := rewardCoins
+	//
+	liquidityProvidersReward := rewardCoins.MulDec(params.LiquidityProvidersPoolTax)
+	pools.LiquidityProvidersPool = pools.LiquidityProvidersPool.Add(liquidityProvidersReward...)
+	validatorsPool = validatorsPool.Sub(liquidityProvidersReward)
+	//
+	publicTreasuryReward := rewardCoins.MulDec(params.PublicTreasuryPoolTax)
+	pools.PublicTreasuryPool = pools.PublicTreasuryPool.Add(publicTreasuryReward...)
+	validatorsPool = validatorsPool.Sub(publicTreasuryReward)
+	//
+	harpReward := rewardCoins.MulDec(params.HARPTax)
+	pools.HARP = pools.HARP.Add(harpReward...)
+	validatorsPool = validatorsPool.Sub(harpReward)
 
 	// feesRemainder are distribution leftovers due to truncations
 	feesRemainder := validatorsPool
@@ -80,7 +89,7 @@ func (k Keeper) AllocateTokens(
 
 	// calculate previous proposer reward relative to its power
 	proposerPowerRatio := sdk.NewDec(proposerPower).Quo(sdk.NewDec(totalPower))
-	proposerMultiplier := params.BaseProposerReward.Add(params.BonusProposerReward.MulTruncate(proposerPowerRatio))
+	proposerMultiplier := params.BaseProposerReward.Add(params.BonusProposerReward.Mul(proposerPowerRatio))
 	proposerReward := validatorsPool.MulDecTruncate(proposerMultiplier)
 
 	// pay previous proposer

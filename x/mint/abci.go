@@ -10,8 +10,6 @@ import (
 
 // BeginBlocker mints new tokens for the previous block.
 func BeginBlocker(ctx sdk.Context, k Keeper) {
-	k.Logger(ctx).Info(fmt.Sprintf("Cur blockTime: %v", ctx.BlockTime()))
-
 	// fetch stored minter & params
 	minter := k.GetMinter(ctx)
 	params := k.GetParams(ctx)
@@ -39,7 +37,6 @@ func BeginBlocker(ctx sdk.Context, k Keeper) {
 	// calculate inflation power
 	bondedRatio, lockedRatio := k.BondedRatio(ctx), k.LockedRatio(ctx)
 	inflationPower := minter.NextInflationPower(params, bondedRatio, lockedRatio)
-	k.Logger(ctx).Info(fmt.Sprintf("Next InflationPower with bondedRatio / lockedRatio (%s / %s): %s", bondedRatio, lockedRatio, inflationPower))
 
 	// recalculate inflation
 	minter.Inflation = minter.NextInflationRate(params, inflationPower)
@@ -52,7 +49,6 @@ func BeginBlocker(ctx sdk.Context, k Keeper) {
 	totalStakingSupply := k.StakingTokenSupply(ctx)
 	minter.Provisions, minter.FoundationProvisions = minter.NextAnnualProvisions(params, totalStakingSupply)
 	k.SetMinter(ctx, minter)
-	k.Logger(ctx).Info(fmt.Sprintf("Next minter state: %s", minter))
 
 	// mint coins, update supply
 	mintedCoin := minter.BlockProvision(params)
