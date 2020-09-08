@@ -23,3 +23,18 @@ func HandlePublicTreasuryPoolSpendProposal(ctx sdk.Context, k Keeper, p types.Pu
 
 	return nil
 }
+
+// HandleTaxParamsUpdateProposal is a handler for executing a passed tax params update proposal.
+func HandleTaxParamsUpdateProposal(ctx sdk.Context, k Keeper, p types.TaxParamsUpdateProposal) error {
+	params := k.GetParams(ctx)
+	params.ValidatorsPoolTax = p.ValidatorsPoolTax
+	params.LiquidityProvidersPoolTax = p.LiquidityProvidersPoolTax
+	params.PublicTreasuryPoolTax = p.PublicTreasuryPoolTax
+	params.HARPTax = p.HARPTax
+	k.SetParams(ctx, params)
+
+	logger := k.Logger(ctx)
+	logger.Info(fmt.Sprintf("tax params updated: %s", params))
+
+	return nil
+}

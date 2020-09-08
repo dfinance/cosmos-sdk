@@ -11,15 +11,15 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/simulation"
 )
 
-// OpWeightSubmitCommunitySpendProposal app params key for community spend proposal
-const OpWeightSubmitCommunitySpendProposal = "op_weight_submit_community_spend_proposal"
+// OpWeightSubmitPublicTreasurySpendProposal app params key for public treasury spend proposal
+const OpWeightSubmitPublicTreasurySpendProposal = "op_weight_submit_public_treasury_spend_proposal"
 
 // ProposalContents defines the module weighted proposals' contents
 func ProposalContents(k keeper.Keeper) []simulation.WeightedProposalContent {
 	return []simulation.WeightedProposalContent{
 		{
-			AppParamsKey:       OpWeightSubmitCommunitySpendProposal,
-			DefaultWeight:      simappparams.DefaultWeightCommunitySpendProposal,
+			AppParamsKey:       OpWeightSubmitPublicTreasurySpendProposal,
+			DefaultWeight:      simappparams.DefaultWeightPublicTreasurySpendProposal,
 			ContentSimulatorFn: SimulatePublicTreasuryPoolSpendProposalContent(k),
 		},
 	}

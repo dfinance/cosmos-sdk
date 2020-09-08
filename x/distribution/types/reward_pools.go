@@ -26,6 +26,10 @@ func (n RewardPoolName) IsValid() bool {
 	}
 }
 
+func (n RewardPoolName) String() string {
+	return string(n)
+}
+
 // RewardPools contains collected rewards distributed by pools.
 // RewardPools aren't module accounts, however its coins are held in the distribution module account.
 // Thus the RewardPools must be reduced separately from the SendCoinsFromModuleToAccount call.

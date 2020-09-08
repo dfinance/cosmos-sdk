@@ -13,7 +13,7 @@ func (k Keeper) DistributeFromPublicTreasuryPool(ctx sdk.Context, amount sdk.Coi
 
 	newPool, negative := pools.PublicTreasuryPool.SafeSub(sdk.NewDecCoinsFromCoins(amount...))
 	if negative {
-		return types.ErrBadDistribution
+		return sdkerrors.Wrap(types.ErrBadDistribution, "public treasury: sub failed")
 	}
 	pools.PublicTreasuryPool = newPool
 
@@ -60,7 +60,7 @@ func (k Keeper) DistributeFromFoundationPoolToWallet(ctx sdk.Context, amount sdk
 
 	newPool, negative := pools.FoundationPool.SafeSub(sdk.NewDecCoinsFromCoins(amount...))
 	if negative {
-		return sdkerrors.Wrap(types.ErrBadDistribution, "FoundationPool sub")
+		return sdkerrors.Wrap(types.ErrBadDistribution, "foundation pool: sub failed")
 	}
 	pools.FoundationPool = newPool
 
@@ -77,7 +77,7 @@ func (k Keeper) DistributeFromFoundationPoolToWallet(ctx sdk.Context, amount sdk
 // DistributeFromFoundationPoolToPool transfers FoundationPool funds to an other distribution pool.
 func (k Keeper) DistributeFromFoundationPoolToPool(ctx sdk.Context, amount sdk.Coins, receivePool types.RewardPoolName) error {
 	if amount.IsAnyNegative() {
-		return sdkerrors.Wrapf(types.ErrBadDistribution, "negative amount: %s", amount)
+		return sdkerrors.Wrapf(types.ErrBadDistribution, "foundation pool: negative amount: %s", amount)
 	}
 
 	pools := k.GetRewardPools(ctx)
@@ -86,7 +86,7 @@ func (k Keeper) DistributeFromFoundationPoolToPool(ctx sdk.Context, amount sdk.C
 	amountDecCoins := sdk.NewDecCoinsFromCoins(amount...)
 	newPool, negative := pools.FoundationPool.SafeSub(amountDecCoins)
 	if negative {
-		return sdkerrors.Wrap(types.ErrBadDistribution, "FoundationPool sub")
+		return sdkerrors.Wrap(types.ErrBadDistribution, "foundation pool: sub failed")
 	}
 	pools.FoundationPool = newPool
 
@@ -98,11 +98,11 @@ func (k Keeper) DistributeFromFoundationPoolToPool(ctx sdk.Context, amount sdk.C
 	case types.HARPName:
 		pools.HARP = pools.HARP.Add(amountDecCoins...)
 	default:
-		return sdkerrors.Wrapf(types.ErrBadDistribution, "unknown receivePool: %s", receivePool)
+		return sdkerrors.Wrapf(types.ErrBadDistribution, "foundation pool: unknown receivePool: %s", receivePool)
 	}
 
 	if !pools.TotalCoins().IsEqual(poolsSupply) {
-		return sdkerrors.Wrap(types.ErrBadDistribution, "sanity check failed")
+		return sdkerrors.Wrap(types.ErrBadDistribution, "foundation pool: sanity check failed")
 	}
 	k.SetRewardPools(ctx, pools)
 

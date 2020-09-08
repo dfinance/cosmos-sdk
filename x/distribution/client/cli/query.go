@@ -33,7 +33,7 @@ func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		GetCmdQueryValidatorCommission(queryRoute, cdc),
 		GetCmdQueryValidatorSlashes(queryRoute, cdc),
 		GetCmdQueryDelegatorRewards(queryRoute, cdc),
-		GetCmdQueryCommunityPool(queryRoute, cdc),
+		GetCmdQueryPool(queryRoute, cdc),
 	)...)
 
 	return distQueryCmd
@@ -260,25 +260,24 @@ $ %s query distribution rewards cosmos1gghjut3ccd8ay0zduzj64hwre2fxs9ld75ru9p co
 	}
 }
 
-// GetCmdQueryCommunityPool returns the command for fetching community pool info
-func GetCmdQueryCommunityPool(queryRoute string, cdc *codec.Codec) *cobra.Command {
+// GetCmdQueryPool returns the command for fetching specified pool info.
+func GetCmdQueryPool(queryRoute string, cdc *codec.Codec) *cobra.Command {
 	return &cobra.Command{
-		Use:   "community-pool",
-		Args:  cobra.NoArgs,
-		Short: "Query the amount of coins in the community pool",
+		Use:   "pool",
+		Args:  cobra.ExactArgs(1),
+		Short: "Query the amount of coins in the specified pool",
 		Long: strings.TrimSpace(
-			fmt.Sprintf(`Query all coins in the community pool which is under Governance control.
+			fmt.Sprintf(`Query the amount of coins in the specified pool.
 
 Example:
-$ %s query distribution community-pool
-`,
-				version.ClientName,
+$ %s query distribution pool PublicTreasuryPool
+`, version.ClientName,
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cliCtx := context.NewCLIContext().WithCodec(cdc)
 
-			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/community_pool", queryRoute), nil)
+			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/%s/%s", queryRoute, types.QueryPool, args[0]), nil)
 			if err != nil {
 				return err
 			}

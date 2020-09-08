@@ -9,7 +9,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 )
 
-func testProposal(recipient sdk.AccAddress, amount sdk.Coins) types.PublicTreasuryPoolSpendProposal {
+func testPublicTreasurySpendProposal(recipient sdk.AccAddress, amount sdk.Coins) types.PublicTreasuryPoolSpendProposal {
 	return types.NewPublicTreasuryPoolSpendProposal(
 		"Test",
 		"description",
@@ -18,7 +18,18 @@ func testProposal(recipient sdk.AccAddress, amount sdk.Coins) types.PublicTreasu
 	)
 }
 
-func TestProposalHandlerPassed(t *testing.T) {
+func testTaxParamsUpdateProposal(validatorsTax, liquidityTax, treasuryTax, harpTax sdk.Dec) types.TaxParamsUpdateProposal {
+	return types.NewTaxParamsUpdateProposal(
+		"Test",
+		"description",
+		validatorsTax,
+		liquidityTax,
+		treasuryTax,
+		harpTax,
+	)
+}
+
+func TestPublicTreasurySpendProposalHandlerPassed(t *testing.T) {
 	ctx, accountKeeper, keeper, _, supplyKeeper := CreateTestInputDefault(t, false, 10)
 	recipient := delAddr1
 
@@ -37,13 +48,13 @@ func TestProposalHandlerPassed(t *testing.T) {
 	rewardPools.PublicTreasuryPool = sdk.NewDecCoinsFromCoins(amount...)
 	keeper.SetRewardPools(ctx, rewardPools)
 
-	tp := testProposal(recipient, amount)
-	hdlr := NewPublicTreasuryPoolSpendProposalHandler(keeper)
+	tp := testPublicTreasurySpendProposal(recipient, amount)
+	hdlr := NewProposalHandler(keeper)
 	require.NoError(t, hdlr(ctx, tp))
 	require.Equal(t, accountKeeper.GetAccount(ctx, recipient).GetCoins(), amount)
 }
 
-func TestProposalHandlerFailed(t *testing.T) {
+func TestPublicTreasurySpendProposalHandlerFailed(t *testing.T) {
 	ctx, accountKeeper, keeper, _, _ := CreateTestInputDefault(t, false, 10)
 	recipient := delAddr1
 
@@ -51,8 +62,27 @@ func TestProposalHandlerFailed(t *testing.T) {
 	require.True(t, account.GetCoins().IsZero())
 	accountKeeper.SetAccount(ctx, account)
 
-	tp := testProposal(recipient, amount)
-	hdlr := NewPublicTreasuryPoolSpendProposalHandler(keeper)
+	tp := testPublicTreasurySpendProposal(recipient, amount)
+	hdlr := NewProposalHandler(keeper)
 	require.Error(t, hdlr(ctx, tp))
 	require.True(t, accountKeeper.GetAccount(ctx, recipient).GetCoins().IsZero())
+}
+
+func TestTaxParamsUpdateHandler(t *testing.T) {
+	ctx, _, keeper, _, _ := CreateTestInputDefault(t, false, 10)
+
+	tp := testTaxParamsUpdateProposal(
+		sdk.NewDecWithPrec(40, 2),
+		sdk.NewDecWithPrec(35, 2),
+		sdk.NewDecWithPrec(15, 2),
+		sdk.NewDecWithPrec(10, 2),
+		)
+	hdlr := NewProposalHandler(keeper)
+	require.NoError(t, hdlr(ctx, tp))
+
+	newParams := keeper.GetParams(ctx)
+	require.True(t, newParams.ValidatorsPoolTax.Equal(tp.ValidatorsPoolTax))
+	require.True(t, newParams.LiquidityProvidersPoolTax.Equal(tp.LiquidityProvidersPoolTax))
+	require.True(t, newParams.PublicTreasuryPoolTax.Equal(tp.PublicTreasuryPoolTax))
+	require.True(t, newParams.HARPTax.Equal(tp.HARPTax))
 }

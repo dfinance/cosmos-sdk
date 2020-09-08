@@ -135,11 +135,13 @@ func handleMsgWithdrawFoundationPool(ctx sdk.Context, msg types.MsgWithdrawFound
 	return nil, nil
 }
 
-func NewPublicTreasuryPoolSpendProposalHandler(k Keeper) govtypes.Handler {
+func NewProposalHandler(k Keeper) govtypes.Handler {
 	return func(ctx sdk.Context, content govtypes.Content) error {
 		switch c := content.(type) {
 		case types.PublicTreasuryPoolSpendProposal:
 			return keeper.HandlePublicTreasuryPoolSpendProposal(ctx, k, c)
+		case types.TaxParamsUpdateProposal:
+			return keeper.HandleTaxParamsUpdateProposal(ctx, k, c)
 
 		default:
 			return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distr proposal content type: %T", c)

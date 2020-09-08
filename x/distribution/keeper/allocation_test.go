@@ -192,7 +192,7 @@ func TestAllocateTokensTruncation(t *testing.T) {
 		Power:   10,
 	}
 
-	// assert initial state: zero outstanding rewards, zero community pool, zero commission, zero current rewards
+	// assert initial state: zero outstanding rewards, zero public treasury pool, zero commission, zero current rewards
 	require.True(t, k.GetValidatorOutstandingRewards(ctx, valOpAddr1).IsZero())
 	require.True(t, k.GetValidatorOutstandingRewards(ctx, valOpAddr2).IsZero())
 	require.True(t, k.GetValidatorOutstandingRewards(ctx, valOpAddr3).IsZero())

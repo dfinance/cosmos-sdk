@@ -163,7 +163,7 @@ func (k Keeper) withdrawDelegationRewards(ctx sdk.Context, val exported.Validato
 			val.GetOperator(), del.GetDelegatorAddr(), rewardsRaw, rewards))
 	}
 
-	// truncate coins, return remainder to community pool
+	// truncate coins, return remainder to FoundationPool
 	coins, remainder := rewards.TruncateDecimal()
 
 	// add coins to user account

@@ -57,10 +57,10 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute st
 		paramsHandlerFn(cliCtx, queryRoute),
 	).Methods("GET")
 
-	// Get the amount held in the community pool
+	// Get the amount held in the specified pool
 	r.HandleFunc(
-		"/distribution/community_pool",
-		communityPoolHandler(cliCtx, queryRoute),
+		"/distribution/pool/{poolName}",
+		poolHandler(cliCtx, queryRoute),
 	).Methods("GET")
 
 }
@@ -257,14 +257,20 @@ func paramsHandlerFn(cliCtx context.CLIContext, queryRoute string) http.HandlerF
 	}
 }
 
-func communityPoolHandler(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
+func poolHandler(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
 		if !ok {
 			return
 		}
 
-		res, height, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/community_pool", queryRoute), nil)
+		poolName := mux.Vars(r)["poolName"]
+		if poolName == "" {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, "poolName: empty")
+			return
+		}
+
+		res, height, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/%s/%s", queryRoute, types.QueryPool, poolName), nil)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return

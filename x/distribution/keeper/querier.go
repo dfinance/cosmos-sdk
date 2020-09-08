@@ -39,11 +39,8 @@ func NewQuerier(k Keeper) sdk.Querier {
 		case types.QueryWithdrawAddr:
 			return queryDelegatorWithdrawAddress(ctx, path[1:], req, k)
 
-		case types.QueryPublicTreasury:
-			return queryPublicTreasuryPool(ctx, path[1:], req, k)
-
-		case types.QueryFoundationPool:
-			return queryFoundationPool(ctx, path[1:], req, k)
+		case types.QueryPool:
+			return queryPool(ctx, path[1:], req, k)
 
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unknown query path: %s", path[0])
@@ -243,19 +240,28 @@ func queryDelegatorWithdrawAddress(ctx sdk.Context, _ []string, req abci.Request
 	return bz, nil
 }
 
-func queryPublicTreasuryPool(ctx sdk.Context, _ []string, req abci.RequestQuery, k Keeper) ([]byte, error) {
-	pools := k.GetRewardPools(ctx)
-	bz, err := k.cdc.MarshalJSON(pools.PublicTreasuryPool)
-	if err != nil {
-		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
+func queryPool(ctx sdk.Context, path []string, req abci.RequestQuery, k Keeper) ([]byte, error) {
+	if len(path) == 0 {
+		return nil, sdkerrors.Wrap(sdkerrors.ErrInvalidRequest, "query path: empty")
 	}
 
-	return bz, nil
-}
+	var poolSupply sdk.DecCoins
+	rewardPools := k.GetRewardPools(ctx)
 
-func queryFoundationPool(ctx sdk.Context, _ []string, req abci.RequestQuery, k Keeper) ([]byte, error) {
-	pools := k.GetRewardPools(ctx)
-	bz, err := k.cdc.MarshalJSON(pools.FoundationPool)
+	switch poolName := types.RewardPoolName(path[0]); poolName {
+	case types.LiquidityProvidersPoolName:
+		poolSupply = rewardPools.LiquidityProvidersPool
+	case types.PublicTreasuryPoolName:
+		poolSupply = rewardPools.PublicTreasuryPool
+	case types.FoundationPoolName:
+		poolSupply = rewardPools.FoundationPool
+	case types.HARPName:
+		poolSupply = rewardPools.HARP
+	default:
+		return nil, sdkerrors.Wrapf(sdkerrors.ErrInvalidRequest, "unknown pool name: %s", poolName)
+	}
+
+	bz, err := k.cdc.MarshalJSON(poolSupply)
 	if err != nil {
 		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
 	}

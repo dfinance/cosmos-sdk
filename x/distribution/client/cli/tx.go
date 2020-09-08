@@ -17,10 +17,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
-	"github.com/cosmos/cosmos-sdk/x/gov"
-
 	"github.com/cosmos/cosmos-sdk/x/distribution/client/common"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
+	"github.com/cosmos/cosmos-sdk/x/gov"
 )
 
 var (
@@ -202,67 +201,6 @@ $ %s tx distribution set-withdraw-addr cosmos1gghjut3ccd8ay0zduzj64hwre2fxs9ld75
 	}
 }
 
-// GetCmdSubmitPublicTreasurySpendProposal implements the command to submit a public-treasury-pool-spend proposal
-func GetCmdSubmitPublicTreasurySpendProposal(cdc *codec.Codec) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "public-treasury-pool-spend [proposal-file]",
-		Args:  cobra.ExactArgs(1),
-		Short: "Submit a public treasury pool spend proposal",
-		Long: strings.TrimSpace(
-			fmt.Sprintf(`Submit a public treasury pool spend proposal along with an initial deposit.
-The proposal details must be supplied via a JSON file.
-
-Example:
-$ %s tx gov submit-proposal public-treasury-pool-spend <path/to/proposal.json> --from=<key_or_address>
-
-Where proposal.json contains:
-
-{
-  "title": "PublicTreasury Pool Spend",
-  "description": "Pay me some Atoms!",
-  "recipient": "cosmos1s5afhd6gxevu37mkqcvvsj8qeylhn0rz46zdlq",
-  "amount": [
-    {
-      "denom": "stake",
-      "amount": "10000"
-    }
-  ],
-  "deposit": [
-    {
-      "denom": "stake",
-      "amount": "10000"
-    }
-  ]
-}
-`,
-				version.ClientName,
-			),
-		),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			inBuf := bufio.NewReader(cmd.InOrStdin())
-			txBldr := auth.NewTxBuilderFromCLI(inBuf).WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContextWithInput(inBuf).WithCodec(cdc)
-
-			proposal, err := ParseCommunityPoolSpendProposalJSON(cdc, args[0])
-			if err != nil {
-				return err
-			}
-
-			from := cliCtx.GetFromAddress()
-			content := types.NewPublicTreasuryPoolSpendProposal(proposal.Title, proposal.Description, proposal.Recipient, proposal.Amount)
-
-			msg := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
-			if err := msg.ValidateBasic(); err != nil {
-				return err
-			}
-
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
-		},
-	}
-
-	return cmd
-}
-
 // GetCmdFundPublicTreasuryPool returns a command implementation that supports directly funding the public treasury pool.
 func GetCmdFundPublicTreasuryPool(cdc *codec.Codec) *cobra.Command {
 	return &cobra.Command{
@@ -339,6 +277,129 @@ $ %s tx distribution foundation-pool-withdraw 100uatom [LiquidityProvidersPool|P
 			}
 
 			msg := types.NewMsgWithdrawFoundationPool(nomineeAddr, recipientAddr, recipientPoolName, amount)
+			if err := msg.ValidateBasic(); err != nil {
+				return err
+			}
+
+			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+		},
+	}
+
+	return cmd
+}
+
+// GetCmdSubmitPublicTreasurySpendProposal implements the command to submit a public-treasury-pool-spend proposal.
+func GetCmdSubmitPublicTreasurySpendProposal(cdc *codec.Codec) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "public-treasury-pool-spend [proposal-file]",
+		Args:  cobra.ExactArgs(1),
+		Short: "Submit a public treasury pool spend proposal",
+		Long: strings.TrimSpace(
+			fmt.Sprintf(`Submit a public treasury pool spend proposal along with an initial deposit.
+The proposal details must be supplied via a JSON file.
+
+Example:
+$ %s tx gov submit-proposal public-treasury-pool-spend <path/to/proposal.json> --from=<key_or_address>
+
+Where proposal.json contains:
+
+{
+  "title": "PublicTreasury Pool Spend",
+  "description": "Pay me some Atoms!",
+  "recipient": "cosmos1s5afhd6gxevu37mkqcvvsj8qeylhn0rz46zdlq",
+  "amount": [
+    {
+      "denom": "stake",
+      "amount": "10000"
+    }
+  ],
+  "deposit": [
+    {
+      "denom": "stake",
+      "amount": "10000"
+    }
+  ]
+}
+`, version.ClientName,
+			),
+		),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := auth.NewTxBuilderFromCLI(inBuf).WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := context.NewCLIContextWithInput(inBuf).WithCodec(cdc)
+
+			proposal, err := ParsePublicTreasuryPoolSpendProposalJSON(cdc, args[0])
+			if err != nil {
+				return err
+			}
+
+			from := cliCtx.GetFromAddress()
+			content := types.NewPublicTreasuryPoolSpendProposal(proposal.Title, proposal.Description, proposal.Recipient, proposal.Amount)
+
+			msg := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
+			if err := msg.ValidateBasic(); err != nil {
+				return err
+			}
+
+			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+		},
+	}
+
+	return cmd
+}
+
+// GetCmdSubmitTaxParamsUpdateProposal implements the command to submit a tax-params-update proposal.
+func GetCmdSubmitTaxParamsUpdateProposal(cdc *codec.Codec) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "tax-params-update [proposal-file]",
+		Args:  cobra.ExactArgs(1),
+		Short: "Submit a tax params update proposal",
+		Long: strings.TrimSpace(
+			fmt.Sprintf(`Submit a tax params update proposal along with an initial deposit.
+The proposal details must be supplied via a JSON file.
+
+Example:
+$ %s tx gov submit-proposal tax-params-update <path/to/proposal.json> --from=<key_or_address>
+
+Where proposal.json contains:
+
+{
+  "title": "TaxParams Update",
+  "description": "Lower the PublicTreasury tax",
+  "validators_pool_tax": "0.45",
+  "liquidity_providers_pool_tax": "0.45",
+  "public_treasury_pool_tax": "0.10",
+  "harp_tax": "0.0",
+  "deposit": [
+    {
+      "denom": "stake",
+      "amount": "10000"
+    }
+  ]
+}
+`, version.ClientName,
+			),
+		),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := auth.NewTxBuilderFromCLI(inBuf).WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := context.NewCLIContextWithInput(inBuf).WithCodec(cdc)
+
+			proposal, err := ParseTaxParamsUpdateProposalJSON(cdc, args[0])
+			if err != nil {
+				return err
+			}
+
+			from := cliCtx.GetFromAddress()
+			content := types.NewTaxParamsUpdateProposal(
+				proposal.Title, proposal.Description,
+				proposal.ValidatorsPoolTax,
+				proposal.LiquidityProvidersPoolTax,
+				proposal.PublicTreasuryPoolTax,
+				proposal.HARPTax,
+			)
+
+			msg := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}

@@ -6,7 +6,15 @@ import (
 	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 )
 
-// param change proposal handler
+// param change proposal handlers
 var (
-	ProposalHandler = govclient.NewProposalHandler(cli.GetCmdSubmitPublicTreasurySpendProposal, rest.ProposalRESTHandler)
+	PublicTreasurySpendProposalHandler = govclient.NewProposalHandler(
+		cli.GetCmdSubmitPublicTreasurySpendProposal,
+		rest.PublicTreasurySpendProposalRESTHandler,
+	)
+
+	TaxParamsUpdateProposalHandler = govclient.NewProposalHandler(
+		cli.GetCmdSubmitTaxParamsUpdateProposal,
+		rest.TaxParamsUpdateProposalRESTHandler,
+	)
 )

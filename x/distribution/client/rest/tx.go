@@ -39,7 +39,7 @@ func registerTxRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute strin
 		withdrawValidatorRewardsHandlerFn(cliCtx),
 	).Methods("POST")
 
-	// Fund the community pool
+	// Fund the public treasury pool
 	r.HandleFunc(
 		"/distribution/public_treasury_pool",
 		fundPublicTreasuryPoolHandlerFn(cliCtx),
@@ -57,7 +57,7 @@ type (
 		WithdrawAddress sdk.AccAddress `json:"withdraw_address" yaml:"withdraw_address"`
 	}
 
-	fundCommunityPoolReq struct {
+	fundPublicTreasuryPoolReq struct {
 		BaseReq rest.BaseReq `json:"base_req" yaml:"base_req"`
 		Amount  sdk.Coins    `json:"amount" yaml:"amount"`
 	}
@@ -190,7 +190,7 @@ func withdrawValidatorRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerFu
 
 func fundPublicTreasuryPoolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req fundCommunityPoolReq
+		var req fundPublicTreasuryPoolReq
 		if !rest.ReadRESTReq(w, r, cliCtx.Codec, &req) {
 			return
 		}

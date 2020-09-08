@@ -52,7 +52,7 @@ func (k Keeper) incrementValidatorPeriod(ctx sdk.Context, val exported.Validator
 	var current sdk.DecCoins
 	if val.GetTokens().IsZero() {
 		// can't calculate ratio for zero-token validators
-		// ergo we instead add to the community pool
+		// ergo we instead add to the FoundationPool
 		k.AppendToFoundationPool(ctx, rewards.Rewards)
 
 		outstanding := k.GetValidatorOutstandingRewards(ctx, val.GetOperator())

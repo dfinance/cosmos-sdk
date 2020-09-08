@@ -22,8 +22,7 @@ const (
 	QueryDelegatorTotalRewards          = types.QueryDelegatorTotalRewards
 	QueryDelegatorValidators            = types.QueryDelegatorValidators
 	QueryWithdrawAddr                   = types.QueryWithdrawAddr
-	QueryPublicTreasury                 = types.QueryPublicTreasury
-	QueryFoundationPool                 = types.QueryFoundationPool
+	QueryPool                           = types.QueryPool
 	DefaultParamspace                   = types.DefaultParamspace
 	TypeMsgFundPublicTreasuryPool       = types.TypeMsgFundPublicTreasuryPool
 )
@@ -85,6 +84,7 @@ var (
 	NewMsgFundPublicTreasuryPool               = types.NewMsgFundPublicTreasuryPool
 	NewMsgWithdrawFoundationPool               = types.NewMsgWithdrawFoundationPool
 	NewPublicTreasuryPoolSpendProposal         = types.NewPublicTreasuryPoolSpendProposal
+	NewTaxParamsUpdateProposal                 = types.NewTaxParamsUpdateProposal
 	NewQueryValidatorOutstandingRewardsParams  = types.NewQueryValidatorOutstandingRewardsParams
 	NewQueryValidatorCommissionParams          = types.NewQueryValidatorCommissionParams
 	NewQueryValidatorSlashesParams             = types.NewQueryValidatorSlashesParams
@@ -124,7 +124,8 @@ var (
 	AttributeKeyWithdrawAddress          = types.AttributeKeyWithdrawAddress
 	AttributeKeyValidator                = types.AttributeKeyValidator
 	AttributeValueCategory               = types.AttributeValueCategory
-	ProposalHandler                      = client.ProposalHandler
+	PublicTreasurySpendProposalHandler   = client.PublicTreasurySpendProposalHandler
+	TaxParamsUpdateProposalHandler       = client.TaxParamsUpdateProposalHandler
 )
 
 type (
@@ -146,6 +147,7 @@ type (
 	MsgWithdrawValidatorCommission         = types.MsgWithdrawValidatorCommission
 	MsgWithdrawFoundationPool              = types.MsgWithdrawFoundationPool
 	PublicTreasuryPoolSpendProposal        = types.PublicTreasuryPoolSpendProposal
+	TaxParamsUpdateProposal                = types.TaxParamsUpdateProposal
 	QueryValidatorOutstandingRewardsParams = types.QueryValidatorOutstandingRewardsParams
 	QueryValidatorCommissionParams         = types.QueryValidatorCommissionParams
 	QueryValidatorSlashesParams            = types.QueryValidatorSlashesParams
