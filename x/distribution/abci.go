@@ -12,22 +12,26 @@ import (
 // Validator power is converted to distribution power which includes lockedRewards.
 // Moving from stakingPower to distributionPower is used to rebalance distribution proportions.
 func BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock, k keeper.Keeper, mk mint.Keeper) {
-	votes := req.LastCommitInfo.GetVotes()
+	consVotes := req.LastCommitInfo.GetVotes()
 
 	// determine the total distribution power signing the block
 	// override voter's power with distribution power
 	var previousTotalPower, previousProposerPower int64
-	for i := 0; i < len(votes); i++ {
-		voteInfo := votes[i]
-		distrPower := k.GetDistributionPower(ctx, voteInfo.Validator.Address, voteInfo.Validator.Power)
+	abciVotes := make(ABCIVotes, 0, len(consVotes))
+	for _, consVote := range consVotes {
+		validator := k.ValidatorByConsAddr(ctx, consVote.Validator.Address)
+		distrPower := k.GetDistributionPower(ctx, validator.GetOperator(), consVote.Validator.Power)
 
 		previousTotalPower += distrPower
-		if voteInfo.SignedLastBlock {
+		if consVote.SignedLastBlock {
 			previousProposerPower += distrPower
 		}
 
-		voteInfo.Validator.Power = distrPower
-		votes[i] = voteInfo
+		abciVotes = append(abciVotes, ABCIVote{
+			Validator:         validator,
+			DistributionPower: distrPower,
+			SignedLastBlock:   consVote.SignedLastBlock,
+		})
 	}
 
 	// TODO this is Tendermint-dependent
@@ -39,7 +43,7 @@ func BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock, k keeper.Keeper, 
 
 		previousProposer := k.GetPreviousProposerConsAddr(ctx)
 
-		k.AllocateTokens(ctx, previousProposerPower, previousTotalPower, previousProposer, votes, dynamicFoundationPoolTax)
+		k.AllocateTokens(ctx, previousProposerPower, previousTotalPower, previousProposer, abciVotes, dynamicFoundationPoolTax)
 	}
 
 	// record the proposer for when we payout on the next block

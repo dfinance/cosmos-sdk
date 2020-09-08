@@ -3,6 +3,7 @@ package keeper
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
+	"github.com/cosmos/cosmos-sdk/x/staking"
 	"github.com/cosmos/cosmos-sdk/x/supply/exported"
 )
 
@@ -21,4 +22,9 @@ func (k Keeper) GetRewardPoolsCoins(ctx sdk.Context) sdk.DecCoins {
 // GetDistributionAccount returns the distribution ModuleAccount.
 func (k Keeper) GetDistributionAccount(ctx sdk.Context) exported.ModuleAccountI {
 	return k.supplyKeeper.GetModuleAccount(ctx, types.ModuleName)
+}
+
+// ValidatorByConsAddr returns validator by consensus voter address.
+func (k Keeper) ValidatorByConsAddr(ctx sdk.Context, address sdk.ConsAddress) staking.ValidatorI {
+	return k.stakingKeeper.ValidatorByConsAddr(ctx, address)
 }

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	abci "github.com/tendermint/tendermint/abci/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
@@ -77,13 +76,17 @@ func TestAllocateTokensToManyValidators(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
-	abciValA := abci.Validator{
-		Address: valConsPk1.Address(),
-		Power:   100,
-	}
-	abciValB := abci.Validator{
-		Address: valConsPk2.Address(),
-		Power:   100,
+	votes := types.ABCIVotes{
+		{
+			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
+			DistributionPower: 100,
+			SignedLastBlock: true,
+		},
+		{
+			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk2.Address())),
+			DistributionPower: 100,
+			SignedLastBlock: true,
+		},
 	}
 
 	// assert initial state: zero outstanding rewards, zero pools, zero commission, zero current rewards
@@ -107,16 +110,7 @@ func TestAllocateTokensToManyValidators(t *testing.T) {
 	require.NoError(t, err)
 	ak.SetAccount(ctx, feeCollector)
 
-	votes := []abci.VoteInfo{
-		{
-			Validator:       abciValA,
-			SignedLastBlock: true,
-		},
-		{
-			Validator:       abciValB,
-			SignedLastBlock: true,
-		},
-	}
+	// allocate
 	k.AllocateTokens(ctx, 200, 200, valConsAddr2, votes, sdk.ZeroDec())
 
 	// val1, val2: outstanding rewards (100% as no pools distribution involved)
@@ -179,17 +173,22 @@ func TestAllocateTokensTruncation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
-	abciValA := abci.Validator{
-		Address: valConsPk1.Address(),
-		Power:   11,
-	}
-	abciValB := abci.Validator{
-		Address: valConsPk2.Address(),
-		Power:   10,
-	}
-	abciValС := abci.Validator{
-		Address: valConsPk3.Address(),
-		Power:   10,
+	votes := types.ABCIVotes{
+		{
+			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
+			DistributionPower: 11,
+			SignedLastBlock: true,
+		},
+		{
+			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk2.Address())),
+			DistributionPower: 10,
+			SignedLastBlock: true,
+		},
+		{
+			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk3.Address())),
+			DistributionPower: 10,
+			SignedLastBlock: true,
+		},
 	}
 
 	// assert initial state: zero outstanding rewards, zero public treasury pool, zero commission, zero current rewards
@@ -210,23 +209,9 @@ func TestAllocateTokensTruncation(t *testing.T) {
 
 	err = feeCollector.SetCoins(fees)
 	require.NoError(t, err)
-
 	ak.SetAccount(ctx, feeCollector)
 
-	votes := []abci.VoteInfo{
-		{
-			Validator:       abciValA,
-			SignedLastBlock: true,
-		},
-		{
-			Validator:       abciValB,
-			SignedLastBlock: true,
-		},
-		{
-			Validator:       abciValС,
-			SignedLastBlock: true,
-		},
-	}
+	// allocate
 	k.AllocateTokens(ctx, 31, 31, valConsAddr2, votes, sdk.ZeroDec())
 
 	// check validators has outstanding rewards
@@ -278,17 +263,17 @@ func TestAllocateTokensPools(t *testing.T) {
 
 	// prepare voting results (validators has the same power)
 	// validator1 is a proposer
-	abciValA := abci.Validator{
-		Address: valConsPk1.Address(),
-		Power:   10,
-	}
-	abciValB := abci.Validator{
-		Address: valConsPk2.Address(),
-		Power:   10,
-	}
-	votes := []abci.VoteInfo{
-		{Validator: abciValA, SignedLastBlock: true},
-		{Validator: abciValB, SignedLastBlock: false},
+	votes := types.ABCIVotes{
+		{
+			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
+			DistributionPower: 10,
+			SignedLastBlock: true,
+		},
+		{
+			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk2.Address())),
+			DistributionPower: 10,
+			SignedLastBlock: false,
+		},
 	}
 
 	// assert initial state: zero outstanding rewards, zero pools, zero distr module balance
@@ -318,7 +303,7 @@ func TestAllocateTokensPools(t *testing.T) {
 
 	// allocate tokens with foundation part of 1%
 	foundationTax := sdk.NewDecWithPrec(1, 2)
-	k.AllocateTokens(ctx, abciValA.Power, abciValA.Power+abciValB.Power, valConsAddr1, votes, foundationTax)
+	k.AllocateTokens(ctx, votes[0].DistributionPower, votes.TotalDistributionPower(), valConsAddr1, votes, foundationTax)
 
 	// check reward pools distribution and only one coin exists in a pool
 	rewardPools := k.GetRewardPools(ctx)
@@ -464,12 +449,12 @@ func TestAllocatePublicTreasuryOverflow(t *testing.T) {
 	}
 
 	// prepare voting results
-	abciVal := abci.Validator{
-		Address: valConsPk1.Address(),
-		Power:   10,
-	}
-	votes := []abci.VoteInfo{
-		{Validator: abciVal, SignedLastBlock: true},
+	votes := types.ABCIVotes{
+		{
+			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
+			DistributionPower: 10,
+			SignedLastBlock: true,
+		},
 	}
 
 	// allocate current fees
@@ -495,7 +480,7 @@ func TestAllocatePublicTreasuryOverflow(t *testing.T) {
 	}
 
 	// allocate tokens without foundation part
-	k.AllocateTokens(ctx, abciVal.Power, abciVal.Power, valConsAddr1, votes, sdk.ZeroDec())
+	k.AllocateTokens(ctx, votes[0].DistributionPower, votes.TotalDistributionPower(), valConsAddr1, votes, sdk.ZeroDec())
 
 	// check pools distribution
 	rewardPools := k.GetRewardPools(ctx)

@@ -3,8 +3,6 @@ package keeper
 import (
 	"fmt"
 
-	abci "github.com/tendermint/tendermint/abci/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 	"github.com/cosmos/cosmos-sdk/x/staking/exported"
@@ -16,7 +14,7 @@ import (
 func (k Keeper) AllocateTokens(
 	ctx sdk.Context,
 	proposerPower, totalPower int64,
-	proposer sdk.ConsAddress, votes []abci.VoteInfo,
+	proposer sdk.ConsAddress, votes types.ABCIVotes,
 	dynamicFoundationPoolTax sdk.Dec,
 ) {
 
@@ -114,11 +112,9 @@ func (k Keeper) AllocateTokens(
 	// calculate previous voters rewards relative to their power
 	voterMultiplier := sdk.OneDec().Sub(proposerMultiplier)
 	for _, vote := range votes {
-		validator := k.stakingKeeper.ValidatorByConsAddr(ctx, vote.Validator.Address)
-
-		validatorPowerRatio := sdk.NewDec(vote.Validator.Power).QuoTruncate(sdk.NewDec(totalPower))
+		validatorPowerRatio := sdk.NewDec(vote.DistributionPower).QuoTruncate(sdk.NewDec(totalPower))
 		validatorReward := validatorsPool.MulDecTruncate(voterMultiplier).MulDecTruncate(validatorPowerRatio)
-		k.AllocateTokensToValidator(ctx, validator, validatorReward)
+		k.AllocateTokensToValidator(ctx, vote.Validator, validatorReward)
 
 		feesRemainder = feesRemainder.Sub(validatorReward)
 	}

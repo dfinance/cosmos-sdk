@@ -53,6 +53,12 @@ func (f *BlockDurFilter) GetBlocksPerYear(window uint16) (uint64, error) {
 		return 0, err
 	}
 
+	// sanity check
+	// this is relevant for tests as they might not increase Header time
+	if avgDur == 0 {
+		return 0, fmt.Errorf("average duration is zero")
+	}
+
 	return uint64(AvgYearDur / avgDur), nil
 }
 

@@ -162,4 +162,6 @@ type (
 	ValidatorSlashEvent                    = types.ValidatorSlashEvent
 	ValidatorSlashEvents                   = types.ValidatorSlashEvents
 	ValidatorOutstandingRewards            = types.ValidatorOutstandingRewards
+	ABCIVote                               = types.ABCIVote
+	ABCIVotes                              = types.ABCIVotes
 )
