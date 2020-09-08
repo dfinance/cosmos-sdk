@@ -87,7 +87,7 @@ func TestProposalHandlerPassed(t *testing.T) {
 	)
 
 	tp := testProposal(params.NewParamChange(testSubspace, keyMaxValidators, "1"))
-	hdlr := params.NewParamChangeProposalHandler(input.keeper, params.RestrictedParams{})
+	hdlr := params.NewParamChangeProposalHandler(input.keeper)
 	require.NoError(t, hdlr(input.ctx, tp))
 
 	var param uint16
@@ -102,7 +102,7 @@ func TestProposalHandlerFailed(t *testing.T) {
 	)
 
 	tp := testProposal(params.NewParamChange(testSubspace, keyMaxValidators, "invalidType"))
-	hdlr := params.NewParamChangeProposalHandler(input.keeper, params.RestrictedParams{})
+	hdlr := params.NewParamChangeProposalHandler(input.keeper)
 	require.Error(t, hdlr(input.ctx, tp))
 
 	require.False(t, ss.Has(input.ctx, []byte(keyMaxValidators)))
@@ -114,7 +114,7 @@ func TestProposalHandlerUpdateOmitempty(t *testing.T) {
 		params.NewKeyTable().RegisterParamSet(&testParams{}),
 	)
 
-	hdlr := params.NewParamChangeProposalHandler(input.keeper, params.RestrictedParams{})
+	hdlr := params.NewParamChangeProposalHandler(input.keeper)
 	var param testParamsSlashingRate
 
 	tp := testProposal(params.NewParamChange(testSubspace, keySlashingRate, `{"downtime": 7}`))
@@ -138,9 +138,11 @@ func TestProposalHandlerUpdateWithRestrictedParams(t *testing.T) {
 
 	var param testParamsSlashingRate
 
-	hdlr := params.NewParamChangeProposalHandler(input.keeper, params.RestrictedParams{
+	input.keeper.SetRestrictedParams(params.RestrictedParams{
 		params.RestrictedParam{Subspace: testSubspace, Key: keyMaxValidators},
 	})
+
+	hdlr := params.NewParamChangeProposalHandler(input.keeper)
 
 	tp := testProposal(params.NewParamChange(testSubspace, keyMaxValidators, "1"))
 	err := hdlr(input.ctx, tp)

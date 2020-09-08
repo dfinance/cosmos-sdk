@@ -9,11 +9,11 @@ import (
 )
 
 // NewParamChangeProposalHandler creates a new governance Handler for a ParamChangeProposal
-func NewParamChangeProposalHandler(k Keeper, r RestrictedParams) govtypes.Handler {
+func NewParamChangeProposalHandler(k Keeper) govtypes.Handler {
 	return func(ctx sdk.Context, content govtypes.Content) error {
 		switch c := content.(type) {
 		case ParameterChangeProposal:
-			return handleParameterChangeProposal(ctx, k, c, r)
+			return handleParameterChangeProposal(ctx, k, c)
 
 		default:
 			return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized param proposal content type: %T", c)
@@ -21,14 +21,14 @@ func NewParamChangeProposalHandler(k Keeper, r RestrictedParams) govtypes.Handle
 	}
 }
 
-func handleParameterChangeProposal(ctx sdk.Context, k Keeper, p ParameterChangeProposal, r RestrictedParams) error {
+func handleParameterChangeProposal(ctx sdk.Context, k Keeper, p ParameterChangeProposal) error {
 	for _, c := range p.Changes {
 		ss, ok := k.GetSubspace(c.Subspace)
 		if !ok {
 			return sdkerrors.Wrap(ErrUnknownSubspace, c.Subspace)
 		}
 
-		if err := r.CheckRestrictions(c.Subspace, c.Key); err != nil {
+		if err := k.restrictedParams.CheckRestrictions(c.Subspace, c.Key); err != nil {
 			return err
 		}
 

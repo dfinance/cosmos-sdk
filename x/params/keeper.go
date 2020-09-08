@@ -2,6 +2,7 @@ package params
 
 import (
 	"fmt"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -13,10 +14,11 @@ import (
 
 // Keeper of the global paramstore
 type Keeper struct {
-	cdc    *codec.Codec
-	key    sdk.StoreKey
-	tkey   sdk.StoreKey
-	spaces map[string]*Subspace
+	cdc              *codec.Codec
+	key              sdk.StoreKey
+	tkey             sdk.StoreKey
+	spaces           map[string]*Subspace
+	restrictedParams RestrictedParams
 }
 
 // NewKeeper constructs a params keeper
@@ -58,4 +60,20 @@ func (k Keeper) GetSubspace(s string) (Subspace, bool) {
 		return Subspace{}, false
 	}
 	return *space, ok
+}
+
+// SetRestrictedParams sets restricted params that will be rejected for a parameter change proposal.
+func (k *Keeper) SetRestrictedParams(rp RestrictedParams) {
+	k.restrictedParams = rp
+}
+
+// CheckRestrictions checks subspace and key in restricted list.
+func (k Keeper) CheckRestrictions(subspace, key string) error {
+	for _, param := range k.restrictedParams {
+		if param.Subspace == subspace && param.Key == key {
+			return sdkerrors.Wrapf(ErrDisallowedParameter, "subspace: %s, key: %s", param.Subspace, param.Key)
+		}
+	}
+
+	return nil
 }
