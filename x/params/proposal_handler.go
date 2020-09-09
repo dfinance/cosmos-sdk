@@ -28,6 +28,10 @@ func handleParameterChangeProposal(ctx sdk.Context, k Keeper, p ParameterChangeP
 			return sdkerrors.Wrap(ErrUnknownSubspace, c.Subspace)
 		}
 
+		if err := k.CheckRestrictions(c.Subspace, c.Key); err != nil {
+			return err
+		}
+
 		k.Logger(ctx).Info(
 			fmt.Sprintf("attempt to set new parameter value; key: %s, value: %s", c.Key, c.Value),
 		)

@@ -116,3 +116,11 @@ func ValidateChanges(changes []ParamChange) error {
 
 	return nil
 }
+
+// RestrictedParams defines a parameter which can't be changed.
+type RestrictedParams []RestrictedParam
+
+type RestrictedParam struct {
+	Subspace string `json:"subspace" yaml:"subspace"`
+	Key      string `json:"key" yaml:"key"`
+}
