@@ -18,6 +18,8 @@ const (
 	Minter       = types.Minter
 	Burner       = types.Burner
 	Staking      = types.Staking
+	//
+	QueryTotalSupply = types.QueryTotalSupply
 )
 
 var (
@@ -46,4 +48,6 @@ type (
 	ModuleAccount = types.ModuleAccount
 	GenesisState  = types.GenesisState
 	Supply        = types.Supply
+	//
+	QueryTotalSupplyParams = types.QueryTotalSupplyParams
 )

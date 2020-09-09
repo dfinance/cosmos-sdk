@@ -124,6 +124,10 @@ var (
 	AttributeKeyWithdrawAddress          = types.AttributeKeyWithdrawAddress
 	AttributeKeyValidator                = types.AttributeKeyValidator
 	AttributeValueCategory               = types.AttributeValueCategory
+	LiquidityProvidersPoolName           = types.LiquidityProvidersPoolName
+	FoundationPoolName                   = types.FoundationPoolName
+	PublicTreasuryPoolName               = types.PublicTreasuryPoolName
+	HARPName                             = types.HARPName
 	PublicTreasurySpendProposalHandler   = client.PublicTreasurySpendProposalHandler
 	TaxParamsUpdateProposalHandler       = client.TaxParamsUpdateProposalHandler
 )
@@ -132,6 +136,7 @@ type (
 	Hooks                                  = keeper.Hooks
 	Keeper                                 = keeper.Keeper
 	DelegatorStartingInfo                  = types.DelegatorStartingInfo
+	RewardPoolName                         = types.RewardPoolName
 	RewardPools                            = types.RewardPools
 	DelegatorWithdrawInfo                  = types.DelegatorWithdrawInfo
 	ValidatorOutstandingRewardsRecord      = types.ValidatorOutstandingRewardsRecord
