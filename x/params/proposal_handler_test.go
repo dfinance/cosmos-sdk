@@ -129,3 +129,30 @@ func TestProposalHandlerUpdateOmitempty(t *testing.T) {
 	ss.Get(input.ctx, []byte(keySlashingRate), &param)
 	require.Equal(t, testParamsSlashingRate{10, 7}, param)
 }
+
+func TestProposalHandlerUpdateWithRestrictedParams(t *testing.T) {
+	input := newTestInput(t)
+	ss := input.keeper.Subspace(testSubspace).WithKeyTable(
+		params.NewKeyTable().RegisterParamSet(&testParams{}),
+	)
+
+	var param testParamsSlashingRate
+
+	input.keeper.SetRestrictedParams(params.RestrictedParams{
+		params.RestrictedParam{Subspace: testSubspace, Key: keyMaxValidators},
+	})
+
+	hdlr := params.NewParamChangeProposalHandler(input.keeper)
+
+	tp := testProposal(params.NewParamChange(testSubspace, keyMaxValidators, "1"))
+	err := hdlr(input.ctx, tp)
+	require.Error(t, err)
+
+	require.False(t, ss.Has(input.ctx, []byte(keyMaxValidators)))
+
+	tp = testProposal(params.NewParamChange(testSubspace, keySlashingRate, `{"double_sign": 10, "downtime": 7}`))
+	require.NoError(t, hdlr(input.ctx, tp))
+
+	ss.Get(input.ctx, []byte(keySlashingRate), &param)
+	require.Equal(t, testParamsSlashingRate{10, 7}, param)
+}

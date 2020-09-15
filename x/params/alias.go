@@ -27,6 +27,7 @@ var (
 	ErrEmptySubspace           = types.ErrEmptySubspace
 	ErrEmptyKey                = types.ErrEmptyKey
 	ErrEmptyValue              = types.ErrEmptyValue
+	ErrDisallowedParameter     = types.ErrDisallowedParameter
 	NewParameterChangeProposal = types.NewParameterChangeProposal
 	NewParamChange             = types.NewParamChange
 	ValidateChanges            = types.ValidateChanges
@@ -44,4 +45,6 @@ type (
 	KeyTable                = subspace.KeyTable
 	ParameterChangeProposal = types.ParameterChangeProposal
 	ParamChange             = types.ParamChange
+	RestrictedParams        = types.RestrictedParams
+	RestrictedParam         = types.RestrictedParam
 )
