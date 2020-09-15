@@ -108,6 +108,7 @@ var (
 	ValidatorCurrentRewardsPrefix        = types.ValidatorCurrentRewardsPrefix
 	ValidatorAccumulatedCommissionPrefix = types.ValidatorAccumulatedCommissionPrefix
 	ValidatorSlashEventPrefix            = types.ValidatorSlashEventPrefix
+	ParamKeyValidatorsPoolTax            = types.ParamKeyValidatorsPoolTax
 	ParamKeyLiquidityProvidersPoolTax    = types.ParamKeyLiquidityProvidersPoolTax
 	ParamKeyPublicTreasuryPoolTax        = types.ParamKeyPublicTreasuryPoolTax
 	ParamKeyHARPTax                      = types.ParamKeyHARPTax
