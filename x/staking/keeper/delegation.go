@@ -64,6 +64,25 @@ func (k Keeper) GetValidatorDelegations(ctx sdk.Context, valAddr sdk.ValAddress)
 	return delegations
 }
 
+// GetValidatorSelfAndTotalStakes iterates over all validator delegations and returns selfStake and totalStakes values.
+func (k Keeper) GetValidatorSelfAndTotalStakes(ctx sdk.Context, val types.Validator) (selfStake, totalStakes sdk.Int) {
+	selfStake, totalStakes = sdk.ZeroInt(), sdk.ZeroInt()
+
+	for _, delegation := range k.GetValidatorDelegations(ctx, val.OperatorAddress) {
+		if delegation.Shares.IsZero() {
+			continue
+		}
+
+		delTokens := val.TokensFromShares(delegation.Shares).TruncateInt()
+		if delegation.DelegatorAddress.Equals(val.OperatorAddress) {
+			selfStake = selfStake.Add(delTokens)
+		}
+		totalStakes = totalStakes.Add(delTokens)
+	}
+
+	return
+}
+
 // return a given amount of all the delegations from a delegator
 func (k Keeper) GetDelegatorDelegations(ctx sdk.Context, delegator sdk.AccAddress,
 	maxRetrieve uint16) (delegations []types.Delegation) {
@@ -82,6 +101,23 @@ func (k Keeper) GetDelegatorDelegations(ctx sdk.Context, delegator sdk.AccAddres
 		i++
 	}
 	return delegations[:i] // trim if the array length < maxRetrieve
+}
+
+// HasValidatorDelegationsOverflow checks if current validator total staked coins are GT than the limit.
+func (k Keeper) HasValidatorDelegationsOverflow(ctx sdk.Context, valSelfState, valTotalStakes sdk.Int) (overflow bool, maxDelegatedLimit sdk.Int) {
+	maxDelegationsRatio := k.MaxDelegationsRatio(ctx)
+
+	// True for unbonding / unbonded validators
+	if valSelfState.IsZero() {
+		return
+	}
+
+	maxDelegatedLimit = sdk.NewDecFromInt(valSelfState).Mul(maxDelegationsRatio).TruncateInt()
+	if valTotalStakes.GT(maxDelegatedLimit) {
+		overflow = true
+	}
+
+	return
 }
 
 // set a delegation
@@ -533,6 +569,16 @@ func (k Keeper) Delegate(
 	// Update delegation
 	delegation.Shares = delegation.Shares.Add(newShares)
 	k.SetDelegation(ctx, delegation)
+
+	// Check if max delegations overflow occurs after this delegation
+	valSelfState, valStakesTotal := k.GetValidatorSelfAndTotalStakes(ctx, validator)
+	if overflow, curLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfState, valStakesTotal); overflow {
+		return sdk.Dec{}, sdkerrors.Wrapf(
+			types.ErrMaxDelegationsLimit,
+			"current tokens limit for %s: %s",
+			validator.GetOperator().String(), curLimit.String(),
+		)
+	}
 
 	// Call the after-modification hook
 	k.AfterDelegationModified(ctx, delegation.DelegatorAddress, delegation.ValidatorAddress)

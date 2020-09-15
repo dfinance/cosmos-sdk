@@ -596,15 +596,15 @@ func TestMultipleMsgDelegate(t *testing.T) {
 	ctx, _, keeper, _ := keep.CreateTestInput(t, false, 1000)
 	validatorAddr, delegatorAddrs := sdk.ValAddress(keep.Addrs[0]), keep.Addrs[1:]
 
-	// first make a validator
-	msgCreateValidator := NewTestMsgCreateValidator(validatorAddr, keep.PKs[0], sdk.NewInt(10))
+	// first make a validator (big selfStake to prevent max delegations overflow)
+	msgCreateValidator := NewTestMsgCreateValidator(validatorAddr, keep.PKs[0], sdk.NewInt(100))
 	res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
 	// delegate multiple parties
 	for _, delegatorAddr := range delegatorAddrs {
-		msgDelegate := NewTestMsgDelegate(delegatorAddr, validatorAddr, sdk.NewInt(10))
+		msgDelegate := NewTestMsgDelegate(delegatorAddr, validatorAddr, sdk.NewInt(1))
 		res, err := handleMsgDelegate(ctx, msgDelegate, keeper)
 		require.NoError(t, err)
 		require.NotNil(t, res)
@@ -617,7 +617,7 @@ func TestMultipleMsgDelegate(t *testing.T) {
 
 	// unbond them all
 	for _, delegatorAddr := range delegatorAddrs {
-		unbondAmt := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(10))
+		unbondAmt := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(1))
 		msgUndelegate := NewMsgUndelegate(delegatorAddr, validatorAddr, unbondAmt)
 
 		res, err := handleMsgUndelegate(ctx, msgUndelegate, keeper)
@@ -1431,4 +1431,216 @@ func TestInvalidMinSelfDelegation(t *testing.T) {
 	res, err = handleMsgCreateValidator(ctx, msgCreate, keeper)
 	require.NoError(t, err)
 	require.NotNil(t, res)
+}
+
+func TestDebug(t *testing.T) {
+	operatorAddr := keep.Addrs[0]
+	del1Addr := keep.Addrs[1]
+	del2Addr := keep.Addrs[2]
+
+	valAddr := sdk.ValAddress(keep.Addrs[0])
+	valPubKey := keep.PKs[0]
+
+	initPower := int64(100)
+	ctx, _, keeper, _ := keep.CreateTestInput(t, false, initPower)
+
+	getCurState := func(prefix string) (types.Validator, types.Delegations) {
+		val, ok := keeper.GetValidator(ctx, valAddr)
+		require.True(t, ok)
+
+		dels := keeper.GetValidatorDelegations(ctx, valAddr)
+
+		t.Logf("%s: validator.Tokens: %s", prefix, val.GetTokens())
+		t.Logf("%s: validator.Shares: %s", prefix, val.GetDelegatorShares())
+
+		for i, del := range dels {
+			t.Logf("%s: validator.Delegations[%d] (%s): %s", prefix, i, del.DelegatorAddress, del.Shares)
+		}
+
+		return val, dels
+	}
+
+	t.Logf("OperatorAddr:   %s", operatorAddr)
+	t.Logf("Delegator1Addr: %s", del1Addr)
+	t.Logf("Delegator2Addr: %s", del2Addr)
+
+	// create validator
+	selfStakePower := int64(100)
+	selfStateAmt := sdk.TokensFromConsensusPower(selfStakePower)
+	msgCreateValidator := NewTestMsgCreateValidator(valAddr, valPubKey, selfStateAmt)
+	res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	//
+	val, _ := getCurState("SelfStake")
+
+	// delegate
+	del1Power := int64(50)
+	del1Amt := sdk.TokensFromConsensusPower(del1Power)
+	_, err = keeper.Delegate(ctx, del1Addr, del1Amt, sdk.Unbonded, val, true)
+	require.NoError(t, err)
+	val, _ = getCurState("Delegation1")
+	//
+	del2Power := int64(25)
+	del2Amt := sdk.TokensFromConsensusPower(del2Power)
+	_, err = keeper.Delegate(ctx, del2Addr, del2Amt, sdk.Unbonded, val, true)
+	require.NoError(t, err)
+	getCurState("Delegation2")
+}
+
+// Test delegating over validator max delegations level
+func TestDelegationOverMaxLimit(t *testing.T) {
+	del1Addr := keep.Addrs[1]
+	del2Addr := keep.Addrs[2]
+
+	valAddr := sdk.ValAddress(keep.Addrs[0])
+	valPubKey := keep.PKs[0]
+
+	initPower := int64(100000)
+	ctx, _, keeper, _ := keep.CreateTestInput(t, false, initPower)
+
+	// create validator
+	selfStakePower := int64(10)
+	selfStateAmt := sdk.TokensFromConsensusPower(selfStakePower)
+	{
+		msgCreateValidator := NewTestMsgCreateValidator(valAddr, valPubKey, selfStateAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	getUpdatedVal := func() types.Validator {
+		val, ok := keeper.GetValidator(ctx, valAddr)
+		require.True(t, ok)
+		return val
+	}
+
+	// estimate the delegation limit and current limit
+	maxDelRatio := keeper.MaxDelegationsRatio(ctx)
+	maxDelAmt := sdk.NewDecFromInt(selfStateAmt).Mul(maxDelRatio).TruncateInt()
+	curDelLimit := maxDelAmt.Sub(selfStateAmt)
+
+	// delegator 1: delegate
+	{
+		delPower := sdk.TokensToConsensusPower(curDelLimit.QuoRaw(2))
+		delAmt := sdk.TokensFromConsensusPower(delPower)
+
+		_, err := keeper.Delegate(ctx, del1Addr, delAmt, sdk.Unbonded, getUpdatedVal(), true)
+		require.NoError(t, err)
+		curDelLimit = curDelLimit.Sub(delAmt)
+	}
+
+	// delegator 2: delegate to the limit
+	{
+		delPower := sdk.TokensToConsensusPower(curDelLimit)
+		delAmt := sdk.TokensFromConsensusPower(delPower)
+
+		_, err := keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getUpdatedVal(), true)
+		require.NoError(t, err)
+		curDelLimit = curDelLimit.Sub(delAmt)
+	}
+
+	// delegator 2: delegate over the limit
+	{
+		delAmt := sdk.OneInt()
+
+		_, err := keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getUpdatedVal(), true)
+		require.Error(t, err)
+		require.True(t, types.ErrMaxDelegationsLimit.Is(err))
+	}
+}
+
+// Test redelegating over validator max delegations level
+func TestRedelegationOverMaxLimit(t *testing.T) {
+	del1Addr := keep.Addrs[2]
+	del2Addr := keep.Addrs[3]
+
+	val1Addr, val2Addr := sdk.ValAddress(keep.Addrs[0]), sdk.ValAddress(keep.Addrs[1])
+	val1PubKey, val2PubKey := keep.PKs[0], keep.PKs[1]
+
+	initPower := int64(100000)
+	ctx, _, keeper, _ := keep.CreateTestInput(t, false, initPower)
+
+	// create validators
+	selfStakePower := int64(10)
+	selfStateAmt := sdk.TokensFromConsensusPower(selfStakePower)
+	{
+		msgCreateValidator := NewTestMsgCreateValidator(val1Addr, val1PubKey, selfStateAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+	{
+		msgCreateValidator := NewTestMsgCreateValidator(val2Addr, val2PubKey, selfStateAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	getUpdatedVal := func(idx int) types.Validator {
+		var valAddr sdk.ValAddress
+		switch idx {
+		case 1:
+			valAddr = val1Addr
+		case 2:
+			valAddr = val2Addr
+		}
+
+		val, ok := keeper.GetValidator(ctx, valAddr)
+		require.True(t, ok)
+
+		return val
+	}
+
+	// estimate the delegation limit and current limit (equal for both validators)
+	maxDelRatio := keeper.MaxDelegationsRatio(ctx)
+	maxDelAmt := sdk.NewDecFromInt(selfStateAmt).Mul(maxDelRatio).TruncateInt()
+	curDelLimit := maxDelAmt.Sub(selfStateAmt)
+
+	// delegator 1: delegate to the validator 1 to the limit
+	{
+		delPower := sdk.TokensToConsensusPower(curDelLimit)
+		delAmt := sdk.TokensFromConsensusPower(delPower)
+
+		_, err := keeper.Delegate(ctx, del1Addr, delAmt, sdk.Unbonded, getUpdatedVal(1), true)
+		require.NoError(t, err)
+	}
+
+	// delegator 2: delegate to the validator 2 below the limit
+	{
+		delPower := sdk.TokensToConsensusPower(curDelLimit.QuoRaw(2))
+		delAmt := sdk.TokensFromConsensusPower(delPower)
+
+		_, err := keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getUpdatedVal(2), true)
+		require.NoError(t, err)
+	}
+
+	// delegator 1: redelegate from the 1st to the 2nd validator (that would max up the 2nd)
+	{
+		val1, val2 := getUpdatedVal(1), getUpdatedVal(2)
+
+		reDelPower := sdk.TokensToConsensusPower(curDelLimit.QuoRaw(2))
+		reDelAmt := sdk.TokensFromConsensusPower(reDelPower)
+
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val1.OperatorAddress, reDelAmt)
+		require.NoError(t, err)
+
+		_, err = keeper.BeginRedelegation(ctx, del1Addr, val1.OperatorAddress, val2.OperatorAddress, reDelShares)
+		require.NoError(t, err)
+	}
+
+	// delegator 1: redelegate from the 1st to the 2nd validator remaining shares (the 2nd is maxed up, so it should fail)
+	{
+		val1, val2 := getUpdatedVal(1), getUpdatedVal(2)
+
+		reDelPower := sdk.TokensToConsensusPower(curDelLimit.QuoRaw(2))
+		reDelAmt := sdk.TokensFromConsensusPower(reDelPower)
+
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val1.OperatorAddress, reDelAmt)
+		require.NoError(t, err)
+
+		_, err = keeper.BeginRedelegation(ctx, del1Addr, val1.OperatorAddress, val2.OperatorAddress, reDelShares)
+		require.Error(t, err)
+		require.True(t, types.ErrMaxDelegationsLimit.Is(err))
+	}
 }

@@ -56,6 +56,12 @@ func (k Keeper) MinSelfDelegationLvl(ctx sdk.Context) (res sdk.Int) {
 	return
 }
 
+// MaxDelegationsRatio - max delegations ratio (MaxDelegationsAmount = SelfDelegation * MaxDelegationsRatio)
+func (k Keeper) MaxDelegationsRatio(ctx sdk.Context) (res sdk.Dec) {
+	k.paramstore.Get(ctx, types.KeyMaxDelegationsRatio, &res)
+	return
+}
+
 // Get all parameteras as types.Params
 func (k Keeper) GetParams(ctx sdk.Context) types.Params {
 	return types.NewParams(
@@ -65,6 +71,7 @@ func (k Keeper) GetParams(ctx sdk.Context) types.Params {
 		k.HistoricalEntries(ctx),
 		k.BondDenom(ctx),
 		k.MinSelfDelegationLvl(ctx),
+		k.MaxDelegationsRatio(ctx),
 	)
 }
 
