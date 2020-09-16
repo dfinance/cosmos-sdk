@@ -62,6 +62,11 @@ func (k Keeper) MaxDelegationsRatio(ctx sdk.Context) (res sdk.Dec) {
 	return
 }
 
+func (k Keeper) ScheduledUnbondDelay(ctx sdk.Context) (res time.Duration) {
+	k.paramstore.Get(ctx, types.KeyScheduledUnbondDelayTime, &res)
+	return
+}
+
 // Get all parameteras as types.Params
 func (k Keeper) GetParams(ctx sdk.Context) types.Params {
 	return types.NewParams(
@@ -72,6 +77,7 @@ func (k Keeper) GetParams(ctx sdk.Context) types.Params {
 		k.BondDenom(ctx),
 		k.MinSelfDelegationLvl(ctx),
 		k.MaxDelegationsRatio(ctx),
+		k.ScheduledUnbondDelay(ctx),
 	)
 }
 

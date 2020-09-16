@@ -57,6 +57,7 @@ func RandomizedGenState(simState *module.SimulationState) {
 		3, sdk.DefaultBondDenom,
 		sdk.NewInt(types.DefaultMinSelfDelegationLvl),
 		sdk.NewDecWithPrec(1000, types.DefaultMaxDelegationsRatioPrecision),
+		types.DefaultScheduledUnbondTime,
 	)
 
 	// validators & delegations

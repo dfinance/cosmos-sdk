@@ -572,12 +572,21 @@ func (k Keeper) Delegate(
 
 	// Check if max delegations overflow occurs after this delegation
 	valSelfState, valStakesTotal := k.GetValidatorSelfAndTotalStakes(ctx, validator)
-	if overflow, curLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfState, valStakesTotal); overflow {
+	if overflow, valStakeLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfState, valStakesTotal); overflow {
 		return sdk.Dec{}, sdkerrors.Wrapf(
 			types.ErrMaxDelegationsLimit,
 			"current tokens limit for %s: %s",
-			validator.GetOperator().String(), curLimit.String(),
+			validator.GetOperator().String(), valStakeLimit.String(),
 		)
+	} else {
+		// If overflow is fixed by this delegation, undo
+		if validator.ScheduledToUnbond {
+			k.unscheduleValidatorForceUnbond(ctx, validator)
+			k.Logger(ctx).Info(fmt.Sprintf(
+				"Validator %s ScheduledUnbond status revoked due to delegation from %s: selfStake / totalStaked / stakeLimit: %s / %s / %s",
+				validator.GetOperator(), delAddr, valSelfState, valStakesTotal, valStakeLimit,
+			))
+		}
 	}
 
 	// Call the after-modification hook
@@ -637,6 +646,27 @@ func (k Keeper) unbond(
 	// remove the shares and coins from the validator
 	// NOTE that the amount is later (in keeper.Delegation) moved between staking module pools
 	validator, amount = k.RemoveValidatorTokensAndShares(ctx, validator, shares)
+
+	// Check if max delegations overflow occurs after this delegation (primary by undelegating selfStake)
+	valSelfState, valStakesTotal := k.GetValidatorSelfAndTotalStakes(ctx, validator)
+	if overflow, valStakeLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfState, valStakesTotal); overflow {
+		if !validator.ScheduledToUnbond {
+			k.scheduleValidatorForceUnbond(ctx, validator)
+			k.Logger(ctx).Info(fmt.Sprintf(
+				"Validator %s ScheduledUnbond status set due to undelegation/redelegation from %s: selfStake / totalStaked / stakeLimit: %s / %s / %s",
+				valAddr, delAddr, valSelfState, valStakesTotal, valStakeLimit,
+			))
+		}
+	} else {
+		// Overflow might be fixed by lowering current delegations amount
+		if validator.ScheduledToUnbond {
+			k.unscheduleValidatorForceUnbond(ctx, validator)
+			k.Logger(ctx).Info(fmt.Sprintf(
+				"Validator %s ScheduledUnbond status revoked due to undelegation/redelegation from %s: selfStake / totalStaked / stakeLimit: %s / %s / %s",
+				valAddr, delAddr, valSelfState, valStakesTotal, valStakeLimit,
+			))
+		}
+	}
 
 	if validator.DelegatorShares.IsZero() && validator.IsUnbonded() {
 		// if not unbonded, we must instead remove validator in EndBlocker once it finishes its unbonding period

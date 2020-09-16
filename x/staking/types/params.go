@@ -34,17 +34,22 @@ const (
 	// Default max delegations ratio (10.0)
 	DefaultMaxDelegationsRatioBase      = 10
 	DefaultMaxDelegationsRatioPrecision = 0
+
+	// Default duration for validator.ScheduledToUnbond flag to be raised up
+	// After the period is over, force validator unbond is performed
+	DefaultScheduledUnbondTime time.Duration = time.Hour * 24 * 7
 )
 
 // nolint - Keys for parameter access
 var (
-	KeyUnbondingTime        = []byte("UnbondingTime")
-	KeyMaxValidators        = []byte("MaxValidators")
-	KeyMaxEntries           = []byte("KeyMaxEntries")
-	KeyBondDenom            = []byte("BondDenom")
-	KeyHistoricalEntries    = []byte("HistoricalEntries")
-	KeyMinSelfDelegationLvl = []byte("MinSelfDelegationLvl")
-	KeyMaxDelegationsRatio  = []byte("MaxDelegationsRatio")
+	KeyUnbondingTime            = []byte("UnbondingTime")
+	KeyMaxValidators            = []byte("MaxValidators")
+	KeyMaxEntries               = []byte("KeyMaxEntries")
+	KeyBondDenom                = []byte("BondDenom")
+	KeyHistoricalEntries        = []byte("HistoricalEntries")
+	KeyMinSelfDelegationLvl     = []byte("MinSelfDelegationLvl")
+	KeyMaxDelegationsRatio      = []byte("MaxDelegationsRatio")
+	KeyScheduledUnbondDelayTime = []byte("ScheduledUnbondDelayTime")
 )
 
 var _ params.ParamSet = (*Params)(nil)
@@ -65,6 +70,8 @@ type Params struct {
 	MinSelfDelegationLvl sdk.Int `json:"min_self_delegation_lvl" yaml:"min_self_delegation_lvl"`
 	// Max delegations per validator is limited by (CurrentSelfDelegation * KeyMaxDelegationsRatio)
 	MaxDelegationsRatio sdk.Dec `json:"max_delegations_ratio" yaml:"max_delegations_ratio"`
+	// Time duration of validator.ScheduledToUnbond to be raised up before forced unbonding is done
+	ScheduledUnbondDelayTime time.Duration `json:"scheduled_unbond_delay" yaml:"scheduled_unbond_delay"`
 }
 
 // NewParams creates a new Params instance
@@ -74,16 +81,18 @@ func NewParams(
 	bondDenom string,
 	minSelfDelegationLvl sdk.Int,
 	maxDelegationsRatio sdk.Dec,
+	scheduledUnbondDelay time.Duration,
 ) Params {
 
 	return Params{
-		UnbondingTime:        unbondingTime,
-		MaxValidators:        maxValidators,
-		MaxEntries:           maxEntries,
-		HistoricalEntries:    historicalEntries,
-		BondDenom:            bondDenom,
-		MinSelfDelegationLvl: minSelfDelegationLvl,
-		MaxDelegationsRatio:  maxDelegationsRatio,
+		UnbondingTime:            unbondingTime,
+		MaxValidators:            maxValidators,
+		MaxEntries:               maxEntries,
+		HistoricalEntries:        historicalEntries,
+		BondDenom:                bondDenom,
+		MinSelfDelegationLvl:     minSelfDelegationLvl,
+		MaxDelegationsRatio:      maxDelegationsRatio,
+		ScheduledUnbondDelayTime: scheduledUnbondDelay,
 	}
 }
 
@@ -97,6 +106,7 @@ func (p *Params) ParamSetPairs() params.ParamSetPairs {
 		params.NewParamSetPair(KeyBondDenom, &p.BondDenom, validateBondDenom),
 		params.NewParamSetPair(KeyMinSelfDelegationLvl, &p.MinSelfDelegationLvl, validateMinSelfDelegationLvl),
 		params.NewParamSetPair(KeyMaxDelegationsRatio, &p.MaxDelegationsRatio, validateMaxDelegationsRatio),
+		params.NewParamSetPair(KeyScheduledUnbondDelayTime, &p.ScheduledUnbondDelayTime, validateScheduledUnbondDelayTime),
 	}
 }
 
@@ -118,6 +128,7 @@ func DefaultParams() Params {
 		sdk.DefaultBondDenom,
 		sdk.NewInt(DefaultMinSelfDelegationLvl),
 		sdk.NewDecWithPrec(DefaultMaxDelegationsRatioBase, DefaultMaxDelegationsRatioPrecision),
+		DefaultScheduledUnbondTime,
 	)
 }
 
@@ -129,8 +140,13 @@ func (p Params) String() string {
   Max Entries:            %d
   Historical Entries:     %d
   Bonded Coin Denom:      %s
-  Min SelfDelegation lvl: %s`,
-		p.UnbondingTime, p.MaxValidators, p.MaxEntries, p.HistoricalEntries, p.BondDenom, p.MinSelfDelegationLvl)
+  Min SelfDelegation lvl: %s
+  Max Delegations Ratio:  %s
+  Scheduled Unbond Delay: %s
+`,
+		p.UnbondingTime, p.MaxValidators, p.MaxEntries, p.HistoricalEntries, p.BondDenom,
+		p.MinSelfDelegationLvl, p.MaxDelegationsRatio, p.ScheduledUnbondDelayTime,
+	)
 }
 
 // unmarshal the current staking params value from store key or panic
@@ -169,6 +185,9 @@ func (p Params) Validate() error {
 		return err
 	}
 	if err := validateMaxDelegationsRatio(p.MaxDelegationsRatio); err != nil {
+		return err
+	}
+	if err := validateScheduledUnbondDelayTime(p.ScheduledUnbondDelayTime); err != nil {
 		return err
 	}
 
@@ -274,6 +293,21 @@ func validateMaxDelegationsRatio(i interface{}) error {
 
 	if v.LT(sdk.OneDec()) {
 		return fmt.Errorf("%s: must be GTE than 1.0: %s", paramName, v.String())
+	}
+
+	return nil
+}
+
+func validateScheduledUnbondDelayTime(i interface{}) error {
+	const paramName = "scheduled unbond delay time"
+
+	v, ok := i.(time.Duration)
+	if !ok {
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	if v <= 0 {
+		return fmt.Errorf("%s: must be positive: %d", paramName, v)
 	}
 
 	return nil

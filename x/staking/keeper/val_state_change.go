@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"time"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 
@@ -24,6 +25,9 @@ func (k Keeper) BlockValidatorUpdates(ctx sdk.Context) []abci.ValidatorUpdate {
 	// ApplyAndReturnValidatorSetUpdates and then Unbonding -> Unbonded during
 	// UnbondAllMatureValidatorQueue).
 	validatorUpdates := k.ApplyAndReturnValidatorSetUpdates(ctx)
+
+	// Perform scheduled unbonding
+	k.ProcessAllScheduledUnbondQueueMatureValidators(ctx)
 
 	// Unbond all mature validators from the unbonding queue.
 	k.UnbondAllMatureValidatorQueue(ctx)
@@ -86,7 +90,6 @@ func (k Keeper) BlockValidatorUpdates(ctx sdk.Context) []abci.ValidatorUpdate {
 // at the previous block height or were removed from the validator set entirely
 // are returned to Tendermint.
 func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx sdk.Context) (updates []abci.ValidatorUpdate) {
-
 	maxValidators := k.GetParams(ctx).MaxValidators
 	totalPower := sdk.ZeroInt()
 	amtFromBondedToNotBonded, amtFromNotBondedToBonded := sdk.ZeroInt(), sdk.ZeroInt()
@@ -100,7 +103,6 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx sdk.Context) (updates []ab
 	iterator := k.ValidatorsPowerStoreIterator(ctx)
 	defer iterator.Close()
 	for count := 0; iterator.Valid() && count < int(maxValidators); iterator.Next() {
-
 		// everything that is iterated in this loop is becoming or already a
 		// part of the bonded validator set
 
@@ -227,6 +229,44 @@ func (k Keeper) jailValidator(ctx sdk.Context, validator types.Validator) {
 	k.DeleteValidatorByPowerIndex(ctx, validator)
 }
 
+// schedule validator force unbond
+func (k Keeper) scheduleValidatorForceUnbond(ctx sdk.Context, validator types.Validator) {
+	delayPeriod := k.ScheduledUnbondDelay(ctx)
+
+	if validator.ScheduledToUnbond {
+		panic(fmt.Sprintf("cannot schedule force unbond validator, validator: %v\n", validator))
+	}
+
+	updValidator := validator.ScheduleValidatorForceUnbond(ctx.BlockHeight(), ctx.BlockTime(), delayPeriod)
+	k.SetValidator(ctx, updValidator)
+	k.InsertScheduledUnbondQueueValidator(ctx, updValidator)
+
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			types.EventTypeScheduleUnbond,
+			sdk.NewAttribute(types.AttributeKeyValidator, updValidator.GetOperator().String()),
+			sdk.NewAttribute(types.AttributeKeyCompletionTime, updValidator.ScheduledUnbondStartTime.Format(time.RFC3339)),
+		),
+	)
+}
+
+// unschedule validator force unbond
+func (k Keeper) unscheduleValidatorForceUnbond(ctx sdk.Context, validator types.Validator) {
+	if !validator.ScheduledToUnbond {
+		panic(fmt.Sprintf("cannot unschedule force unbond validator, validator: %v\n", validator))
+	}
+
+	k.DeleteScheduledUnbondQueueValidator(ctx, validator)
+	k.SetValidator(ctx, validator.UnscheduleValidatorForceUnbond())
+
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			types.EventTypeUnscheduleUnbond,
+			sdk.NewAttribute(types.AttributeKeyValidator, validator.GetOperator().String()),
+		),
+	)
+}
+
 // remove a validator from jail
 func (k Keeper) unjailValidator(ctx sdk.Context, validator types.Validator) {
 	if !validator.Jailed {
@@ -261,7 +301,6 @@ func (k Keeper) bondValidator(ctx sdk.Context, validator types.Validator) types.
 
 // perform all the store operations for when a validator begins unbonding
 func (k Keeper) beginUnbondingValidator(ctx sdk.Context, validator types.Validator) types.Validator {
-
 	params := k.GetParams(ctx)
 
 	// delete the validator by power index, as the key will change
@@ -296,6 +335,38 @@ func (k Keeper) completeUnbondingValidator(ctx sdk.Context, validator types.Vali
 	validator = validator.UpdateStatus(sdk.Unbonded)
 	k.SetValidator(ctx, validator)
 	return validator
+}
+
+// completeForceUnbondValidator performs validator force unbond operations.
+// Validator might be deleted during the operation, so the return value is a pointer.
+func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Validator) (retValidator *types.Validator) {
+	k.Logger(ctx).Info(fmt.Sprintf("Validator %s ScheduledUnbond processing", validator.OperatorAddress))
+
+	for _, delegation := range k.GetValidatorDelegations(ctx, validator.OperatorAddress) {
+		completionTime, err := k.Undelegate(ctx, delegation.DelegatorAddress, validator.OperatorAddress, delegation.Shares)
+		if err != nil {
+			panic(fmt.Errorf(
+				"force unbond delegation %s for validator %s: %v",
+				delegation.DelegatorAddress, validator.OperatorAddress, err),
+			)
+		}
+
+		ctx.EventManager().EmitEvents(sdk.Events{
+			sdk.NewEvent(
+				types.EventTypeForceUnbond,
+				sdk.NewAttribute(types.AttributeKeyValidator, validator.OperatorAddress.String()),
+				sdk.NewAttribute(sdk.AttributeKeyShare, delegation.Shares.String()),
+				sdk.NewAttribute(types.AttributeKeyCompletionTime, completionTime.Format(time.RFC3339)),
+			),
+		})
+	}
+
+	updValidator, found := k.GetValidator(ctx, validator.OperatorAddress)
+	if found {
+		retValidator = &updValidator
+	}
+
+	return
 }
 
 // map of operator addresses to serialized power

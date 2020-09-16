@@ -39,45 +39,68 @@ var _ exported.ValidatorI = Validator{}
 // divided by the current exchange rate. Voting power can be calculated as total
 // bonded shares multiplied by exchange rate.
 type Validator struct {
-	OperatorAddress         sdk.ValAddress `json:"operator_address" yaml:"operator_address"`       // address of the validator's operator; bech encoded in JSON
-	ConsPubKey              crypto.PubKey  `json:"consensus_pubkey" yaml:"consensus_pubkey"`       // the consensus public key of the validator; bech encoded in JSON
-	Jailed                  bool           `json:"jailed" yaml:"jailed"`                           // has the validator been jailed from bonded status?
-	Status                  sdk.BondStatus `json:"status" yaml:"status"`                           // validator status (bonded/unbonding/unbonded)
-	Tokens                  sdk.Int        `json:"tokens" yaml:"tokens"`                           // delegated tokens (incl. self-delegation)
-	DelegatorShares         sdk.Dec        `json:"delegator_shares" yaml:"delegator_shares"`       // total shares issued to a validator's delegators
-	Description             Description    `json:"description" yaml:"description"`                 // description terms for the validator
-	UnbondingHeight         int64          `json:"unbonding_height" yaml:"unbonding_height"`       // if unbonding, height at which this validator has begun unbonding
-	UnbondingCompletionTime time.Time      `json:"unbonding_time" yaml:"unbonding_time"`           // if unbonding, min time for the validator to complete unbonding
-	Commission              Commission     `json:"commission" yaml:"commission"`                   // commission parameters
-	MinSelfDelegation       sdk.Int        `json:"min_self_delegation" yaml:"min_self_delegation"` // validator's self declared minimum self delegation
+	// Address of the validator's operator; bech encoded in JSON
+	OperatorAddress sdk.ValAddress `json:"operator_address" yaml:"operator_address"`
+	// Consensus public key of the validator; bech encoded in JSON
+	ConsPubKey crypto.PubKey `json:"consensus_pubkey" yaml:"consensus_pubkey"`
+	// Has the validator been jailed from bonded status?
+	Jailed bool `json:"jailed" yaml:"jailed"`
+	// Has the validator been scheduled to force unbond due to low SelfStake amount compared to TotalDelegationsAmount
+	ScheduledToUnbond bool `json:"scheduled_to_unbond" yaml:"scheduled_to_unbond"`
+	// Validator status (bonded/unbonding/unbonded)
+	Status sdk.BondStatus `json:"status" yaml:"status"`
+	// Delegated tokens (incl. self-delegation)
+	Tokens sdk.Int `json:"tokens" yaml:"tokens"`
+	// Total shares issued to a validator's delegators
+	DelegatorShares sdk.Dec `json:"delegator_shares" yaml:"delegator_shares"`
+	// Description terms for the validator
+	Description Description `json:"description" yaml:"description"`
+	// If unbonding, height at which this validator has begun unbonding
+	UnbondingHeight int64 `json:"unbonding_height" yaml:"unbonding_height"`
+	// If unbonding, min time for the validator to complete unbonding
+	UnbondingCompletionTime time.Time `json:"unbonding_time" yaml:"unbonding_time"`
+	// If ScheduledToUnbond, height at which this schedule started
+	ScheduledUnbondHeight int64 `json:"scheduled_unbond_height" yaml:"scheduled_unbond_height"`
+	// Is ScheduledToUnbond, min time for the validator to begin force unbond
+	ScheduledUnbondStartTime time.Time `json:"scheduled_unbond_time" yaml:"scheduled_unbond_time"`
+	// Commission parameters
+	Commission Commission `json:"commission" yaml:"commission"`
+	// Validator's self declared minimum self delegation
+	MinSelfDelegation sdk.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
 }
 
 // custom marshal yaml function due to consensus pubkey
 func (v Validator) MarshalYAML() (interface{}, error) {
 	bs, err := yaml.Marshal(struct {
-		OperatorAddress         sdk.ValAddress
-		ConsPubKey              string
-		Jailed                  bool
-		Status                  sdk.BondStatus
-		Tokens                  sdk.Int
-		DelegatorShares         sdk.Dec
-		Description             Description
-		UnbondingHeight         int64
-		UnbondingCompletionTime time.Time
-		Commission              Commission
-		MinSelfDelegation       sdk.Int
+		OperatorAddress          sdk.ValAddress
+		ConsPubKey               string
+		Jailed                   bool
+		ScheduledToUnbond        bool
+		Status                   sdk.BondStatus
+		Tokens                   sdk.Int
+		DelegatorShares          sdk.Dec
+		Description              Description
+		UnbondingHeight          int64
+		UnbondingCompletionTime  time.Time
+		ScheduledUnbondHeight    int64
+		ScheduledUnbondStartTime time.Time
+		Commission               Commission
+		MinSelfDelegation        sdk.Int
 	}{
-		OperatorAddress:         v.OperatorAddress,
-		ConsPubKey:              sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey),
-		Jailed:                  v.Jailed,
-		Status:                  v.Status,
-		Tokens:                  v.Tokens,
-		DelegatorShares:         v.DelegatorShares,
-		Description:             v.Description,
-		UnbondingHeight:         v.UnbondingHeight,
-		UnbondingCompletionTime: v.UnbondingCompletionTime,
-		Commission:              v.Commission,
-		MinSelfDelegation:       v.MinSelfDelegation,
+		OperatorAddress:          v.OperatorAddress,
+		ConsPubKey:               sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey),
+		Jailed:                   v.Jailed,
+		ScheduledToUnbond:        v.ScheduledToUnbond,
+		Status:                   v.Status,
+		Tokens:                   v.Tokens,
+		DelegatorShares:          v.DelegatorShares,
+		Description:              v.Description,
+		UnbondingHeight:          v.UnbondingHeight,
+		UnbondingCompletionTime:  v.UnbondingCompletionTime,
+		ScheduledUnbondHeight:    v.ScheduledUnbondHeight,
+		ScheduledUnbondStartTime: v.ScheduledUnbondStartTime,
+		Commission:               v.Commission,
+		MinSelfDelegation:        v.MinSelfDelegation,
 	})
 	if err != nil {
 		return nil, err
@@ -129,17 +152,20 @@ func (v Validators) Swap(i, j int) {
 // NewValidator - initialize a new validator
 func NewValidator(operator sdk.ValAddress, pubKey crypto.PubKey, description Description) Validator {
 	return Validator{
-		OperatorAddress:         operator,
-		ConsPubKey:              pubKey,
-		Jailed:                  false,
-		Status:                  sdk.Unbonded,
-		Tokens:                  sdk.ZeroInt(),
-		DelegatorShares:         sdk.ZeroDec(),
-		Description:             description,
-		UnbondingHeight:         int64(0),
-		UnbondingCompletionTime: time.Unix(0, 0).UTC(),
-		Commission:              NewCommission(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec()),
-		MinSelfDelegation:       sdk.OneInt(),
+		OperatorAddress:          operator,
+		ConsPubKey:               pubKey,
+		Jailed:                   false,
+		ScheduledToUnbond:        false,
+		Status:                   sdk.Unbonded,
+		Tokens:                   sdk.ZeroInt(),
+		DelegatorShares:          sdk.ZeroDec(),
+		Description:              description,
+		UnbondingHeight:          int64(0),
+		UnbondingCompletionTime:  time.Unix(0, 0).UTC(),
+		ScheduledUnbondHeight:    int64(0),
+		ScheduledUnbondStartTime: time.Unix(0, 0).UTC(),
+		Commission:               NewCommission(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec()),
+		MinSelfDelegation:        sdk.OneInt(),
 	}
 }
 
@@ -170,35 +196,44 @@ func (v Validator) String() string {
 		panic(err)
 	}
 	return fmt.Sprintf(`Validator
-  Operator Address:           %s
-  Validator Consensus Pubkey: %s
-  Jailed:                     %v
-  Status:                     %s
-  Tokens:                     %s
-  Delegator Shares:           %s
-  Description:                %s
-  Unbonding Height:           %d
-  Unbonding Completion Time:  %v
-  Minimum Self Delegation:    %v
-  Commission:                 %s`, v.OperatorAddress, bechConsPubKey,
-		v.Jailed, v.Status, v.Tokens,
-		v.DelegatorShares, v.Description,
-		v.UnbondingHeight, v.UnbondingCompletionTime, v.MinSelfDelegation, v.Commission)
+  Operator Address:            %s
+  Validator Consensus Pubkey:  %s
+  Jailed:                      %v
+  ScheduledToUnbond:           %v
+  Status:                      %s
+  Tokens:                      %s
+  Delegator Shares:            %s
+  Description:                 %s
+  Unbonding Height:            %d
+  Unbonding Completion Time:   %v
+  Scheduled Unbond Height:     %d
+  Scheduled Unbond Start Time: %v
+  Minimum Self Delegation:     %v
+  Commission:                  %s`,
+		v.OperatorAddress, bechConsPubKey,
+		v.Jailed, v.ScheduledToUnbond, v.Status,
+		v.Tokens, v.DelegatorShares, v.Description,
+		v.UnbondingHeight, v.UnbondingCompletionTime,
+		v.ScheduledUnbondHeight, v.ScheduledUnbondStartTime,
+		v.MinSelfDelegation, v.Commission)
 }
 
 // this is a helper struct used for JSON de- and encoding only
 type bechValidator struct {
-	OperatorAddress         sdk.ValAddress `json:"operator_address" yaml:"operator_address"`       // the bech32 address of the validator's operator
-	ConsPubKey              string         `json:"consensus_pubkey" yaml:"consensus_pubkey"`       // the bech32 consensus public key of the validator
-	Jailed                  bool           `json:"jailed" yaml:"jailed"`                           // has the validator been jailed from bonded status?
-	Status                  sdk.BondStatus `json:"status" yaml:"status"`                           // validator status (bonded/unbonding/unbonded)
-	Tokens                  sdk.Int        `json:"tokens" yaml:"tokens"`                           // delegated tokens (incl. self-delegation)
-	DelegatorShares         sdk.Dec        `json:"delegator_shares" yaml:"delegator_shares"`       // total shares issued to a validator's delegators
-	Description             Description    `json:"description" yaml:"description"`                 // description terms for the validator
-	UnbondingHeight         int64          `json:"unbonding_height" yaml:"unbonding_height"`       // if unbonding, height at which this validator has begun unbonding
-	UnbondingCompletionTime time.Time      `json:"unbonding_time" yaml:"unbonding_time"`           // if unbonding, min time for the validator to complete unbonding
-	Commission              Commission     `json:"commission" yaml:"commission"`                   // commission parameters
-	MinSelfDelegation       sdk.Int        `json:"min_self_delegation" yaml:"min_self_delegation"` // minimum self delegation
+	OperatorAddress          sdk.ValAddress `json:"operator_address" yaml:"operator_address"`               // the bech32 address of the validator's operator
+	ConsPubKey               string         `json:"consensus_pubkey" yaml:"consensus_pubkey"`               // the bech32 consensus public key of the validator
+	Jailed                   bool           `json:"jailed" yaml:"jailed"`                                   // has the validator been jailed from bonded status?
+	ScheduledToUnbond        bool           `json:"scheduled_to_unbond" yaml:"scheduled_to_unbond"`         // has the validator been scheduled to force unbond due to low SelfStake amount compared to TotalDelegationsAmount
+	Status                   sdk.BondStatus `json:"status" yaml:"status"`                                   // validator status (bonded/unbonding/unbonded)
+	Tokens                   sdk.Int        `json:"tokens" yaml:"tokens"`                                   // delegated tokens (incl. self-delegation)
+	DelegatorShares          sdk.Dec        `json:"delegator_shares" yaml:"delegator_shares"`               // total shares issued to a validator's delegators
+	Description              Description    `json:"description" yaml:"description"`                         // description terms for the validator
+	UnbondingHeight          int64          `json:"unbonding_height" yaml:"unbonding_height"`               // if unbonding, height at which this validator has begun unbonding
+	UnbondingCompletionTime  time.Time      `json:"unbonding_time" yaml:"unbonding_time"`                   // if unbonding, min time for the validator to complete unbonding
+	ScheduledUnbondHeight    int64          `json:"scheduled_unbond_height" yaml:"scheduled_unbond_height"` // if ScheduledToUnbond, height at which this schedule started
+	ScheduledUnbondStartTime time.Time      `json:"scheduled_unbond_time" yaml:"scheduled_unbond_time"`     // is ScheduledToUnbond, min time for the validator to begin force unbond
+	Commission               Commission     `json:"commission" yaml:"commission"`                           // commission parameters
+	MinSelfDelegation        sdk.Int        `json:"min_self_delegation" yaml:"min_self_delegation"`         // minimum self delegation
 }
 
 // MarshalJSON marshals the validator to JSON using Bech32
@@ -209,17 +244,20 @@ func (v Validator) MarshalJSON() ([]byte, error) {
 	}
 
 	return codec.Cdc.MarshalJSON(bechValidator{
-		OperatorAddress:         v.OperatorAddress,
-		ConsPubKey:              bechConsPubKey,
-		Jailed:                  v.Jailed,
-		Status:                  v.Status,
-		Tokens:                  v.Tokens,
-		DelegatorShares:         v.DelegatorShares,
-		Description:             v.Description,
-		UnbondingHeight:         v.UnbondingHeight,
-		UnbondingCompletionTime: v.UnbondingCompletionTime,
-		MinSelfDelegation:       v.MinSelfDelegation,
-		Commission:              v.Commission,
+		OperatorAddress:          v.OperatorAddress,
+		ConsPubKey:               bechConsPubKey,
+		Jailed:                   v.Jailed,
+		ScheduledToUnbond:        v.ScheduledToUnbond,
+		Status:                   v.Status,
+		Tokens:                   v.Tokens,
+		DelegatorShares:          v.DelegatorShares,
+		Description:              v.Description,
+		UnbondingHeight:          v.UnbondingHeight,
+		UnbondingCompletionTime:  v.UnbondingCompletionTime,
+		ScheduledUnbondHeight:    v.ScheduledUnbondHeight,
+		ScheduledUnbondStartTime: v.ScheduledUnbondStartTime,
+		MinSelfDelegation:        v.MinSelfDelegation,
+		Commission:               v.Commission,
 	})
 }
 
@@ -234,17 +272,20 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*v = Validator{
-		OperatorAddress:         bv.OperatorAddress,
-		ConsPubKey:              consPubKey,
-		Jailed:                  bv.Jailed,
-		Tokens:                  bv.Tokens,
-		Status:                  bv.Status,
-		DelegatorShares:         bv.DelegatorShares,
-		Description:             bv.Description,
-		UnbondingHeight:         bv.UnbondingHeight,
-		UnbondingCompletionTime: bv.UnbondingCompletionTime,
-		Commission:              bv.Commission,
-		MinSelfDelegation:       bv.MinSelfDelegation,
+		OperatorAddress:          bv.OperatorAddress,
+		ConsPubKey:               consPubKey,
+		Jailed:                   bv.Jailed,
+		ScheduledToUnbond:        bv.ScheduledToUnbond,
+		Tokens:                   bv.Tokens,
+		Status:                   bv.Status,
+		DelegatorShares:          bv.DelegatorShares,
+		Description:              bv.Description,
+		UnbondingHeight:          bv.UnbondingHeight,
+		UnbondingCompletionTime:  bv.UnbondingCompletionTime,
+		ScheduledUnbondHeight:    bv.ScheduledUnbondHeight,
+		ScheduledUnbondStartTime: bv.ScheduledUnbondStartTime,
+		Commission:               bv.Commission,
+		MinSelfDelegation:        bv.MinSelfDelegation,
 	}
 	return nil
 }
@@ -515,8 +556,27 @@ func (v Validator) RemoveDelShares(delShares sdk.Dec) (Validator, sdk.Int) {
 	return v, issuedTokens
 }
 
+// ScheduleValidatorForceUnbond set ScheduledToUnbond state
+func (v Validator) ScheduleValidatorForceUnbond(curBlockHeight int64, curBlockTime time.Time, unbondDelay time.Duration) Validator {
+	v.ScheduledToUnbond = true
+	v.ScheduledUnbondHeight = curBlockHeight
+	v.ScheduledUnbondStartTime = curBlockTime.Add(unbondDelay)
+
+	return v
+}
+
+// UnscheduleValidatorForceUnbond drops ScheduledToUnbond state
+func (v Validator) UnscheduleValidatorForceUnbond() Validator {
+	v.ScheduledToUnbond = false
+	v.ScheduledUnbondHeight = int64(0)
+	v.ScheduledUnbondStartTime = time.Unix(0, 0).UTC()
+
+	return v
+}
+
 // nolint - for ValidatorI
 func (v Validator) IsJailed() bool                { return v.Jailed }
+func (v Validator) IsScheduledToUnbond() bool     { return v.ScheduledToUnbond }
 func (v Validator) GetMoniker() string            { return v.Description.Moniker }
 func (v Validator) GetStatus() sdk.BondStatus     { return v.Status }
 func (v Validator) GetOperator() sdk.ValAddress   { return v.OperatorAddress }
