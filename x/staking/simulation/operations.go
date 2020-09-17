@@ -272,13 +272,13 @@ func SimulateMsgDelegate(ak types.AccountKeeper, k keeper.Keeper) simulation.Ope
 		}
 
 		// check if operation would overflow validator max delegations level
-		valSelfState, valTotalStakes := k.GetValidatorSelfAndTotalStakes(ctx, val)
+		valSelfStaked, valTotalStaked := k.GetValidatorStakingState(ctx, val.OperatorAddress).GetSelfAndTotalStakes(val)
 		if simAccount.Address.Equals(val.OperatorAddress) {
-			valSelfState = valSelfState.Add(amount)
+			valSelfStaked = valSelfStaked.Add(amount)
 		}
-		valTotalStakes = valTotalStakes.Add(amount)
+		valTotalStaked = valTotalStaked.Add(amount)
 
-		if overflow, _ := k.HasValidatorDelegationsOverflow(ctx, valSelfState, valTotalStakes); overflow {
+		if overflow, _ := k.HasValidatorDelegationsOverflow(ctx, valSelfStaked, valTotalStaked); overflow {
 			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
 
@@ -460,13 +460,13 @@ func SimulateMsgBeginRedelegate(ak types.AccountKeeper, k keeper.Keeper) simulat
 		}
 
 		// check if operation would overflow validator max delegations level
-		valSelfState, valTotalStakes := k.GetValidatorSelfAndTotalStakes(ctx, destVal)
+		valSelfStaked, valTotalStaked := k.GetValidatorStakingState(ctx, destVal.OperatorAddress).GetSelfAndTotalStakes(destVal)
 		if delAddr.Equals(destVal.OperatorAddress) {
-			valSelfState = valSelfState.Add(redAmt)
+			valSelfStaked = valSelfStaked.Add(redAmt)
 		}
-		valTotalStakes = valTotalStakes.Add(redAmt)
+		valTotalStaked = valTotalStaked.Add(redAmt)
 
-		if overflow, _ := k.HasValidatorDelegationsOverflow(ctx, valSelfState, valTotalStakes); overflow {
+		if overflow, _ := k.HasValidatorDelegationsOverflow(ctx, valSelfStaked, valTotalStaked); overflow {
 			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
 

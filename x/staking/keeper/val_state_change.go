@@ -342,12 +342,15 @@ func (k Keeper) completeUnbondingValidator(ctx sdk.Context, validator types.Vali
 func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Validator) (retValidator *types.Validator) {
 	k.Logger(ctx).Info(fmt.Sprintf("Validator %s ScheduledUnbond processing", validator.OperatorAddress))
 
-	for _, delegation := range k.GetValidatorDelegations(ctx, validator.OperatorAddress) {
-		completionTime, err := k.Undelegate(ctx, delegation.DelegatorAddress, validator.OperatorAddress, delegation.Shares)
+	state := k.GetValidatorStakingState(ctx, validator.OperatorAddress)
+	delegations := append(state.Delegators, state.Operator)
+
+	for _, delegation := range delegations {
+		completionTime, err := k.Undelegate(ctx, delegation.Address, validator.OperatorAddress, delegation.Shares)
 		if err != nil {
 			panic(fmt.Errorf(
 				"force unbond delegation %s for validator %s: %v",
-				delegation.DelegatorAddress, validator.OperatorAddress, err),
+				delegation.Address, validator.OperatorAddress, err),
 			)
 		}
 
@@ -358,8 +361,15 @@ func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Va
 				sdk.NewAttribute(sdk.AttributeKeyShare, delegation.Shares.String()),
 				sdk.NewAttribute(types.AttributeKeyCompletionTime, completionTime.Format(time.RFC3339)),
 			),
+			sdk.NewEvent(
+				sdk.EventTypeMessage,
+				sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
+				sdk.NewAttribute(sdk.AttributeKeySender, delegation.Address.String()),
+			),
 		})
 	}
+
+	k.DeleteValidatorStakingState(ctx, validator.OperatorAddress)
 
 	updValidator, found := k.GetValidator(ctx, validator.OperatorAddress)
 	if found {

@@ -70,6 +70,9 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeep
 		if !data.Exported {
 			keeper.AfterDelegationModified(ctx, delegation.DelegatorAddress, delegation.ValidatorAddress)
 		}
+
+		// Update validator staking state
+		keeper.SetValidatorStakingStateDelegation(ctx, delegation.ValidatorAddress, delegation.DelegatorAddress, delegation.Shares)
 	}
 
 	for _, ubd := range data.UnbondingDelegations {

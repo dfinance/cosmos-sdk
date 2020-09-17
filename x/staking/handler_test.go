@@ -1689,6 +1689,12 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		require.Len(t, keeper.GetAllScheduledUnbondQueueMatureValidators(ctx, future), 0)
 	}
 
+	checkInvariant := func() {
+		inv := DelegatorSharesInvariant(keeper)
+		msg, broken := inv(ctx)
+		require.False(t, broken, msg)
+	}
+
 	// create validator
 	{
 		curSelfStakeAmt = sdk.TokensFromConsensusPower(10)
@@ -1697,6 +1703,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
 		require.NoError(t, err)
 		require.NotNil(t, res)
+		checkInvariant()
 	}
 
 	// delegator 1: delegate to the validator 1 half the limit
@@ -1705,6 +1712,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 
 		_, err := keeper.Delegate(ctx, del1Addr, curDel1StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
+		checkInvariant()
 	}
 
 	// delegator 2: delegate to the validator 2 half the limit
@@ -1713,6 +1721,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 
 		_, err := keeper.Delegate(ctx, del2Addr, curDel2StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
+		checkInvariant()
 	}
 
 	// check not scheduled
@@ -1729,6 +1738,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares)
 		require.NoError(t, err)
 		checkScheduled()
+		checkInvariant()
 	}
 
 	// fix by raising selfDelegation back
@@ -1739,6 +1749,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		_, err := keeper.Delegate(ctx, valOpAddr, delAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
 		checkUnscheduled()
+		checkInvariant()
 	}
 
 	// lower the selfDelegation again (a bit, otherwise one delegator won't fix due to insufficient funds)
@@ -1763,6 +1774,8 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		checkScheduled()
 		require.Equal(t, scheduledBlock, getUpdatedVal().ScheduledUnbondHeight)
 		require.True(t, scheduledTime.Equal(getUpdatedVal().ScheduledUnbondStartTime))
+
+		checkInvariant()
 	}
 
 	// fix by undelegating shares by delegator 1
@@ -1778,6 +1791,8 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		_, err = keeper.Undelegate(ctx, del1Addr, valAddr, unDelShares)
 		require.NoError(t, err)
 		checkUnscheduled()
+
+		checkInvariant()
 	}
 }
 
@@ -1788,7 +1803,7 @@ func TestForceUnbondCompletion(t *testing.T) {
 	valAddr, valPubKey := sdk.ValAddress(keep.Addrs[0]), keep.PKs[0]
 
 	initPower := int64(100000)
-	ctx, _, keeper, _ := keep.CreateTestInput(t, false, initPower)
+	ctx, ak, keeper, _ := keep.CreateTestInput(t, false, initPower)
 	schedulerDelay := keeper.ScheduledUnbondDelay(ctx)
 	maxDelRatio := keeper.MaxDelegationsRatio(ctx)
 	future := time.Now()
@@ -1870,6 +1885,9 @@ func TestForceUnbondCompletion(t *testing.T) {
 	}
 
 	// check everything is delegated
+	valOpBalance := ak.GetAccount(ctx, valOpAddr).GetCoins().AmountOf(sdk.DefaultBondDenom)
+	del1Balance := ak.GetAccount(ctx, del1Addr).GetCoins().AmountOf(sdk.DefaultBondDenom)
+	del2Balance := ak.GetAccount(ctx, del2Addr).GetCoins().AmountOf(sdk.DefaultBondDenom)
 	{
 		_, opDelFound := keeper.GetDelegation(ctx, valOpAddr, valAddr)
 		require.True(t, opDelFound)
@@ -1885,29 +1903,35 @@ func TestForceUnbondCompletion(t *testing.T) {
 	ctx = ctx.WithBlockTime(scheduledStartTime)
 	EndBlocker(ctx, keeper)
 
-	// check no longer scheduled and everything is undelegated
+	// check no longer scheduled, everything is undelegated, acc balances weren't updated yet
 	{
 		checkUnscheduled()
 
 		_, opDelFound := keeper.GetDelegation(ctx, valOpAddr, valAddr)
-		require.False(t, opDelFound)
-
 		_, del1DelFound := keeper.GetDelegation(ctx, del1Addr, valAddr)
-		require.False(t, del1DelFound)
-
 		_, del1De2Found := keeper.GetDelegation(ctx, del2Addr, valAddr)
+		require.False(t, opDelFound)
+		require.False(t, del1DelFound)
 		require.False(t, del1De2Found)
+
+		require.True(t, ak.GetAccount(ctx, valOpAddr).GetCoins().AmountOf(sdk.DefaultBondDenom).Equal(valOpBalance))
+		require.True(t, ak.GetAccount(ctx, del1Addr).GetCoins().AmountOf(sdk.DefaultBondDenom).Equal(del1Balance))
+		require.True(t, ak.GetAccount(ctx, del2Addr).GetCoins().AmountOf(sdk.DefaultBondDenom).Equal(del2Balance))
 	}
 
 	// emulate endBlock to change validator status
 	EndBlocker(ctx, keeper)
 
-	// check validator status (unbonding and jailed)
+	// check validator status changed (unbonding and jailed), balances are not yet changed (UnbondingCompletionTime)
 	var unbondingTime time.Time
 	{
 		val := getUpdatedVal()
 		require.Equal(t, sdk.Unbonding, val.GetStatus())
 		require.True(t, val.Jailed)
+
+		require.True(t, ak.GetAccount(ctx, valOpAddr).GetCoins().AmountOf(sdk.DefaultBondDenom).Equal(valOpBalance))
+		require.True(t, ak.GetAccount(ctx, del1Addr).GetCoins().AmountOf(sdk.DefaultBondDenom).Equal(del1Balance))
+		require.True(t, ak.GetAccount(ctx, del2Addr).GetCoins().AmountOf(sdk.DefaultBondDenom).Equal(del2Balance))
 
 		unbondingTime = val.UnbondingCompletionTime
 	}
@@ -1916,9 +1940,13 @@ func TestForceUnbondCompletion(t *testing.T) {
 	ctx = ctx.WithBlockTime(unbondingTime)
 	EndBlocker(ctx, keeper)
 
-	// check validator deleted
+	// check validator deleted, undelegation finished
 	{
 		_, found := keeper.GetValidator(ctx, valAddr)
 		require.False(t, found)
+
+		require.True(t, ak.GetAccount(ctx, valOpAddr).GetCoins().AmountOf(sdk.DefaultBondDenom).GT(valOpBalance))
+		require.True(t, ak.GetAccount(ctx, del1Addr).GetCoins().AmountOf(sdk.DefaultBondDenom).GT(del1Balance))
+		require.True(t, ak.GetAccount(ctx, del2Addr).GetCoins().AmountOf(sdk.DefaultBondDenom).GT(del2Balance))
 	}
 }

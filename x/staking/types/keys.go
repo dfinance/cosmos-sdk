@@ -35,6 +35,7 @@ var (
 	ValidatorsKey             = []byte{0x21} // prefix for each key to a validator
 	ValidatorsByConsAddrKey   = []byte{0x22} // prefix for each key to a validator index, by pubkey
 	ValidatorsByPowerIndexKey = []byte{0x23} // prefix for each key to a validator index, sorted by power
+	ValidatorsStakingStateKey = []byte{0x24} // prefix for each key to a validator staking info
 
 	DelegationKey                    = []byte{0x31} // key for a delegation
 	UnbondingDelegationKey           = []byte{0x32} // key for an unbonding-delegation
@@ -55,6 +56,12 @@ var (
 // VALUE: staking/Validator
 func GetValidatorKey(operatorAddr sdk.ValAddress) []byte {
 	return append(ValidatorsKey, operatorAddr.Bytes()...)
+}
+
+// gets the key for the validator staking state with address
+// VALUE: staking/Validator
+func GetValidatorStakingStateKey(operatorAddr sdk.ValAddress) []byte {
+	return append(ValidatorsStakingStateKey, operatorAddr.Bytes()...)
 }
 
 // gets the key for the validator with pubkey

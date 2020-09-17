@@ -84,6 +84,55 @@ func (k Keeper) mustGetValidatorByConsAddr(ctx sdk.Context, consAddr sdk.ConsAdd
 	return validator
 }
 
+// GetValidatorStakingState gets validator staking state.
+func (k Keeper) GetValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress) (state types.ValidatorStakingState) {
+	store := ctx.KVStore(k.storeKey)
+	key := types.GetValidatorStakingStateKey(addr)
+
+	bz := store.Get(key)
+	if bz == nil {
+		return types.NewValidatorStakingState()
+	}
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(bz, &state)
+
+	return
+}
+
+// SetValidatorStakingState sets validator staking state for specified validator address.
+func (k Keeper) SetValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress, state types.ValidatorStakingState) {
+	store := ctx.KVStore(k.storeKey)
+	key := types.GetValidatorStakingStateKey(addr)
+
+	bz := k.cdc.MustMarshalBinaryLengthPrefixed(state)
+	store.Set(key, bz)
+}
+
+// DeleteValidatorStakingState removes validator staking state for specified validator address.
+func (k Keeper) DeleteValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress) {
+	store := ctx.KVStore(k.storeKey)
+	key := types.GetValidatorStakingStateKey(addr)
+
+	store.Delete(key)
+}
+
+// SetValidatorStakingStateDelegation adds / sets validator staking state delegation info.
+func (k Keeper) SetValidatorStakingStateDelegation(ctx sdk.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress, delShares sdk.Dec) types.ValidatorStakingState {
+	state := k.GetValidatorStakingState(ctx, valAddr)
+	state = state.SetDelegator(valAddr, delAddr, delShares)
+	k.SetValidatorStakingState(ctx, valAddr, state)
+
+	return state
+}
+
+// RemoveValidatorStakingStateDelegation removes validator staking state delegation info.
+func (k Keeper) RemoveValidatorStakingStateDelegation(ctx sdk.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress) types.ValidatorStakingState {
+	state := k.GetValidatorStakingState(ctx, valAddr)
+	state = state.RemoveDelegator(delAddr)
+	k.SetValidatorStakingState(ctx, valAddr, state)
+
+	return state
+}
+
 // set the main record holding validator details
 func (k Keeper) SetValidator(ctx sdk.Context, validator types.Validator) {
 	store := ctx.KVStore(k.storeKey)

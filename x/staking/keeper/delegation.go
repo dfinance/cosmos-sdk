@@ -64,25 +64,6 @@ func (k Keeper) GetValidatorDelegations(ctx sdk.Context, valAddr sdk.ValAddress)
 	return delegations
 }
 
-// GetValidatorSelfAndTotalStakes iterates over all validator delegations and returns selfStake and totalStakes values.
-func (k Keeper) GetValidatorSelfAndTotalStakes(ctx sdk.Context, val types.Validator) (selfStake, totalStakes sdk.Int) {
-	selfStake, totalStakes = sdk.ZeroInt(), sdk.ZeroInt()
-
-	for _, delegation := range k.GetValidatorDelegations(ctx, val.OperatorAddress) {
-		if delegation.Shares.IsZero() {
-			continue
-		}
-
-		delTokens := val.TokensFromShares(delegation.Shares).TruncateInt()
-		if delegation.DelegatorAddress.Equals(val.OperatorAddress) {
-			selfStake = selfStake.Add(delTokens)
-		}
-		totalStakes = totalStakes.Add(delTokens)
-	}
-
-	return
-}
-
 // return a given amount of all the delegations from a delegator
 func (k Keeper) GetDelegatorDelegations(ctx sdk.Context, delegator sdk.AccAddress,
 	maxRetrieve uint16) (delegations []types.Delegation) {
@@ -104,16 +85,15 @@ func (k Keeper) GetDelegatorDelegations(ctx sdk.Context, delegator sdk.AccAddres
 }
 
 // HasValidatorDelegationsOverflow checks if current validator total staked coins are GT than the limit.
-func (k Keeper) HasValidatorDelegationsOverflow(ctx sdk.Context, valSelfState, valTotalStakes sdk.Int) (overflow bool, maxDelegatedLimit sdk.Int) {
-	maxDelegationsRatio := k.MaxDelegationsRatio(ctx)
-
+func (k Keeper) HasValidatorDelegationsOverflow(ctx sdk.Context, selfStaked, totalStaked sdk.Int) (overflow bool, maxDelegatedLimit sdk.Int) {
 	// True for unbonding / unbonded validators
-	if valSelfState.IsZero() {
+	if selfStaked.IsZero() {
 		return
 	}
 
-	maxDelegatedLimit = sdk.NewDecFromInt(valSelfState).Mul(maxDelegationsRatio).TruncateInt()
-	if valTotalStakes.GT(maxDelegatedLimit) {
+	maxDelegationsRatio := k.MaxDelegationsRatio(ctx)
+	maxDelegatedLimit = sdk.NewDecFromInt(selfStaked).Mul(maxDelegationsRatio).TruncateInt()
+	if totalStaked.GT(maxDelegatedLimit) {
 		overflow = true
 	}
 
@@ -570,21 +550,25 @@ func (k Keeper) Delegate(
 	delegation.Shares = delegation.Shares.Add(newShares)
 	k.SetDelegation(ctx, delegation)
 
+	// Update validator staking state
+	valStakingState := k.SetValidatorStakingStateDelegation(ctx, validator.OperatorAddress, delegation.DelegatorAddress, delegation.Shares)
+
 	// Check if max delegations overflow occurs after this delegation
-	valSelfState, valStakesTotal := k.GetValidatorSelfAndTotalStakes(ctx, validator)
-	if overflow, valStakeLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfState, valStakesTotal); overflow {
+	valSelfStaked, valTotalStaked := valStakingState.GetSelfAndTotalStakes(validator)
+	overflow, valStakeLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfStaked, valTotalStaked)
+	if overflow {
 		return sdk.Dec{}, sdkerrors.Wrapf(
 			types.ErrMaxDelegationsLimit,
 			"current tokens limit for %s: %s",
-			validator.GetOperator().String(), valStakeLimit.String(),
+			validator.OperatorAddress, valStakeLimit,
 		)
 	} else {
 		// If overflow is fixed by this delegation, undo
 		if validator.ScheduledToUnbond {
 			k.unscheduleValidatorForceUnbond(ctx, validator)
 			k.Logger(ctx).Info(fmt.Sprintf(
-				"Validator %s ScheduledUnbond status revoked due to delegation from %s: selfStake / totalStaked / stakeLimit: %s / %s / %s",
-				validator.GetOperator(), delAddr, valSelfState, valStakesTotal, valStakeLimit,
+				"Validator %s ScheduledUnbond status revoked due to delegation from %s: selfStaked / totalStaked / limit: %s / %s / %s",
+				validator.OperatorAddress, delegation.DelegatorAddress, valSelfStaked, valTotalStaked, valStakeLimit,
 			))
 		}
 	}
@@ -647,14 +631,23 @@ func (k Keeper) unbond(
 	// NOTE that the amount is later (in keeper.Delegation) moved between staking module pools
 	validator, amount = k.RemoveValidatorTokensAndShares(ctx, validator, shares)
 
+	// Update validator staking state
+	var valStakingState types.ValidatorStakingState
+	if delegation.Shares.IsZero() {
+		valStakingState = k.RemoveValidatorStakingStateDelegation(ctx, validator.OperatorAddress, delegation.DelegatorAddress)
+	} else {
+		valStakingState = k.SetValidatorStakingStateDelegation(ctx, validator.OperatorAddress, delegation.DelegatorAddress, delegation.Shares)
+	}
+
 	// Check if max delegations overflow occurs after this delegation (primary by undelegating selfStake)
-	valSelfState, valStakesTotal := k.GetValidatorSelfAndTotalStakes(ctx, validator)
-	if overflow, valStakeLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfState, valStakesTotal); overflow {
+	valSelfStaked, valTotalStaked := valStakingState.GetSelfAndTotalStakes(validator)
+	overflow, valStakeLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfStaked, valTotalStaked)
+	if overflow {
 		if !validator.ScheduledToUnbond {
 			k.scheduleValidatorForceUnbond(ctx, validator)
 			k.Logger(ctx).Info(fmt.Sprintf(
-				"Validator %s ScheduledUnbond status set due to undelegation/redelegation from %s: selfStake / totalStaked / stakeLimit: %s / %s / %s",
-				valAddr, delAddr, valSelfState, valStakesTotal, valStakeLimit,
+				"Validator %s ScheduledUnbond status set due to undelegation/redelegation from %s: selfStaked / totalStaked / limit: %s / %s / %s",
+				validator.OperatorAddress, delegation.DelegatorAddress, valSelfStaked, valTotalStaked, valStakeLimit,
 			))
 		}
 	} else {
@@ -662,8 +655,8 @@ func (k Keeper) unbond(
 		if validator.ScheduledToUnbond {
 			k.unscheduleValidatorForceUnbond(ctx, validator)
 			k.Logger(ctx).Info(fmt.Sprintf(
-				"Validator %s ScheduledUnbond status revoked due to undelegation/redelegation from %s: selfStake / totalStaked / stakeLimit: %s / %s / %s",
-				valAddr, delAddr, valSelfState, valStakesTotal, valStakeLimit,
+				"Validator %s ScheduledUnbond status revoked due to undelegation/redelegation from %s: selfStaked / totalStaked / limit: %s / %s / %s",
+				validator.OperatorAddress, delegation.DelegatorAddress, valSelfStaked, valTotalStaked, valStakeLimit,
 			))
 		}
 	}
