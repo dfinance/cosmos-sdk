@@ -1796,6 +1796,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 	}
 }
 
+// Test scheduled unbond completion
 func TestForceUnbondCompletion(t *testing.T) {
 	del1Addr, del2Addr := keep.Addrs[2], keep.Addrs[3]
 
@@ -1949,4 +1950,549 @@ func TestForceUnbondCompletion(t *testing.T) {
 		require.True(t, ak.GetAccount(ctx, del1Addr).GetCoins().AmountOf(sdk.DefaultBondDenom).GT(del1Balance))
 		require.True(t, ak.GetAccount(ctx, del2Addr).GetCoins().AmountOf(sdk.DefaultBondDenom).GT(del2Balance))
 	}
+}
+
+// Test delegators run off the scheduled unbond validator before the delay is over
+func TestForceUnbondSafeBoat1(t *testing.T) {
+	params := types.DefaultParams()
+	params.ScheduledUnbondDelayTime = params.UnbondingTime * 2
+
+	const (
+		ValOp1Idx = 0
+		ValOp2Idx = 1
+		Del1Idx   = 2
+		Del2Idx   = 3
+	)
+
+	accs := []struct {
+		Addr      sdk.AccAddress
+		Balance   sdk.Int
+		Val1Stake sdk.Int
+		Val2Stake sdk.Int
+	}{
+		{
+			Addr:      keep.Addrs[ValOp1Idx],
+			Balance:   sdk.ZeroInt(),
+			Val1Stake: sdk.ZeroInt(),
+			Val2Stake: sdk.ZeroInt(),
+		},
+		{
+			Addr:      keep.Addrs[ValOp2Idx],
+			Balance:   sdk.ZeroInt(),
+			Val1Stake: sdk.ZeroInt(),
+			Val2Stake: sdk.ZeroInt(),
+		},
+		{
+			Addr:      keep.Addrs[Del1Idx],
+			Balance:   sdk.ZeroInt(),
+			Val1Stake: sdk.ZeroInt(),
+			Val2Stake: sdk.ZeroInt(),
+		},
+		{
+			Addr:      keep.Addrs[Del2Idx],
+			Balance:   sdk.ZeroInt(),
+			Val1Stake: sdk.ZeroInt(),
+			Val2Stake: sdk.ZeroInt(),
+		},
+	}
+	val1Addr, val1PubKey := sdk.ValAddress(keep.Addrs[ValOp1Idx]), keep.PKs[ValOp1Idx]
+	val2Addr, val2PubKey := sdk.ValAddress(keep.Addrs[ValOp2Idx]), keep.PKs[ValOp2Idx]
+
+	initPower := int64(100000)
+	ctx, ak, keeper, _ := keep.CreateTestInput(t, false, initPower)
+	keeper.SetParams(ctx, params)
+	schedulerDelay := keeper.ScheduledUnbondDelay(ctx)
+	maxDelRatio := keeper.MaxDelegationsRatio(ctx)
+
+	// time
+	future := time.Now()
+	unbondingOverTime := ctx.BlockTime().Add(params.UnbondingTime)
+	schedulerOverTime := ctx.BlockTime().Add(params.ScheduledUnbondDelayTime)
+
+	// helpers
+	getVal := func(valID int) types.Validator {
+		var valAddr sdk.ValAddress
+		switch valID {
+		case 1:
+			valAddr = val1Addr
+		case 2:
+			valAddr = val2Addr
+		}
+
+		val, ok := keeper.GetValidator(ctx, valAddr)
+		require.True(t, ok)
+
+		return val
+	}
+
+	getMaxDelegation := func(valID int) sdk.Int {
+		selfStake, totalStakes := sdk.ZeroInt(), sdk.ZeroInt()
+		switch valID {
+		case 1:
+			selfStake = accs[ValOp1Idx].Val1Stake
+			totalStakes = totalStakes.Add(accs[Del1Idx].Val1Stake)
+			totalStakes = totalStakes.Add(accs[Del2Idx].Val1Stake)
+		case 2:
+			selfStake = accs[ValOp2Idx].Val2Stake
+			totalStakes = totalStakes.Add(accs[Del1Idx].Val2Stake)
+			totalStakes = totalStakes.Add(accs[Del2Idx].Val2Stake)
+		}
+		maxDelAmt := sdk.NewDecFromInt(selfStake).Mul(maxDelRatio).TruncateInt()
+
+		return maxDelAmt.Sub(selfStake).Sub(totalStakes)
+	}
+
+	getAccBalance := func(idx int) sdk.Int {
+		return ak.GetAccount(ctx, accs[idx].Addr).GetCoins().AmountOf(sdk.DefaultBondDenom)
+	}
+
+	checkScheduled := func(valID int) {
+		val := getVal(valID)
+		require.True(t, val.ScheduledToUnbond)
+		require.Equal(t, ctx.BlockHeight(), val.ScheduledUnbondHeight)
+		require.True(t, ctx.BlockTime().Add(schedulerDelay).Equal(val.ScheduledUnbondStartTime))
+
+		scheduledVals := keeper.GetAllScheduledUnbondQueueMatureValidators(ctx, future)
+		require.Contains(t, scheduledVals, val.OperatorAddress)
+
+		return
+	}
+
+	checkUnscheduled := func(valID int) {
+		val := getVal(valID)
+		require.False(t, val.ScheduledToUnbond)
+
+		scheduledVals := keeper.GetAllScheduledUnbondQueueMatureValidators(ctx, future)
+		require.NotContains(t, scheduledVals, val.OperatorAddress)
+	}
+
+	checkRedeligation := func(accIdx, dstValID int) {
+		acc := accs[accIdx]
+		var srcValID int
+		var expSrcDelAmt, expDstDelAmt sdk.Int
+
+		switch dstValID {
+		case 1:
+			srcValID = 2
+			expSrcDelAmt, expDstDelAmt = acc.Val2Stake, acc.Val1Stake
+		case 2:
+			srcValID = 1
+			expSrcDelAmt, expDstDelAmt = acc.Val1Stake, acc.Val2Stake
+		}
+
+		srcVal, dstVal := getVal(srcValID), getVal(dstValID)
+
+		// check the source stake existence
+		srcDel, srcDelFound := keeper.GetDelegation(ctx, acc.Addr, srcVal.OperatorAddress)
+		if expSrcDelAmt.IsZero() {
+			require.False(t, srcDelFound, srcDel.Shares.String())
+		} else {
+			require.True(t, srcDelFound)
+		}
+
+		// check the destination stake existence
+		dstDel, dstDelFound := keeper.GetDelegation(ctx, acc.Addr, dstVal.OperatorAddress)
+		if expDstDelAmt.IsZero() {
+			require.False(t, dstDelFound, dstDel.Shares.String())
+		} else {
+			require.True(t, dstDelFound)
+		}
+
+		// check balance not changed
+		curBalance := getAccBalance(accIdx)
+		require.True(t, acc.Balance.Equal(curBalance))
+	}
+
+	checkUndelegation := func(accIdx, valID int) {
+		acc := accs[accIdx]
+		val := getVal(valID)
+
+		_, delFound := keeper.GetDelegation(ctx, acc.Addr, val.OperatorAddress)
+		require.False(t, delFound)
+
+		curBalance := getAccBalance(accIdx)
+		require.True(t, curBalance.Equal(acc.Balance), "%s / %s", curBalance, acc.Balance)
+	}
+
+	// ValOp1Idx: create validator
+	// ValOp2Idx: create validator
+	{
+		accs[ValOp1Idx].Val1Stake = sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val1Addr, val1PubKey, accs[ValOp1Idx].Val1Stake)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+	{
+		accs[ValOp2Idx].Val2Stake = sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val2Addr, val2PubKey, accs[ValOp2Idx].Val2Stake)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	// Del1Idx: delegate to ValOp1Idx half the limit
+	// Del2Idx: delegate to ValOp1Idx up to the limit
+	{
+		accs[Del1Idx].Val1Stake = getMaxDelegation(1).QuoRaw(2)
+
+		_, err := keeper.Delegate(ctx, accs[Del1Idx].Addr, accs[Del1Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
+		require.NoError(t, err)
+	}
+	{
+		accs[Del2Idx].Val1Stake = getMaxDelegation(1)
+
+		_, err := keeper.Delegate(ctx, accs[Del2Idx].Addr, accs[Del2Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
+		require.NoError(t, err)
+	}
+
+	// get initial balances
+	accs[ValOp1Idx].Balance = getAccBalance(ValOp1Idx)
+	accs[ValOp2Idx].Balance = getAccBalance(ValOp2Idx)
+	accs[Del1Idx].Balance = getAccBalance(Del1Idx)
+	accs[Del2Idx].Balance = getAccBalance(Del2Idx)
+
+	// ValOp1Idx, ValOp2Idx: check not scheduled
+	checkUnscheduled(1)
+	checkUnscheduled(2)
+
+	// ValOp1Idx: redelegate to ValOp1Idx triggering the scheduler
+	// Redelegate all to avoid schedule undo due to undelegations / redelegations
+	{
+		accs[ValOp1Idx].Val2Stake = accs[ValOp1Idx].Val1Stake.QuoRaw(2)
+		accs[ValOp1Idx].Val1Stake = accs[ValOp1Idx].Val2Stake
+
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[ValOp1Idx].Addr, val1Addr, accs[ValOp1Idx].Val2Stake)
+		require.NoError(t, err)
+
+		_, err = keeper.BeginRedelegation(ctx, accs[ValOp1Idx].Addr, val1Addr, val2Addr, reDelShares)
+		require.NoError(t, err)
+	}
+
+	// ValOp1Idx, ValOp2Idx: 1st scheduled, 2nd not
+	checkScheduled(1)
+	checkUnscheduled(2)
+
+	// Del1Idx: redelegates all his tokens to ValOp2Idx
+	{
+		accs[Del1Idx].Val2Stake = accs[Del1Idx].Val1Stake
+		accs[Del1Idx].Val1Stake = sdk.ZeroInt()
+
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del1Idx].Addr, val1Addr, accs[Del1Idx].Val2Stake)
+		require.NoError(t, err)
+
+		_, err = keeper.BeginRedelegation(ctx, accs[Del1Idx].Addr, val1Addr, val2Addr, reDelShares)
+		require.NoError(t, err)
+	}
+
+	// Del2Idx: undelegates all his tokens from ValOp1Idx
+	{
+		unDelAmt := accs[Del2Idx].Val1Stake
+		accs[Del2Idx].Balance = accs[Del2Idx].Balance.Add(unDelAmt)
+		accs[Del2Idx].Val1Stake = sdk.ZeroInt()
+
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del2Idx].Addr, val1Addr, unDelAmt)
+		require.NoError(t, err)
+
+		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, unDelShares)
+		require.NoError(t, err)
+	}
+
+	// emulate unbonding time has passed
+	ctx = ctx.WithBlockTime(unbondingOverTime)
+	EndBlocker(ctx, keeper)
+
+	// check redelegations and undelegation done
+	{
+		checkRedeligation(ValOp1Idx, 2)
+		checkRedeligation(Del1Idx, 2)
+		checkUndelegation(Del2Idx, 1)
+	}
+
+	// check 1st is not scheduled any more (all delegator have ran away)
+	// check 2nd it not scheduled (his is still behaving well)
+	checkUnscheduled(1)
+	checkUnscheduled(2)
+
+	// emulate schedule delay time has passed
+	ctx = ctx.WithBlockTime(schedulerOverTime)
+	EndBlocker(ctx, keeper)
+}
+
+// Test delegators run off the scheduled unbond validator during the delay (unbonding > delay)
+func TestForceUnbondSafeBoat2(t *testing.T) {
+	params := types.DefaultParams()
+	params.UnbondingTime = params.ScheduledUnbondDelayTime * 2
+
+	const (
+		ValOp1Idx = 0
+		ValOp2Idx = 1
+		Del1Idx   = 2
+		Del2Idx   = 3
+	)
+
+	accs := []struct {
+		Addr      sdk.AccAddress
+		Balance   sdk.Int
+		Val1Stake sdk.Int
+		Val2Stake sdk.Int
+	}{
+		{
+			Addr:      keep.Addrs[ValOp1Idx],
+			Balance:   sdk.ZeroInt(),
+			Val1Stake: sdk.ZeroInt(),
+			Val2Stake: sdk.ZeroInt(),
+		},
+		{
+			Addr:      keep.Addrs[ValOp2Idx],
+			Balance:   sdk.ZeroInt(),
+			Val1Stake: sdk.ZeroInt(),
+			Val2Stake: sdk.ZeroInt(),
+		},
+		{
+			Addr:      keep.Addrs[Del1Idx],
+			Balance:   sdk.ZeroInt(),
+			Val1Stake: sdk.ZeroInt(),
+			Val2Stake: sdk.ZeroInt(),
+		},
+		{
+			Addr:      keep.Addrs[Del2Idx],
+			Balance:   sdk.ZeroInt(),
+			Val1Stake: sdk.ZeroInt(),
+			Val2Stake: sdk.ZeroInt(),
+		},
+	}
+	val1Addr, val1PubKey := sdk.ValAddress(keep.Addrs[ValOp1Idx]), keep.PKs[ValOp1Idx]
+	val2Addr, val2PubKey := sdk.ValAddress(keep.Addrs[ValOp2Idx]), keep.PKs[ValOp2Idx]
+
+	initPower := int64(100000)
+	ctx, ak, keeper, _ := keep.CreateTestInput(t, false, initPower)
+	keeper.SetParams(ctx, params)
+	schedulerDelay := keeper.ScheduledUnbondDelay(ctx)
+	maxDelRatio := keeper.MaxDelegationsRatio(ctx)
+
+	// time
+	future := time.Now()
+	unbondingOverTime := ctx.BlockTime().Add(params.UnbondingTime)
+	schedulerOverTime := ctx.BlockTime().Add(params.ScheduledUnbondDelayTime)
+
+	// helpers
+	getVal := func(valID int) types.Validator {
+		var valAddr sdk.ValAddress
+		switch valID {
+		case 1:
+			valAddr = val1Addr
+		case 2:
+			valAddr = val2Addr
+		}
+
+		val, ok := keeper.GetValidator(ctx, valAddr)
+		require.True(t, ok)
+
+		return val
+	}
+
+	getMaxDelegation := func(valID int) sdk.Int {
+		selfStake, totalStakes := sdk.ZeroInt(), sdk.ZeroInt()
+		switch valID {
+		case 1:
+			selfStake = accs[ValOp1Idx].Val1Stake
+			totalStakes = totalStakes.Add(accs[Del1Idx].Val1Stake)
+			totalStakes = totalStakes.Add(accs[Del2Idx].Val1Stake)
+		case 2:
+			selfStake = accs[ValOp2Idx].Val2Stake
+			totalStakes = totalStakes.Add(accs[Del1Idx].Val2Stake)
+			totalStakes = totalStakes.Add(accs[Del2Idx].Val2Stake)
+		}
+		maxDelAmt := sdk.NewDecFromInt(selfStake).Mul(maxDelRatio).TruncateInt()
+
+		return maxDelAmt.Sub(selfStake).Sub(totalStakes)
+	}
+
+	getAccBalance := func(idx int) sdk.Int {
+		return ak.GetAccount(ctx, accs[idx].Addr).GetCoins().AmountOf(sdk.DefaultBondDenom)
+	}
+
+	checkScheduled := func(valID int) {
+		val := getVal(valID)
+		require.True(t, val.ScheduledToUnbond)
+		require.Equal(t, ctx.BlockHeight(), val.ScheduledUnbondHeight)
+		require.True(t, ctx.BlockTime().Add(schedulerDelay).Equal(val.ScheduledUnbondStartTime))
+
+		scheduledVals := keeper.GetAllScheduledUnbondQueueMatureValidators(ctx, future)
+		require.Contains(t, scheduledVals, val.OperatorAddress)
+
+		return
+	}
+
+	checkUnscheduled := func(valID int) {
+		val := getVal(valID)
+		require.False(t, val.ScheduledToUnbond)
+
+		scheduledVals := keeper.GetAllScheduledUnbondQueueMatureValidators(ctx, future)
+		require.NotContains(t, scheduledVals, val.OperatorAddress)
+	}
+
+	checkRedeligation := func(accIdx, dstValID int) {
+		acc := accs[accIdx]
+		var srcValID int
+		var expSrcDelAmt, expDstDelAmt sdk.Int
+
+		switch dstValID {
+		case 1:
+			srcValID = 2
+			expSrcDelAmt, expDstDelAmt = acc.Val2Stake, acc.Val1Stake
+		case 2:
+			srcValID = 1
+			expSrcDelAmt, expDstDelAmt = acc.Val1Stake, acc.Val2Stake
+		}
+
+		srcVal, dstVal := getVal(srcValID), getVal(dstValID)
+
+		// check the source stake existence
+		srcDel, srcDelFound := keeper.GetDelegation(ctx, acc.Addr, srcVal.OperatorAddress)
+		if expSrcDelAmt.IsZero() {
+			require.False(t, srcDelFound, srcDel.Shares.String())
+		} else {
+			require.True(t, srcDelFound)
+		}
+
+		// check the destination stake existence
+		dstDel, dstDelFound := keeper.GetDelegation(ctx, acc.Addr, dstVal.OperatorAddress)
+		if expDstDelAmt.IsZero() {
+			require.False(t, dstDelFound, dstDel.Shares.String())
+		} else {
+			require.True(t, dstDelFound)
+		}
+
+		// check balance not changed
+		curBalance := getAccBalance(accIdx)
+		require.True(t, acc.Balance.Equal(curBalance))
+	}
+
+	checkUndelegation := func(accIdx, valID int, notFinished bool) {
+		acc := accs[accIdx]
+		val := getVal(valID)
+
+		_, delFound := keeper.GetDelegation(ctx, acc.Addr, val.OperatorAddress)
+		require.False(t, delFound)
+
+		curBalance := getAccBalance(accIdx)
+		if notFinished {
+			require.True(t, curBalance.LT(acc.Balance), "%s / %s", curBalance, acc.Balance)
+		} else {
+			require.True(t, curBalance.Equal(acc.Balance), "%s / %s", curBalance, acc.Balance)
+		}
+	}
+
+	// ValOp1Idx: create validator
+	// ValOp2Idx: create validator
+	{
+		accs[ValOp1Idx].Val1Stake = sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val1Addr, val1PubKey, accs[ValOp1Idx].Val1Stake)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+	{
+		accs[ValOp2Idx].Val2Stake = sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val2Addr, val2PubKey, accs[ValOp2Idx].Val2Stake)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	// Del1Idx: delegate to ValOp1Idx half the limit
+	// Del2Idx: delegate to ValOp1Idx up to the limit
+	{
+		accs[Del1Idx].Val1Stake = getMaxDelegation(1).QuoRaw(2)
+
+		_, err := keeper.Delegate(ctx, accs[Del1Idx].Addr, accs[Del1Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
+		require.NoError(t, err)
+	}
+	{
+		accs[Del2Idx].Val1Stake = getMaxDelegation(1)
+
+		_, err := keeper.Delegate(ctx, accs[Del2Idx].Addr, accs[Del2Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
+		require.NoError(t, err)
+	}
+
+	// get initial balances
+	accs[ValOp1Idx].Balance = getAccBalance(ValOp1Idx)
+	accs[ValOp2Idx].Balance = getAccBalance(ValOp2Idx)
+	accs[Del1Idx].Balance = getAccBalance(Del1Idx)
+	accs[Del2Idx].Balance = getAccBalance(Del2Idx)
+
+	// ValOp1Idx, ValOp2Idx: check not scheduled
+	checkUnscheduled(1)
+	checkUnscheduled(2)
+
+	// ValOp1Idx: redelegate to ValOp1Idx triggering the scheduler
+	// Redelegate all to avoid schedule undo due to undelegations / redelegations
+	{
+		accs[ValOp1Idx].Val2Stake = accs[ValOp1Idx].Val1Stake.QuoRaw(2)
+		accs[ValOp1Idx].Val1Stake = accs[ValOp1Idx].Val2Stake
+
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[ValOp1Idx].Addr, val1Addr, accs[ValOp1Idx].Val2Stake)
+		require.NoError(t, err)
+
+		_, err = keeper.BeginRedelegation(ctx, accs[ValOp1Idx].Addr, val1Addr, val2Addr, reDelShares)
+		require.NoError(t, err)
+	}
+
+	// ValOp1Idx, ValOp2Idx: 1st scheduled, 2nd not
+	checkScheduled(1)
+	checkUnscheduled(2)
+
+	// Del1Idx: redelegates all his tokens to ValOp2Idx
+	{
+		accs[Del1Idx].Val2Stake = accs[Del1Idx].Val1Stake
+		accs[Del1Idx].Val1Stake = sdk.ZeroInt()
+
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del1Idx].Addr, val1Addr, accs[Del1Idx].Val2Stake)
+		require.NoError(t, err)
+
+		_, err = keeper.BeginRedelegation(ctx, accs[Del1Idx].Addr, val1Addr, val2Addr, reDelShares)
+		require.NoError(t, err)
+	}
+
+	// Del2Idx: undelegates all his tokens from ValOp1Idx
+	{
+		unDelAmt := accs[Del2Idx].Val1Stake
+		accs[Del2Idx].Balance = accs[Del2Idx].Balance.Add(unDelAmt)
+		accs[Del2Idx].Val1Stake = sdk.ZeroInt()
+
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del2Idx].Addr, val1Addr, unDelAmt)
+		require.NoError(t, err)
+
+		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, unDelShares)
+		require.NoError(t, err)
+	}
+
+	// emulate scheduler dealy has passed
+	ctx = ctx.WithBlockTime(schedulerOverTime)
+	EndBlocker(ctx, keeper)
+
+	// check redelegations done and undelegation not done yet
+	{
+		checkRedeligation(ValOp1Idx, 2)
+		checkRedeligation(Del1Idx, 2)
+		checkUndelegation(Del2Idx, 1, true)
+	}
+
+	// check 1st is not scheduled any more (all delegator have ran away)
+	// check 2nd it not scheduled (his is still behaving well)
+	checkUnscheduled(1)
+	checkUnscheduled(2)
+
+	// emulate unbonding time has passed
+	ctx = ctx.WithBlockTime(unbondingOverTime)
+	EndBlocker(ctx, keeper)
+
+	// check undelegation done
+	checkUndelegation(Del2Idx, 1, false)
 }
