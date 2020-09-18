@@ -13,18 +13,20 @@ import (
 
 // Keeper of the mint store
 type Keeper struct {
-	cdc              *codec.Codec
-	storeKey         sdk.StoreKey
-	paramSpace       params.Subspace
-	sk               types.StakingKeeper
-	supplyKeeper     types.SupplyKeeper
-	feeCollectorName string
+	cdc                *codec.Codec
+	storeKey           sdk.StoreKey
+	paramSpace         params.Subspace
+	sk                 types.StakingKeeper
+	supplyKeeper       types.SupplyKeeper
+	distributionKeeper types.DistributionKeeper
+	feeCollectorName   string
 }
 
 // NewKeeper creates a new mint Keeper instance
 func NewKeeper(
 	cdc *codec.Codec, key sdk.StoreKey, paramSpace params.Subspace,
-	sk types.StakingKeeper, supplyKeeper types.SupplyKeeper, feeCollectorName string,
+	sk types.StakingKeeper, supplyKeeper types.SupplyKeeper,
+	distributionKeeper types.DistributionKeeper, feeCollectorName string,
 ) Keeper {
 
 	// ensure mint module account is set
@@ -33,12 +35,13 @@ func NewKeeper(
 	}
 
 	return Keeper{
-		cdc:              cdc,
-		storeKey:         key,
-		paramSpace:       paramSpace.WithKeyTable(types.ParamKeyTable()),
-		sk:               sk,
-		supplyKeeper:     supplyKeeper,
-		feeCollectorName: feeCollectorName,
+		cdc:                cdc,
+		storeKey:           key,
+		paramSpace:         paramSpace.WithKeyTable(types.ParamKeyTable()),
+		sk:                 sk,
+		supplyKeeper:       supplyKeeper,
+		distributionKeeper: distributionKeeper,
+		feeCollectorName:   feeCollectorName,
 	}
 }
 
@@ -71,11 +74,16 @@ func (k Keeper) BurnFeeCoins(ctx sdk.Context) {
 	// burn
 	err := k.supplyKeeper.BurnCoins(ctx, k.feeCollectorName, sdk.NewCoins(burnCoin))
 	if err != nil {
-		panic(fmt.Errorf("burning fees %s for %s: %v", burnCoin.String(),k.feeCollectorName,  err))
+		panic(fmt.Errorf("burning fees %s for %s: %v", burnCoin.String(), k.feeCollectorName, err))
 	}
 }
 
 // TransferCoinsToFeeCollector transfers coins from the Mint to the FeeCollector module account.
 func (k Keeper) TransferCoinsToFeeCollector(ctx sdk.Context, coins sdk.Coins) error {
 	return k.supplyKeeper.SendCoinsFromModuleToModule(ctx, types.ModuleName, k.feeCollectorName, coins)
+}
+
+// GetNominees returns foundation nominee list from distribution module.
+func (k Keeper) GetNominees(ctx sdk.Context) []sdk.AccAddress {
+	return k.distributionKeeper.GetFoundationNominees(ctx)
 }

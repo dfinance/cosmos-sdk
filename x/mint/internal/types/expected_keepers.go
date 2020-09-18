@@ -11,6 +11,11 @@ type StakingKeeper interface {
 	BondedRatio(ctx sdk.Context) sdk.Dec
 }
 
+// DistributionKeeper defines the expected distribution keeper
+type DistributionKeeper interface {
+	GetFoundationNominees(ctx sdk.Context) []sdk.AccAddress
+}
+
 // SupplyKeeper defines the expected supply keeper
 type SupplyKeeper interface {
 	GetModuleAddress(name string) sdk.AccAddress

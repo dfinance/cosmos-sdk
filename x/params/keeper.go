@@ -64,7 +64,7 @@ func (k Keeper) GetSubspace(s string) (Subspace, bool) {
 
 // SetRestrictedParams sets restricted params that will be rejected for a parameter change proposal.
 func (k *Keeper) SetRestrictedParams(rp RestrictedParams) {
-	k.restrictedParams = rp
+	k.restrictedParams = append(k.restrictedParams, rp...)
 }
 
 // CheckRestrictions checks subspace and key in restricted list.

@@ -7,4 +7,6 @@ const (
 	AttributeKeyBondedRatio      = "bonded_ratio"
 	AttributeKeyInflation        = "inflation"
 	AttributeKeyAnnualProvisions = "annual_provisions"
+
+	AttributeValueCategory = ModuleName
 )

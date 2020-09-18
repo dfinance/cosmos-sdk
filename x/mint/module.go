@@ -3,6 +3,7 @@ package mint
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/x/mint/internal/types"
 	"math/rand"
 
 	"github.com/gorilla/mux"
@@ -37,7 +38,9 @@ func (AppModuleBasic) Name() string {
 }
 
 // RegisterCodec registers the mint module's types for the given codec.
-func (AppModuleBasic) RegisterCodec(cdc *codec.Codec) {}
+func (AppModuleBasic) RegisterCodec(cdc *codec.Codec) {
+	RegisterCodec(cdc)
+}
 
 // DefaultGenesis returns default genesis state as raw bytes for the mint
 // module.
@@ -61,7 +64,9 @@ func (AppModuleBasic) RegisterRESTRoutes(ctx context.CLIContext, rtr *mux.Router
 }
 
 // GetTxCmd returns no root tx command for the mint module.
-func (AppModuleBasic) GetTxCmd(_ *codec.Codec) *cobra.Command { return nil }
+func (AppModuleBasic) GetTxCmd(cdc *codec.Codec) *cobra.Command {
+	return cli.GetTxCmd(cdc)
+}
 
 // GetQueryCmd returns the root query command for the mint module.
 func (AppModuleBasic) GetQueryCmd(cdc *codec.Codec) *cobra.Command {
@@ -94,10 +99,12 @@ func (AppModule) Name() string {
 func (am AppModule) RegisterInvariants(_ sdk.InvariantRegistry) {}
 
 // Route returns the message routing key for the mint module.
-func (AppModule) Route() string { return "" }
+func (AppModule) Route() string { return types.RouterKey }
 
 // NewHandler returns an sdk.Handler for the mint module.
-func (am AppModule) NewHandler() sdk.Handler { return nil }
+func (am AppModule) NewHandler() sdk.Handler {
+	return NewHandler(am.keeper)
+}
 
 // QuerierRoute returns the mint module's querier route name.
 func (AppModule) QuerierRoute() string {
