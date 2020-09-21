@@ -7,7 +7,7 @@ const (
 	DefaultWeightMsgSetWithdrawAddress          int = 50
 	DefaultWeightMsgWithdrawDelegationReward    int = 50
 	DefaultWeightMsgWithdrawValidatorCommission int = 50
-	DefaultWeightMsgFundCommunityPool           int = 50
+	DefaultWeightMsgFundPublicTreasuryPool      int = 50
 	DefaultWeightMsgDeposit                     int = 100
 	DefaultWeightMsgVote                        int = 67
 	DefaultWeightMsgUnjail                      int = 100
@@ -17,7 +17,7 @@ const (
 	DefaultWeightMsgUndelegate                  int = 100
 	DefaultWeightMsgBeginRedelegate             int = 100
 
-	DefaultWeightCommunitySpendProposal int = 5
-	DefaultWeightTextProposal           int = 5
-	DefaultWeightParamChangeProposal    int = 5
+	DefaultWeightPublicTreasurySpendProposal int = 5
+	DefaultWeightTextProposal                int = 5
+	DefaultWeightParamChangeProposal         int = 5
 )

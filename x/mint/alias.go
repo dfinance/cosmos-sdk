@@ -15,6 +15,7 @@ const (
 	QueryParameters       = types.QueryParameters
 	QueryInflation        = types.QueryInflation
 	QueryAnnualProvisions = types.QueryAnnualProvisions
+	QueryBlocksPerYear    = types.QueryBlocksPerYear
 )
 
 var (
@@ -33,14 +34,15 @@ var (
 	DefaultParams        = types.DefaultParams
 
 	// variable aliases
-	ModuleCdc              = types.ModuleCdc
-	MinterKey              = types.MinterKey
-	KeyMintDenom           = types.KeyMintDenom
-	KeyInflationRateChange = types.KeyInflationRateChange
-	KeyInflationMax        = types.KeyInflationMax
-	KeyInflationMin        = types.KeyInflationMin
-	KeyGoalBonded          = types.KeyGoalBonded
-	KeyBlocksPerYear       = types.KeyBlocksPerYear
+	ModuleCdc                    = types.ModuleCdc
+	MinterKey                    = types.MinterKey
+	KeyMintDenom                 = types.KeyMintDenom
+	KeyInflationMax              = types.KeyInflationMax
+	KeyInflationMin              = types.KeyInflationMin
+	KeyFeeBurningRatio           = types.KeyFeeBurningRatio
+	KeyInfPwrBondedLockedRatio   = types.KeyInfPwrBondedLockedRatio
+	KeyFoundationAllocationRatio = types.KeyFoundationAllocationRatio
+	KeyAvgBlockTimeWindow        = types.KeyAvgBlockTimeWindow
 )
 
 type (

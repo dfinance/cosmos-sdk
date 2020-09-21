@@ -39,10 +39,10 @@ func registerTxRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute strin
 		withdrawValidatorRewardsHandlerFn(cliCtx),
 	).Methods("POST")
 
-	// Fund the community pool
+	// Fund the public treasury pool
 	r.HandleFunc(
-		"/distribution/community_pool",
-		fundCommunityPoolHandlerFn(cliCtx),
+		"/distribution/public_treasury_pool",
+		fundPublicTreasuryPoolHandlerFn(cliCtx),
 	).Methods("POST")
 
 }
@@ -57,7 +57,7 @@ type (
 		WithdrawAddress sdk.AccAddress `json:"withdraw_address" yaml:"withdraw_address"`
 	}
 
-	fundCommunityPoolReq struct {
+	fundPublicTreasuryPoolReq struct {
 		BaseReq rest.BaseReq `json:"base_req" yaml:"base_req"`
 		Amount  sdk.Coins    `json:"amount" yaml:"amount"`
 	}
@@ -188,9 +188,9 @@ func withdrawValidatorRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerFu
 	}
 }
 
-func fundCommunityPoolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func fundPublicTreasuryPoolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req fundCommunityPoolReq
+		var req fundPublicTreasuryPoolReq
 		if !rest.ReadRESTReq(w, r, cliCtx.Codec, &req) {
 			return
 		}
@@ -206,7 +206,7 @@ func fundCommunityPoolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		msg := types.NewMsgFundCommunityPool(req.Amount, fromAddr)
+		msg := types.NewMsgFundPublicTreasuryPool(req.Amount, fromAddr)
 		if err := msg.ValidateBasic(); err != nil {
 			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
 			return

@@ -23,7 +23,7 @@ const (
 // Keys for distribution store
 // Items are stored with the following key: values
 //
-// - 0x00<proposalID_Bytes>: FeePol
+// - 0x00<proposalID_Bytes>: RewardPools
 //
 // - 0x01: sdk.ConsAddress
 //
@@ -41,7 +41,7 @@ const (
 //
 // - 0x08<valAddr_Bytes><height>: ValidatorSlashEvent
 var (
-	FeePoolKey                        = []byte{0x00} // key for global distribution state
+	RewardPoolsKey                    = []byte{0x00} // key for reward pools distribution state
 	ProposerKey                       = []byte{0x01} // key for the proposer operator address
 	ValidatorOutstandingRewardsPrefix = []byte{0x02} // key for outstanding rewards
 
@@ -51,6 +51,7 @@ var (
 	ValidatorCurrentRewardsPrefix        = []byte{0x06} // key for current validator rewards
 	ValidatorAccumulatedCommissionPrefix = []byte{0x07} // key for accumulated validator commission
 	ValidatorSlashEventPrefix            = []byte{0x08} // key for validator slash fraction
+	ValidatorLockedRewardsPrefix         = []byte{0x09} // key for validator locked rewards info
 )
 
 // gets an address from a validator's outstanding rewards key
@@ -190,4 +191,9 @@ func GetValidatorSlashEventKey(v sdk.ValAddress, height, period uint64) []byte {
 	binary.BigEndian.PutUint64(periodBz, period)
 	prefix := GetValidatorSlashEventKeyPrefix(v, height)
 	return append(prefix, periodBz...)
+}
+
+// gets the key for a validator's locked rewards info
+func GetValidatorLockedRewardsKey(v sdk.ValAddress) []byte {
+	return append(ValidatorLockedRewardsPrefix, v.Bytes()...)
 }

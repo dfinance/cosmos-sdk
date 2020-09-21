@@ -54,7 +54,7 @@ type ValidatorSlashEventRecord struct {
 // GenesisState - all distribution state that must be provided at genesis
 type GenesisState struct {
 	Params                          Params                                 `json:"params" yaml:"params"`
-	FeePool                         FeePool                                `json:"fee_pool" yaml:"fee_pool"`
+	RewardPools                     RewardPools                            `json:"reward_pools" yaml:"reward_pools"`
 	DelegatorWithdrawInfos          []DelegatorWithdrawInfo                `json:"delegator_withdraw_infos" yaml:"delegator_withdraw_infos"`
 	PreviousProposer                sdk.ConsAddress                        `json:"previous_proposer" yaml:"previous_proposer"`
 	OutstandingRewards              []ValidatorOutstandingRewardsRecord    `json:"outstanding_rewards" yaml:"outstanding_rewards"`
@@ -66,14 +66,14 @@ type GenesisState struct {
 }
 
 func NewGenesisState(
-	params Params, fp FeePool, dwis []DelegatorWithdrawInfo, pp sdk.ConsAddress, r []ValidatorOutstandingRewardsRecord,
+	params Params, rp RewardPools, dwis []DelegatorWithdrawInfo, pp sdk.ConsAddress, r []ValidatorOutstandingRewardsRecord,
 	acc []ValidatorAccumulatedCommissionRecord, historical []ValidatorHistoricalRewardsRecord,
 	cur []ValidatorCurrentRewardsRecord, dels []DelegatorStartingInfoRecord, slashes []ValidatorSlashEventRecord,
 ) GenesisState {
 
 	return GenesisState{
 		Params:                          params,
-		FeePool:                         fp,
+		RewardPools:                     rp,
 		DelegatorWithdrawInfos:          dwis,
 		PreviousProposer:                pp,
 		OutstandingRewards:              r,
@@ -88,7 +88,7 @@ func NewGenesisState(
 // get raw genesis raw message for testing
 func DefaultGenesisState() GenesisState {
 	return GenesisState{
-		FeePool:                         InitialFeePool(),
+		RewardPools:                     InitialRewardPools(),
 		Params:                          DefaultParams(),
 		DelegatorWithdrawInfos:          []DelegatorWithdrawInfo{},
 		PreviousProposer:                nil,
@@ -106,5 +106,5 @@ func ValidateGenesis(gs GenesisState) error {
 	if err := gs.Params.ValidateBasic(); err != nil {
 		return err
 	}
-	return gs.FeePool.ValidateGenesis()
+	return gs.RewardPools.ValidateGenesis()
 }

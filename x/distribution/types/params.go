@@ -16,18 +16,42 @@ const (
 
 // Parameter keys
 var (
-	ParamStoreKeyCommunityTax        = []byte("communitytax")
-	ParamStoreKeyBaseProposerReward  = []byte("baseproposerreward")
-	ParamStoreKeyBonusProposerReward = []byte("bonusproposerreward")
-	ParamStoreKeyWithdrawAddrEnabled = []byte("withdrawaddrenabled")
+	ParamKeyValidatorsPoolTax         = []byte("ValidatorsPoolTax")
+	ParamKeyLiquidityProvidersPoolTax = []byte("LiquidityProvidersPoolTax")
+	ParamKeyPublicTreasuryPoolTax     = []byte("PublicTreasuryPoolTax")
+	ParamKeyHARPTax                   = []byte("HARPTax")
+	//
+	ParamKeyPublicTreasuryPoolCapacity = []byte("PublicTreasuryPoolCapacity")
+	//
+	ParamKeyBaseProposerReward  = []byte("BaseProposerReward")
+	ParamKeyBonusProposerReward = []byte("BonusProposerReward")
+	//
+	ParamKeyWithdrawAddrEnabled = []byte("WithdrawAddrEnabled")
+	ParamKeyFoundationNominees  = []byte("FoundationNominees")
 )
 
 // Params defines the set of distribution parameters.
 type Params struct {
-	CommunityTax        sdk.Dec `json:"community_tax" yaml:"community_tax"`
-	BaseProposerReward  sdk.Dec `json:"base_proposer_reward" yaml:"base_proposer_reward"`
+	// Rewards distribution ratio for ValidatorsPool
+	ValidatorsPoolTax sdk.Dec `json:"validators_pool_tax" yaml:"validators_pool_tax"`
+	// Rewards distribution ratio for LiquidityProvidersPool
+	LiquidityProvidersPoolTax sdk.Dec `json:"liquidity_providers_pool_tax" yaml:"liquidity_providers_pool_tax"`
+	// Rewards distribution ratio for PublicTreasuryPool
+	PublicTreasuryPoolTax sdk.Dec `json:"public_treasury_pool_tax" yaml:"public_treasury_pool_tax"`
+	// Rewards distribution ratio for HARP
+	HARPTax sdk.Dec `json:"harp_tax" yaml:"harp_tax"`
+
+	// PublicTreasuryPool max amount limit
+	PublicTreasuryPoolCapacity sdk.Int `json:"public_treasury_pool_capacity"`
+
+	// Block proposer base reward ratio
+	BaseProposerReward sdk.Dec `json:"base_proposer_reward" yaml:"base_proposer_reward"`
+	// Block proposer bonus reward ratio
 	BonusProposerReward sdk.Dec `json:"bonus_proposer_reward" yaml:"bonus_proposer_reward"`
-	WithdrawAddrEnabled bool    `json:"withdraw_addr_enabled" yaml:"withdraw_addr_enabled"`
+
+	//
+	WithdrawAddrEnabled bool             `json:"withdraw_addr_enabled" yaml:"withdraw_addr_enabled"`
+	FoundationNominees  []sdk.AccAddress `json:"foundation_nominees" yaml:"foundation_nominees"`
 }
 
 // ParamKeyTable returns the parameter key table.
@@ -38,10 +62,18 @@ func ParamKeyTable() params.KeyTable {
 // DefaultParams returns default distribution parameters
 func DefaultParams() Params {
 	return Params{
-		CommunityTax:        sdk.NewDecWithPrec(2, 2), // 2%
+		ValidatorsPoolTax:         sdk.NewDecWithPrec(4825, 4), // 48.25%
+		LiquidityProvidersPoolTax: sdk.NewDecWithPrec(4825, 4), // 48.25%
+		PublicTreasuryPoolTax:     sdk.NewDecWithPrec(15, 3),   // 1.5%
+		HARPTax:                   sdk.NewDecWithPrec(2, 2),    // 2%
+		//
+		PublicTreasuryPoolCapacity: sdk.NewInt(250000), // 250K (doesn't include currency decimals)
+		//
 		BaseProposerReward:  sdk.NewDecWithPrec(1, 2), // 1%
 		BonusProposerReward: sdk.NewDecWithPrec(4, 2), // 4%
+		//
 		WithdrawAddrEnabled: true,
+		FoundationNominees:  make([]sdk.AccAddress, 0),
 	}
 }
 
@@ -53,100 +85,125 @@ func (p Params) String() string {
 // ParamSetPairs returns the parameter set pairs.
 func (p *Params) ParamSetPairs() params.ParamSetPairs {
 	return params.ParamSetPairs{
-		params.NewParamSetPair(ParamStoreKeyCommunityTax, &p.CommunityTax, validateCommunityTax),
-		params.NewParamSetPair(ParamStoreKeyBaseProposerReward, &p.BaseProposerReward, validateBaseProposerReward),
-		params.NewParamSetPair(ParamStoreKeyBonusProposerReward, &p.BonusProposerReward, validateBonusProposerReward),
-		params.NewParamSetPair(ParamStoreKeyWithdrawAddrEnabled, &p.WithdrawAddrEnabled, validateWithdrawAddrEnabled),
+		params.NewParamSetPair(ParamKeyValidatorsPoolTax, &p.ValidatorsPoolTax, validateValidatorsPoolTax),
+		params.NewParamSetPair(ParamKeyLiquidityProvidersPoolTax, &p.LiquidityProvidersPoolTax, validateLiquidityProvidersPoolTax),
+		params.NewParamSetPair(ParamKeyPublicTreasuryPoolTax, &p.PublicTreasuryPoolTax, validatePublicTreasuryPoolTax),
+		params.NewParamSetPair(ParamKeyHARPTax, &p.HARPTax, validateParamKeyHARPTax),
+		params.NewParamSetPair(ParamKeyPublicTreasuryPoolCapacity, &p.PublicTreasuryPoolCapacity, validatePublicTreasuryPoolCapacity),
+		params.NewParamSetPair(ParamKeyBaseProposerReward, &p.BaseProposerReward, validateBaseProposerReward),
+		params.NewParamSetPair(ParamKeyBonusProposerReward, &p.BonusProposerReward, validateBonusProposerReward),
+		params.NewParamSetPair(ParamKeyWithdrawAddrEnabled, &p.WithdrawAddrEnabled, validateWithdrawAddrEnabled),
+		params.NewParamSetPair(ParamKeyFoundationNominees, &p.FoundationNominees, validateFoundationNominees),
 	}
 }
 
 // ValidateBasic performs basic validation on distribution parameters.
 func (p Params) ValidateBasic() error {
-	if p.CommunityTax.IsNegative() || p.CommunityTax.GT(sdk.OneDec()) {
-		return fmt.Errorf(
-			"community tax should non-negative and less than one: %s", p.CommunityTax,
-		)
+	if err := validateValidatorsPoolTax(p.ValidatorsPoolTax); err != nil {
+		return err
 	}
-	if p.BaseProposerReward.IsNegative() {
-		return fmt.Errorf(
-			"base proposer reward should be positive: %s", p.BaseProposerReward,
-		)
+	if err := validateLiquidityProvidersPoolTax(p.LiquidityProvidersPoolTax); err != nil {
+		return err
 	}
-	if p.BonusProposerReward.IsNegative() {
-		return fmt.Errorf(
-			"bonus proposer reward should be positive: %s", p.BonusProposerReward,
-		)
+	if err := validatePublicTreasuryPoolTax(p.PublicTreasuryPoolTax); err != nil {
+		return err
 	}
+	if err := validateParamKeyHARPTax(p.HARPTax); err != nil {
+		return err
+	}
+	if err := validatePublicTreasuryPoolCapacity(p.PublicTreasuryPoolCapacity); err != nil {
+		return err
+	}
+	if err := validateBaseProposerReward(p.BaseProposerReward); err != nil {
+		return err
+	}
+	if err := validateBonusProposerReward(p.BonusProposerReward); err != nil {
+		return err
+	}
+	if err := validateWithdrawAddrEnabled(p.WithdrawAddrEnabled); err != nil {
+		return err
+	}
+	if err := validateFoundationNominees(p.FoundationNominees); err != nil {
+		return err
+	}
+
+	if v := p.ValidatorsPoolTax.Add(p.LiquidityProvidersPoolTax).Add(p.PublicTreasuryPoolTax).Add(p.HARPTax); !v.Equal(sdk.OneDec()) {
+		return fmt.Errorf("sum of all pool taxes must be 1.0: %s", v)
+	}
+
 	if v := p.BaseProposerReward.Add(p.BonusProposerReward); v.GT(sdk.OneDec()) {
-		return fmt.Errorf(
-			"sum of base and bonus proposer reward cannot greater than one: %s", v,
-		)
+		return fmt.Errorf("sum of base and bonus proposer reward cannot greater than one: %s", v)
 	}
 
 	return nil
 }
 
-func validateCommunityTax(i interface{}) error {
-	v, ok := i.(sdk.Dec)
+func validateValidatorsPoolTax(i interface{}) error {
+	return CheckRatioVariable("validators pool tax", i)
+}
+
+func validateLiquidityProvidersPoolTax(i interface{}) error {
+	return CheckRatioVariable("liquidity providers pool tax", i)
+}
+
+func validatePublicTreasuryPoolTax(i interface{}) error {
+	return CheckRatioVariable("public treasury pool tax", i)
+}
+
+func validateParamKeyHARPTax(i interface{}) error {
+	return CheckRatioVariable("HARP tax", i)
+}
+
+func validatePublicTreasuryPoolCapacity(i interface{}) error {
+	const paramName = "public treasury pool capacity"
+
+	v, ok := i.(sdk.Int)
 	if !ok {
-		return fmt.Errorf("invalid parameter type: %T", i)
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
 	}
 
-	if v.IsNil() {
-		return fmt.Errorf("community tax must be not nil")
-	}
 	if v.IsNegative() {
-		return fmt.Errorf("community tax must be positive: %s", v)
+		return fmt.Errorf("%s: must be positive: %s", paramName, v)
 	}
-	if v.GT(sdk.OneDec()) {
-		return fmt.Errorf("community tax too large: %s", v)
+
+	if v.IsZero() {
+		return fmt.Errorf("%s: cannot be zero: %s", paramName, v)
 	}
 
 	return nil
 }
 
 func validateBaseProposerReward(i interface{}) error {
-	v, ok := i.(sdk.Dec)
-	if !ok {
-		return fmt.Errorf("invalid parameter type: %T", i)
-	}
-
-	if v.IsNil() {
-		return fmt.Errorf("base proposer reward must be not nil")
-	}
-	if v.IsNegative() {
-		return fmt.Errorf("base proposer reward must be positive: %s", v)
-	}
-	if v.GT(sdk.OneDec()) {
-		return fmt.Errorf("base proposer reward too large: %s", v)
-	}
-
-	return nil
+	return CheckRatioVariable("base proposer reward", i)
 }
 
 func validateBonusProposerReward(i interface{}) error {
-	v, ok := i.(sdk.Dec)
-	if !ok {
-		return fmt.Errorf("invalid parameter type: %T", i)
-	}
+	return CheckRatioVariable("bonus proposer reward", i)
+}
 
-	if v.IsNil() {
-		return fmt.Errorf("bonus proposer reward must be not nil")
-	}
-	if v.IsNegative() {
-		return fmt.Errorf("bonus proposer reward must be positive: %s", v)
-	}
-	if v.GT(sdk.OneDec()) {
-		return fmt.Errorf("bonus proposer reward too large: %s", v)
+func validateWithdrawAddrEnabled(i interface{}) error {
+	const paramName = "withdraw address enabled"
+
+	_, ok := i.(bool)
+	if !ok {
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
 	}
 
 	return nil
 }
 
-func validateWithdrawAddrEnabled(i interface{}) error {
-	_, ok := i.(bool)
+func validateFoundationNominees(i interface{}) error {
+	const paramName = "foundation nominees"
+
+	v, ok := i.([]sdk.AccAddress)
 	if !ok {
-		return fmt.Errorf("invalid parameter type: %T", i)
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	for i, vv := range v {
+		if vv.Empty() {
+			return fmt.Errorf("%s: address [%d]: empty", paramName, i)
+		}
 	}
 
 	return nil

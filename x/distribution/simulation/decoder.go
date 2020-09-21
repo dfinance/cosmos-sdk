@@ -14,11 +14,11 @@ import (
 // DecodeStore unmarshals the KVPair's Value to the corresponding distribution type
 func DecodeStore(cdc *codec.Codec, kvA, kvB tmkv.Pair) string {
 	switch {
-	case bytes.Equal(kvA.Key[:1], types.FeePoolKey):
-		var feePoolA, feePoolB types.FeePool
-		cdc.MustUnmarshalBinaryLengthPrefixed(kvA.Value, &feePoolA)
-		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &feePoolB)
-		return fmt.Sprintf("%v\n%v", feePoolA, feePoolB)
+	case bytes.Equal(kvA.Key[:1], types.RewardPoolsKey):
+		var rewardPoolsA, rewardPoolsB types.RewardPools
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvA.Value, &rewardPoolsA)
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &rewardPoolsB)
+		return fmt.Sprintf("%v\n%v", rewardPoolsA, rewardPoolsB)
 
 	case bytes.Equal(kvA.Key[:1], types.ProposerKey):
 		return fmt.Sprintf("%v\n%v", sdk.ConsAddress(kvA.Value), sdk.ConsAddress(kvB.Value))

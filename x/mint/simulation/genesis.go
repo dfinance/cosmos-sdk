@@ -15,11 +15,11 @@ import (
 
 // Simulation parameter constants
 const (
-	Inflation           = "inflation"
-	InflationRateChange = "inflation_rate_change"
-	InflationMax        = "inflation_max"
-	InflationMin        = "inflation_min"
-	GoalBonded          = "goal_bonded"
+	Inflation               = "inflation"
+	InflationMax            = "inflation_max"
+	InflationMin            = "inflation_min"
+	FeeBurningRatio         = "fee_burning_ratio"
+	InfPwrBondedLockedRatio = "infpwr_bondedlocked_ratio"
 )
 
 // GenInflation randomized Inflation
@@ -27,24 +27,24 @@ func GenInflation(r *rand.Rand) sdk.Dec {
 	return sdk.NewDecWithPrec(int64(r.Intn(99)), 2)
 }
 
-// GenInflationRateChange randomized InflationRateChange
-func GenInflationRateChange(r *rand.Rand) sdk.Dec {
-	return sdk.NewDecWithPrec(int64(r.Intn(99)), 2)
-}
-
 // GenInflationMax randomized InflationMax
 func GenInflationMax(r *rand.Rand) sdk.Dec {
-	return sdk.NewDecWithPrec(20, 2)
+	return sdk.NewDecWithPrec(50, 2)
 }
 
 // GenInflationMin randomized InflationMin
 func GenInflationMin(r *rand.Rand) sdk.Dec {
-	return sdk.NewDecWithPrec(7, 2)
+	return sdk.NewDecWithPrec(1776, 4)
 }
 
-// GenGoalBonded randomized GoalBonded
-func GenGoalBonded(r *rand.Rand) sdk.Dec {
-	return sdk.NewDecWithPrec(67, 2)
+// GenFeeBurningRatio randomized FeeBurningRatio
+func GenFeeBurningRatio(r *rand.Rand) sdk.Dec {
+	return sdk.NewDecWithPrec(50, 2)
+}
+
+// GenInfPwrBondedLockedRatio randomized InfPwrBondedLockedRatio
+func GenInfPwrBondedLockedRatio(r *rand.Rand) sdk.Dec {
+	return sdk.NewDecWithPrec(4, 1)
 }
 
 // RandomizedGenState generates a random GenesisState for mint
@@ -57,11 +57,7 @@ func RandomizedGenState(simState *module.SimulationState) {
 	)
 
 	// params
-	var inflationRateChange sdk.Dec
-	simState.AppParams.GetOrGenerate(
-		simState.Cdc, InflationRateChange, &inflationRateChange, simState.Rand,
-		func(r *rand.Rand) { inflationRateChange = GenInflationRateChange(r) },
-	)
+	mintDenom := sdk.DefaultBondDenom
 
 	var inflationMax sdk.Dec
 	simState.AppParams.GetOrGenerate(
@@ -75,15 +71,30 @@ func RandomizedGenState(simState *module.SimulationState) {
 		func(r *rand.Rand) { inflationMin = GenInflationMin(r) },
 	)
 
-	var goalBonded sdk.Dec
+	var feeBurningRatio sdk.Dec
 	simState.AppParams.GetOrGenerate(
-		simState.Cdc, GoalBonded, &goalBonded, simState.Rand,
-		func(r *rand.Rand) { goalBonded = GenGoalBonded(r) },
+		simState.Cdc, FeeBurningRatio, &feeBurningRatio, simState.Rand,
+		func(r *rand.Rand) { feeBurningRatio = GenFeeBurningRatio(r) },
 	)
 
-	mintDenom := sdk.DefaultBondDenom
-	blocksPerYear := uint64(60 * 60 * 8766 / 5)
-	params := types.NewParams(mintDenom, inflationRateChange, inflationMax, inflationMin, goalBonded, blocksPerYear)
+	var infPwrBondedLockedRatio sdk.Dec
+	simState.AppParams.GetOrGenerate(
+		simState.Cdc, InfPwrBondedLockedRatio, &infPwrBondedLockedRatio, simState.Rand,
+		func(r *rand.Rand) { infPwrBondedLockedRatio = GenInfPwrBondedLockedRatio(r) },
+	)
+
+	foundationAllocationRatio := sdk.NewDecWithPrec(45, 2)
+	avgBlocksTimeWindow := uint16(2)
+
+	params := types.NewParams(
+		mintDenom,
+		inflationMax,
+		inflationMin,
+		feeBurningRatio,
+		infPwrBondedLockedRatio,
+		foundationAllocationRatio,
+		avgBlocksTimeWindow,
+	)
 
 	mintGenesis := types.NewGenesisState(types.InitialMinter(inflation), params)
 

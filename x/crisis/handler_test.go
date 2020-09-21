@@ -35,9 +35,9 @@ func createTestApp() (*simapp.SimApp, sdk.Context, []sdk.AccAddress) {
 	app.CrisisKeeper.RegisterRoute(testModuleName, dummyRouteWhichPasses.Route, dummyRouteWhichPasses.Invar)
 	app.CrisisKeeper.RegisterRoute(testModuleName, dummyRouteWhichFails.Route, dummyRouteWhichFails.Invar)
 
-	feePool := distr.InitialFeePool()
-	feePool.CommunityPool = sdk.NewDecCoinsFromCoins(sdk.NewCoins(constantFee)...)
-	app.DistrKeeper.SetFeePool(ctx, feePool)
+	rewardPools := distr.InitialRewardPools()
+	rewardPools.PublicTreasuryPool = sdk.NewDecCoinsFromCoins(sdk.NewCoins(constantFee)...)
+	app.DistrKeeper.SetRewardPools(ctx, rewardPools)
 	app.SupplyKeeper.SetSupply(ctx, supply.NewSupply(sdk.Coins{}))
 
 	addrs := simapp.AddTestAddrs(app, ctx, 1, sdk.NewInt(10000))
@@ -107,9 +107,9 @@ func TestHandleMsgVerifyInvariantWithInvariantBrokenAndNotEnoughPoolCoins(t *tes
 	sender := addrs[0]
 
 	// set the community pool to empty
-	feePool := app.DistrKeeper.GetFeePool(ctx)
-	feePool.CommunityPool = sdk.DecCoins{}
-	app.DistrKeeper.SetFeePool(ctx, feePool)
+	rewardPools := app.DistrKeeper.GetRewardPools(ctx)
+	rewardPools.PublicTreasuryPool = sdk.DecCoins{}
+	app.DistrKeeper.SetRewardPools(ctx, rewardPools)
 
 	h := crisis.NewHandler(app.CrisisKeeper)
 	msg := crisis.NewMsgVerifyInvariant(sender, testModuleName, dummyRouteWhichFails.Route)

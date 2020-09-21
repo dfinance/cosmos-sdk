@@ -5,25 +5,45 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/keeper"
+	"github.com/cosmos/cosmos-sdk/x/mint"
 )
 
-// BeginBlocker sets the proposer for determining distribution during endblock
-// and distribute rewards for the previous block
-func BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock, k keeper.Keeper) {
-	// determine the total power signing the block
-	var previousTotalPower, sumPreviousPrecommitPower int64
-	for _, voteInfo := range req.LastCommitInfo.GetVotes() {
-		previousTotalPower += voteInfo.Validator.Power
-		if voteInfo.SignedLastBlock {
-			sumPreviousPrecommitPower += voteInfo.Validator.Power
+// BeginBlocker sets the proposer for determining distribution during endBlock and distributes rewards for the previous block.
+// Validator power is converted to distribution power which includes lockedRewards.
+// Moving from stakingPower to distributionPower is used to rebalance distribution proportions.
+func BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock, k keeper.Keeper, mk mint.Keeper) {
+	consVotes := req.LastCommitInfo.GetVotes()
+
+	// determine the total distribution power signing the block
+	// override voter's power with distribution power
+	var previousTotalPower, previousProposerPower int64
+	abciVotes := make(ABCIVotes, 0, len(consVotes))
+	for _, consVote := range consVotes {
+		validator := k.ValidatorByConsAddr(ctx, consVote.Validator.Address)
+		distrPower := k.GetDistributionPower(ctx, validator.GetOperator(), consVote.Validator.Power)
+
+		previousTotalPower += distrPower
+		if consVote.SignedLastBlock {
+			previousProposerPower += distrPower
 		}
+
+		abciVotes = append(abciVotes, ABCIVote{
+			Validator:         validator,
+			DistributionPower: distrPower,
+			SignedLastBlock:   consVote.SignedLastBlock,
+		})
 	}
 
 	// TODO this is Tendermint-dependent
 	// ref https://github.com/cosmos/cosmos-sdk/issues/3095
 	if ctx.BlockHeight() > 1 {
+		// calculate dynamic FoundationPool tax based on previous mint results
+		minter := mk.GetMinter(ctx)
+		dynamicFoundationPoolTax := minter.FoundationInflation.Quo(minter.Inflation.Add(minter.FoundationInflation))
+
 		previousProposer := k.GetPreviousProposerConsAddr(ctx)
-		k.AllocateTokens(ctx, sumPreviousPrecommitPower, previousTotalPower, previousProposer, req.LastCommitInfo.GetVotes())
+
+		k.AllocateTokens(ctx, previousProposerPower, previousTotalPower, previousProposer, abciVotes, dynamicFoundationPoolTax)
 	}
 
 	// record the proposer for when we payout on the next block

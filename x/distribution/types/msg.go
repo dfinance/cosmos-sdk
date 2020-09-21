@@ -119,50 +119,111 @@ func (msg MsgWithdrawValidatorCommission) ValidateBasic() error {
 	return nil
 }
 
-const TypeMsgFundCommunityPool = "fund_community_pool"
+const TypeMsgFundPublicTreasuryPool = "fund_public_treasury_pool"
 
-// MsgFundCommunityPool defines a Msg type that allows an account to directly
-// fund the community pool.
-type MsgFundCommunityPool struct {
+// MsgFundPublicTreasuryPool defines a Msg type that allows an account to directly fund the public treasury pool.
+type MsgFundPublicTreasuryPool struct {
 	Amount    sdk.Coins      `json:"amount" yaml:"amount"`
 	Depositor sdk.AccAddress `json:"depositor" yaml:"depositor"`
 }
 
-// NewMsgFundCommunityPool returns a new MsgFundCommunityPool with a sender and
-// a funding amount.
-func NewMsgFundCommunityPool(amount sdk.Coins, depositor sdk.AccAddress) MsgFundCommunityPool {
-	return MsgFundCommunityPool{
+// NewMsgFundPublicTreasuryPool returns a new MsgFundPublicTreasuryPool with a sender and a funding amount.
+func NewMsgFundPublicTreasuryPool(amount sdk.Coins, depositor sdk.AccAddress) MsgFundPublicTreasuryPool {
+	return MsgFundPublicTreasuryPool{
 		Amount:    amount,
 		Depositor: depositor,
 	}
 }
 
-// Route returns the MsgFundCommunityPool message route.
-func (msg MsgFundCommunityPool) Route() string { return ModuleName }
+// Route returns the MsgFundPublicTreasuryPool message route.
+func (msg MsgFundPublicTreasuryPool) Route() string { return ModuleName }
 
-// Type returns the MsgFundCommunityPool message type.
-func (msg MsgFundCommunityPool) Type() string { return TypeMsgFundCommunityPool }
+// Type returns the MsgFundPublicTreasuryPool message type.
+func (msg MsgFundPublicTreasuryPool) Type() string { return TypeMsgFundPublicTreasuryPool }
 
-// GetSigners returns the signer addresses that are expected to sign the result
-// of GetSignBytes.
-func (msg MsgFundCommunityPool) GetSigners() []sdk.AccAddress {
+// GetSigners returns the signer addresses that are expected to sign the result of GetSignBytes.
+func (msg MsgFundPublicTreasuryPool) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{msg.Depositor}
 }
 
-// GetSignBytes returns the raw bytes for a MsgFundCommunityPool message that
-// the expected signer needs to sign.
-func (msg MsgFundCommunityPool) GetSignBytes() []byte {
+// GetSignBytes returns the raw bytes for a MsgFundPublicTreasuryPool message that the expected signer needs to sign.
+func (msg MsgFundPublicTreasuryPool) GetSignBytes() []byte {
 	bz := ModuleCdc.MustMarshalJSON(msg)
 	return sdk.MustSortJSON(bz)
 }
 
-// ValidateBasic performs basic MsgFundCommunityPool message validation.
-func (msg MsgFundCommunityPool) ValidateBasic() error {
+// ValidateBasic performs basic MsgFundPublicTreasuryPool message validation.
+func (msg MsgFundPublicTreasuryPool) ValidateBasic() error {
 	if !msg.Amount.IsValid() {
 		return sdkerrors.Wrap(sdkerrors.ErrInvalidCoins, msg.Amount.String())
 	}
 	if msg.Depositor.Empty() {
 		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, msg.Depositor.String())
+	}
+
+	return nil
+}
+
+const TypeMsgWithdrawFoundationPool = "withdraw_foundation_pool"
+
+// MsgWithdrawFoundationPool defines a Msg type that allows transfer from the FoundationPool
+// to target account waller / module account.
+// Nominee limits number of accounts allowed to do the transfer.
+type MsgWithdrawFoundationPool struct {
+	NomineeAddr   sdk.AccAddress `json:"nominee_address" yaml:"nominee_address"`
+	RecipientAddr sdk.AccAddress `json:"recipient_address" yaml:"recipient_address"`
+	RecipientPool RewardPoolName `json:"recipient_pool" yaml:"recipient_pool"`
+	Amount        sdk.Coins      `json:"amount" yaml:"amount"`
+}
+
+// NewMsgFundPublicTreasuryPool returns a new MsgFundPublicTreasuryPool with a sender and a funding amount.
+func NewMsgWithdrawFoundationPool(nominee, recipient sdk.AccAddress, pool RewardPoolName, amount sdk.Coins) MsgWithdrawFoundationPool {
+	return MsgWithdrawFoundationPool{
+		NomineeAddr:   nominee,
+		RecipientAddr: recipient,
+		RecipientPool: pool,
+		Amount:        amount,
+	}
+}
+
+// Route returns the MsgWithdrawFoundationPool message route.
+func (msg MsgWithdrawFoundationPool) Route() string { return ModuleName }
+
+// Type returns the MsgWithdrawFoundationPool message type.
+func (msg MsgWithdrawFoundationPool) Type() string { return TypeMsgWithdrawFoundationPool }
+
+// GetSigners returns the signer addresses that are expected to sign the result of GetSignBytes.
+func (msg MsgWithdrawFoundationPool) GetSigners() []sdk.AccAddress {
+	return []sdk.AccAddress{msg.NomineeAddr}
+}
+
+// GetSignBytes returns the raw bytes for a MsgWithdrawFoundationPool message that the expected signer needs to sign.
+func (msg MsgWithdrawFoundationPool) GetSignBytes() []byte {
+	bz := ModuleCdc.MustMarshalJSON(msg)
+	return sdk.MustSortJSON(bz)
+}
+
+// ValidateBasic performs basic MsgWithdrawFoundationPool message validation.
+func (msg MsgWithdrawFoundationPool) ValidateBasic() error {
+	if !msg.Amount.IsValid() {
+		return sdkerrors.Wrap(sdkerrors.ErrInvalidCoins, msg.Amount.String())
+	}
+	if msg.NomineeAddr.Empty() {
+		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "nominee address: empty")
+	}
+	if msg.RecipientAddr.Empty() && msg.RecipientPool == "" {
+		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "recipient: not defined")
+	}
+	if !msg.RecipientAddr.Empty() && msg.RecipientPool != "" {
+		return sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "recipient: only one is allowed (wallet/pool): %s / %s", msg.RecipientAddr, msg.RecipientPool)
+	}
+	if msg.RecipientPool != "" {
+		if !msg.RecipientPool.IsValid() {
+			return sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "recipient: invalid pool name: %s", msg.RecipientPool)
+		}
+		if msg.RecipientPool == FoundationPoolName {
+			return sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "recipient: target pool can not be %s", FoundationPoolName)
+		}
 	}
 
 	return nil

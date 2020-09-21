@@ -11,7 +11,7 @@ import (
 func InitGenesis(ctx sdk.Context, keeper Keeper, supplyKeeper types.SupplyKeeper, data types.GenesisState) {
 	var moduleHoldings sdk.DecCoins
 
-	keeper.SetFeePool(ctx, data.FeePool)
+	keeper.SetRewardPools(ctx, data.RewardPools)
 	keeper.SetParams(ctx, data.Params)
 
 	for _, dwi := range data.DelegatorWithdrawInfos {
@@ -38,7 +38,7 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, supplyKeeper types.SupplyKeeper
 		keeper.SetValidatorSlashEvent(ctx, evt.ValidatorAddress, evt.Height, evt.Period, evt.Event)
 	}
 
-	moduleHoldings = moduleHoldings.Add(data.FeePool.CommunityPool...)
+	moduleHoldings = moduleHoldings.Add(data.RewardPools.TotalCoins()...)
 	moduleHoldingsInt, _ := moduleHoldings.TruncateDecimal()
 
 	// check if the module account exists
@@ -57,7 +57,7 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, supplyKeeper types.SupplyKeeper
 
 // ExportGenesis returns a GenesisState for a given context and keeper.
 func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
-	feePool := keeper.GetFeePool(ctx)
+	rewardPools := keeper.GetRewardPools(ctx)
 	params := keeper.GetParams(ctx)
 
 	dwi := make([]types.DelegatorWithdrawInfo, 0)
@@ -139,5 +139,5 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 		},
 	)
 
-	return types.NewGenesisState(params, feePool, dwi, pp, outstanding, acc, his, cur, dels, slashes)
+	return types.NewGenesisState(params, rewardPools, dwi, pp, outstanding, acc, his, cur, dels, slashes)
 }

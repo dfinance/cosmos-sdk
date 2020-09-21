@@ -3,20 +3,28 @@ package keeper
 import (
 	"fmt"
 
-	abci "github.com/tendermint/tendermint/abci/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 	"github.com/cosmos/cosmos-sdk/x/staking/exported"
 )
 
-// AllocateTokens handles distribution of the collected fees
+// AllocateTokens handles distribution of the collected fees between pools and validators.
+// Distribution is done based on previous block voting info.
+// {dynamicFoundationPoolTax} is defined by mint module as a ratio between foundationAllocated token to all minted tokens.
 func (k Keeper) AllocateTokens(
-	ctx sdk.Context, sumPreviousPrecommitPower, totalPreviousPower int64,
-	previousProposer sdk.ConsAddress, previousVotes []abci.VoteInfo,
+	ctx sdk.Context,
+	proposerPower, totalPower int64,
+	proposer sdk.ConsAddress, votes types.ABCIVotes,
+	dynamicFoundationPoolTax sdk.Dec,
 ) {
 
+	// sanity check
+	if dynamicFoundationPoolTax.IsNegative() || dynamicFoundationPoolTax.GT(sdk.OneDec()) {
+		panic(fmt.Errorf("invalid dynamicFoundationPoolTax value: %s", dynamicFoundationPoolTax))
+	}
+
 	logger := k.Logger(ctx)
+	params := k.GetParams(ctx)
 
 	// fetch and clear the collected fees for distribution, since this is
 	// called in BeginBlock, collected fees will be from the previous block
@@ -33,26 +41,59 @@ func (k Keeper) AllocateTokens(
 
 	// temporary workaround to keep CanWithdrawInvariant happy
 	// general discussions here: https://github.com/cosmos/cosmos-sdk/issues/2906#issuecomment-441867634
-	feePool := k.GetFeePool(ctx)
-	if totalPreviousPower == 0 {
-		feePool.CommunityPool = feePool.CommunityPool.Add(feesCollected...)
-		k.SetFeePool(ctx, feePool)
+	if totalPower == 0 {
+		k.AppendToFoundationPool(ctx, feesCollected)
 		return
 	}
 
-	// calculate fraction votes
-	previousFractionVotes := sdk.NewDec(sumPreviousPrecommitPower).Quo(sdk.NewDec(totalPreviousPower))
+	// fund the FoundationPool using dynamic tax ratio
+	pools := k.GetRewardPools(ctx)
+	feesFoundationPart := feesCollected.MulDec(dynamicFoundationPoolTax)
+	pools.FoundationPool = pools.FoundationPool.Add(feesFoundationPart...)
+	rewardCoins := feesCollected.Sub(feesFoundationPart)
 
-	// calculate previous proposer reward
-	baseProposerReward := k.GetBaseProposerReward(ctx)
-	bonusProposerReward := k.GetBonusProposerReward(ctx)
-	proposerMultiplier := baseProposerReward.Add(bonusProposerReward.MulTruncate(previousFractionVotes))
-	proposerReward := feesCollected.MulDecTruncate(proposerMultiplier)
+	// distribute collected fees (sub Foundation part) between pools
+	validatorsPool := rewardCoins
+	//
+	liquidityProvidersReward := rewardCoins.MulDec(params.LiquidityProvidersPoolTax)
+	pools.LiquidityProvidersPool = pools.LiquidityProvidersPool.Add(liquidityProvidersReward...)
+	validatorsPool = validatorsPool.Sub(liquidityProvidersReward)
+	//
+	publicTreasuryReward := rewardCoins.MulDec(params.PublicTreasuryPoolTax)
+	pools.PublicTreasuryPool = pools.PublicTreasuryPool.Add(publicTreasuryReward...)
+	validatorsPool = validatorsPool.Sub(publicTreasuryReward)
+	//
+	harpReward := rewardCoins.MulDec(params.HARPTax)
+	pools.HARP = pools.HARP.Add(harpReward...)
+	validatorsPool = validatorsPool.Sub(harpReward)
+
+	// feesRemainder are distribution leftovers due to truncations
+	feesRemainder := validatorsPool
+
+	// check publicTreasuryPool capacity: overflow is transferred to FoundationPool
+	for i := 0; i < len(pools.PublicTreasuryPool); i++ {
+		decCoin := pools.PublicTreasuryPool[i]
+
+		diffDec := decCoin.Amount.Sub(sdk.NewDecFromInt(params.PublicTreasuryPoolCapacity))
+		if diffDec.IsPositive() {
+			foundationDecCoin := sdk.NewDecCoinFromDec(decCoin.Denom, diffDec)
+			pools.FoundationPool = pools.FoundationPool.Add(foundationDecCoin)
+
+			treasuryCoin := decCoin.Sub(foundationDecCoin)
+			pools.PublicTreasuryPool[i] = treasuryCoin
+		}
+	}
+	k.SetRewardPools(ctx, pools)
+
+	// distribute validatorsPool
+
+	// calculate previous proposer reward relative to its power
+	proposerPowerRatio := sdk.NewDec(proposerPower).Quo(sdk.NewDec(totalPower))
+	proposerMultiplier := params.BaseProposerReward.Add(params.BonusProposerReward.Mul(proposerPowerRatio))
+	proposerReward := validatorsPool.MulDecTruncate(proposerMultiplier)
 
 	// pay previous proposer
-	remaining := feesCollected
-	proposerValidator := k.stakingKeeper.ValidatorByConsAddr(ctx, previousProposer)
-
+	proposerValidator := k.stakingKeeper.ValidatorByConsAddr(ctx, proposer)
 	if proposerValidator != nil {
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
@@ -63,7 +104,7 @@ func (k Keeper) AllocateTokens(
 		)
 
 		k.AllocateTokensToValidator(ctx, proposerValidator, proposerReward)
-		remaining = remaining.Sub(proposerReward)
+		feesRemainder = feesRemainder.Sub(proposerReward)
 	} else {
 		// previous proposer can be unknown if say, the unbonding period is 1 block, so
 		// e.g. a validator undelegates at block X, it's removed entirely by
@@ -74,32 +115,24 @@ func (k Keeper) AllocateTokens(
 				"This should happen only if the proposer unbonded completely within a single block, "+
 				"which generally should not happen except in exceptional circumstances (or fuzz testing). "+
 				"We recommend you investigate immediately.",
-			previousProposer.String()))
+			proposer.String()))
 	}
 
-	// calculate fraction allocated to validators
-	communityTax := k.GetCommunityTax(ctx)
-	voteMultiplier := sdk.OneDec().Sub(proposerMultiplier).Sub(communityTax)
+	// calculate previous voters rewards relative to their power
+	voterMultiplier := sdk.OneDec().Sub(proposerMultiplier)
+	for _, vote := range votes {
+		validatorPowerRatio := sdk.NewDec(vote.DistributionPower).QuoTruncate(sdk.NewDec(totalPower))
+		validatorReward := validatorsPool.MulDecTruncate(voterMultiplier).MulDecTruncate(validatorPowerRatio)
+		k.AllocateTokensToValidator(ctx, vote.Validator, validatorReward)
 
-	// allocate tokens proportionally to voting power
-	// TODO consider parallelizing later, ref https://github.com/cosmos/cosmos-sdk/pull/3099#discussion_r246276376
-	for _, vote := range previousVotes {
-		validator := k.stakingKeeper.ValidatorByConsAddr(ctx, vote.Validator.Address)
-
-		// TODO consider microslashing for missing votes.
-		// ref https://github.com/cosmos/cosmos-sdk/issues/2525#issuecomment-430838701
-		powerFraction := sdk.NewDec(vote.Validator.Power).QuoTruncate(sdk.NewDec(totalPreviousPower))
-		reward := feesCollected.MulDecTruncate(voteMultiplier).MulDecTruncate(powerFraction)
-		k.AllocateTokensToValidator(ctx, validator, reward)
-		remaining = remaining.Sub(reward)
+		feesRemainder = feesRemainder.Sub(validatorReward)
 	}
 
-	// allocate community funding
-	feePool.CommunityPool = feePool.CommunityPool.Add(remaining...)
-	k.SetFeePool(ctx, feePool)
+	// transfer ValidatorsPool remainder to FoundationPool
+	k.AppendToFoundationPool(ctx, feesRemainder)
 }
 
-// AllocateTokensToValidator allocate tokens to a particular validator, splitting according to commission
+// AllocateTokensToValidator allocates tokens to a particular validator, splitting according to commission.
 func (k Keeper) AllocateTokensToValidator(ctx sdk.Context, val exported.ValidatorI, tokens sdk.DecCoins) {
 	// split tokens between validator and delegators according to commission
 	commission := tokens.MulDec(val.GetCommission())

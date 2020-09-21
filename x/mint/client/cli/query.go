@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -28,6 +29,8 @@ func GetQueryCmd(cdc *codec.Codec) *cobra.Command {
 			GetCmdQueryParams(cdc),
 			GetCmdQueryInflation(cdc),
 			GetCmdQueryAnnualProvisions(cdc),
+			GetCmdQueryBlocksPerYear(cdc),
+			GetCmdQueryNextAnnualParamsUpdate(cdc),
 		)...,
 	)
 
@@ -108,6 +111,56 @@ func GetCmdQueryAnnualProvisions(cdc *codec.Codec) *cobra.Command {
 			}
 
 			return cliCtx.PrintOutput(inflation)
+		},
+	}
+}
+
+// GetCmdQueryBlocksPerYear implements a command to return the current blocksPerYear estimation.
+func GetCmdQueryBlocksPerYear(cdc *codec.Codec) *cobra.Command {
+	return &cobra.Command{
+		Use:   "blocks-per-year",
+		Short: "Query the current blocks per year estimation value",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cliCtx := context.NewCLIContext().WithCodec(cdc)
+
+			route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryBlocksPerYear)
+			res, _, err := cliCtx.QueryWithData(route, nil)
+			if err != nil {
+				return err
+			}
+
+			var estimation uint64
+			if err := cdc.UnmarshalJSON(res, &estimation); err != nil {
+				return err
+			}
+
+			return cliCtx.PrintOutput(estimation)
+		},
+	}
+}
+
+// GetCmdQueryNextAnnualParamsUpdate implements a command to return the next annual params update timestamp.
+func GetCmdQueryNextAnnualParamsUpdate(cdc *codec.Codec) *cobra.Command {
+	return &cobra.Command{
+		Use:   "next-annual-update",
+		Short: "Query the next annual params update timestamp",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cliCtx := context.NewCLIContext().WithCodec(cdc)
+
+			route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryNextAnnualParamsUpdate)
+			res, _, err := cliCtx.QueryWithData(route, nil)
+			if err != nil {
+				return err
+			}
+
+			var ts time.Time
+			if err := cdc.UnmarshalJSON(res, &ts); err != nil {
+				return err
+			}
+
+			return cliCtx.PrintOutput(ts)
 		},
 	}
 }

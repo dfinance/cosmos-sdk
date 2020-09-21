@@ -153,6 +153,7 @@ func PositiveDelegationInvariant(k Keeper) sdk.Invariant {
 // DelegatorSharesInvariant checks whether all the delegator shares which persist
 // in the delegator object add up to the correct total delegator shares
 // amount stored in each validator.
+// Invariant checks ValidatorStakingState consistency.
 func DelegatorSharesInvariant(k Keeper) sdk.Invariant {
 	return func(ctx sdk.Context) (string, bool) {
 		var msg string
@@ -160,6 +161,7 @@ func DelegatorSharesInvariant(k Keeper) sdk.Invariant {
 
 		validators := k.GetAllValidators(ctx)
 		for _, validator := range validators {
+			valStakingState := k.GetValidatorStakingState(ctx, validator.OperatorAddress)
 
 			valTotalDelShares := validator.GetDelegatorShares()
 
@@ -167,6 +169,11 @@ func DelegatorSharesInvariant(k Keeper) sdk.Invariant {
 			delegations := k.GetValidatorDelegations(ctx, validator.GetOperator())
 			for _, delegation := range delegations {
 				totalDelShares = totalDelShares.Add(delegation.Shares)
+
+				if err := valStakingState.InvariantCheck(validator, delegation); err != nil {
+					broken = true
+					msg += err.Error() + "\n"
+				}
 			}
 
 			if !valTotalDelShares.Equal(totalDelShares) {

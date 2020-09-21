@@ -77,16 +77,14 @@ func MakeTestCodec() *codec.Codec {
 func CreateTestInputDefault(t *testing.T, isCheckTx bool, initPower int64) (
 	sdk.Context, auth.AccountKeeper, Keeper, staking.Keeper, types.SupplyKeeper) {
 
-	communityTax := sdk.NewDecWithPrec(2, 2)
+	ctx, ak, _, dk, sk, _, supplyKeeper := CreateTestInputAdvanced(t, isCheckTx, initPower, types.DefaultParams())
 
-	ctx, ak, _, dk, sk, _, supplyKeeper := CreateTestInputAdvanced(t, isCheckTx, initPower, communityTax)
 	return ctx, ak, dk, sk, supplyKeeper
 }
 
 // hogpodge of all sorts of input required for testing
-func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64,
-	communityTax sdk.Dec) (sdk.Context, auth.AccountKeeper, bank.Keeper,
-	Keeper, staking.Keeper, params.Keeper, types.SupplyKeeper) {
+func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, distrParams types.Params) (
+	sdk.Context, auth.AccountKeeper, bank.Keeper, Keeper, staking.Keeper, params.Keeper, types.SupplyKeeper) {
 
 	initTokens := sdk.TokensFromConsensusPower(initPower)
 
@@ -135,7 +133,9 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64,
 	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bankKeeper, maccPerms)
 
 	sk := staking.NewKeeper(cdc, keyStaking, supplyKeeper, pk.Subspace(staking.DefaultParamspace))
-	sk.SetParams(ctx, staking.DefaultParams())
+	skParams := staking.DefaultParams()
+	skParams.MinSelfDelegationLvl = sdk.OneInt()
+	sk.SetParams(ctx, skParams)
 
 	keeper := NewKeeper(cdc, keyDistr, pk.Subspace(types.DefaultParamspace), sk, supplyKeeper, auth.FeeCollectorName, blacklistedAddrs)
 
@@ -159,13 +159,9 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64,
 	sk.SetHooks(keeper.Hooks())
 
 	// set genesis items required for distribution
-	keeper.SetFeePool(ctx, types.InitialFeePool())
+	keeper.SetRewardPools(ctx, types.InitialRewardPools())
 
-	params := types.DefaultParams()
-	params.CommunityTax = communityTax
-	params.BaseProposerReward = sdk.NewDecWithPrec(1, 2)
-	params.BonusProposerReward = sdk.NewDecWithPrec(4, 2)
-	keeper.SetParams(ctx, params)
+	keeper.SetParams(ctx, distrParams)
 
 	return ctx, accountKeeper, bankKeeper, keeper, sk, pk, supplyKeeper
 }

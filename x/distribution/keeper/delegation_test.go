@@ -9,6 +9,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking"
 )
 
+// Allocate tokens to validator (1 delegator) with 50% commission.
 func TestCalculateRewardsBasic(t *testing.T) {
 	ctx, _, k, sk, _ := CreateTestInputDefault(t, false, 1000)
 	sh := staking.NewHandler(sk)
@@ -66,6 +67,7 @@ func TestCalculateRewardsBasic(t *testing.T) {
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial / 2)}}, k.GetValidatorAccumulatedCommission(ctx, valOpAddr1))
 }
 
+// Allocate tokens to validator (1 delegator) with 50% commission and slash with 50% fraction.
 func TestCalculateRewardsAfterSlash(t *testing.T) {
 	ctx, _, k, sk, _ := CreateTestInputDefault(t, false, 1000)
 	sh := staking.NewHandler(sk)
@@ -131,6 +133,7 @@ func TestCalculateRewardsAfterSlash(t *testing.T) {
 		k.GetValidatorAccumulatedCommission(ctx, valOpAddr1))
 }
 
+// Slash, allocate, slash with 50% (first slash has no rewards, second should lower rewards to 1/2).
 func TestCalculateRewardsAfterManySlashes(t *testing.T) {
 	ctx, _, k, sk, _ := CreateTestInputDefault(t, false, 1000)
 	sh := staking.NewHandler(sk)
@@ -208,6 +211,7 @@ func TestCalculateRewardsAfterManySlashes(t *testing.T) {
 		k.GetValidatorAccumulatedCommission(ctx, valOpAddr1))
 }
 
+// Allocate tokens per delegator (twice) with commission 50%.
 func TestCalculateRewardsMultiDelegator(t *testing.T) {
 	ctx, _, k, sk, _ := CreateTestInputDefault(t, false, 1000)
 	sh := staking.NewHandler(sk)
@@ -276,6 +280,7 @@ func TestCalculateRewardsMultiDelegator(t *testing.T) {
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial)}}, k.GetValidatorAccumulatedCommission(ctx, valOpAddr1))
 }
 
+// Allocate tokens to validator (1 delegator) with 50% commission and withdraw delegator rewards and validator commission.
 func TestWithdrawDelegationRewardsBasic(t *testing.T) {
 	balancePower := int64(1000)
 	balanceTokens := sdk.TokensFromConsensusPower(balancePower)
@@ -352,6 +357,7 @@ func TestWithdrawDelegationRewardsBasic(t *testing.T) {
 	)
 }
 
+// Allocate tokens twice and slash the first allocation.
 func TestCalculateRewardsAfterManySlashesInSameBlock(t *testing.T) {
 	ctx, _, k, sk, _ := CreateTestInputDefault(t, false, 1000)
 	sh := staking.NewHandler(sk)

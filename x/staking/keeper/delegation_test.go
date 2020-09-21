@@ -877,7 +877,12 @@ func TestRedelegateFromUnbondingValidator(t *testing.T) {
 }
 
 func TestRedelegateFromUnbondedValidator(t *testing.T) {
+	// init and set params raising the delegation limit
 	ctx, _, keeper, _ := CreateTestInput(t, false, 0)
+	params := keeper.GetParams(ctx)
+	params.MaxDelegationsRatio = sdk.NewDecWithPrec(100, 0)
+	keeper.SetParams(ctx, params)
+
 	startTokens := sdk.TokensFromConsensusPower(30)
 	startCoins := sdk.NewCoins(sdk.NewCoin(keeper.BondDenom(ctx), startTokens))
 
@@ -927,8 +932,8 @@ func TestRedelegateFromUnbondedValidator(t *testing.T) {
 
 	validator, found := keeper.GetValidator(ctx, addrVals[0])
 	require.True(t, found)
+	require.Equal(t, sdk.Unbonding, validator.GetStatus())
 	require.Equal(t, ctx.BlockHeight(), validator.UnbondingHeight)
-	params := keeper.GetParams(ctx)
 	require.True(t, ctx.BlockHeader().Time.Add(params.UnbondingTime).Equal(validator.UnbondingCompletionTime))
 
 	// unbond the validator

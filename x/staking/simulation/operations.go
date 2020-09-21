@@ -271,6 +271,17 @@ func SimulateMsgDelegate(ak types.AccountKeeper, k keeper.Keeper) simulation.Ope
 			return simulation.NoOpMsg(types.ModuleName), nil, err
 		}
 
+		// check if operation would overflow validator max delegations level
+		valSelfStaked, valTotalStaked := k.GetValidatorStakingState(ctx, val.OperatorAddress).GetSelfAndTotalStakes(val)
+		if simAccount.Address.Equals(val.OperatorAddress) {
+			valSelfStaked = valSelfStaked.Add(amount)
+		}
+		valTotalStaked = valTotalStaked.Add(amount)
+
+		if overflow, _ := k.HasValidatorDelegationsOverflow(ctx, valSelfStaked, valTotalStaked); overflow {
+			return simulation.NoOpMsg(types.ModuleName), nil, nil
+		}
+
 		bondAmt := sdk.NewCoin(denom, amount)
 
 		account := ak.GetAccount(ctx, simAccount.Address)
@@ -446,6 +457,17 @@ func SimulateMsgBeginRedelegate(ak types.AccountKeeper, k keeper.Keeper) simulat
 
 		if srcVal.TokensFromShares(shares).TruncateInt().IsZero() {
 			return simulation.NoOpMsg(types.ModuleName), nil, nil // skip
+		}
+
+		// check if operation would overflow validator max delegations level
+		valSelfStaked, valTotalStaked := k.GetValidatorStakingState(ctx, destVal.OperatorAddress).GetSelfAndTotalStakes(destVal)
+		if delAddr.Equals(destVal.OperatorAddress) {
+			valSelfStaked = valSelfStaked.Add(redAmt)
+		}
+		valTotalStaked = valTotalStaked.Add(redAmt)
+
+		if overflow, _ := k.HasValidatorDelegationsOverflow(ctx, valSelfStaked, valTotalStaked); overflow {
+			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
 
 		// need to retrieve the simulation account associated with delegation to retrieve PrivKey

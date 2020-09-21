@@ -99,7 +99,7 @@ test-ledger: test-ledger-mock
 	@go test -mod=readonly -v `go list github.com/cosmos/cosmos-sdk/crypto` -tags='cgo ledger'
 
 test-unit:
-	@VERSION=$(VERSION) go test -mod=readonly $(PACKAGES_NOSIMULATION) -tags='ledger test_ledger_mock'
+	@VERSION=$(VERSION) go test -mod=readonly $(PACKAGES_NOSIMULATION) -tags='ledger test_ledger_mock' -count=1
 
 test-race:
 	@VERSION=$(VERSION) go test -mod=readonly -race $(PACKAGES_NOSIMULATION)
@@ -179,6 +179,11 @@ lint: golangci-lint
 	find . -name '*.go' -type f -not -path "./vendor*" -not -path "*.git*" | xargs gofmt -d -s
 	go mod verify
 .PHONY: lint
+
+lint-local:
+	golangci-lint run
+	find . -name '*.go' -type f -not -path "./vendor*" -not -path "*.git*" | xargs gofmt -d -s
+	go mod verify
 
 format: tools
 	find . -name '*.go' -type f -not -path "./vendor*" -not -path "*.git*" -not -path "./client/lcd/statik/statik.go" | xargs gofmt -w -s

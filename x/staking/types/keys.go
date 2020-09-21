@@ -35,6 +35,7 @@ var (
 	ValidatorsKey             = []byte{0x21} // prefix for each key to a validator
 	ValidatorsByConsAddrKey   = []byte{0x22} // prefix for each key to a validator index, by pubkey
 	ValidatorsByPowerIndexKey = []byte{0x23} // prefix for each key to a validator index, sorted by power
+	ValidatorsStakingStateKey = []byte{0x24} // prefix for each key to a validator staking info
 
 	DelegationKey                    = []byte{0x31} // key for a delegation
 	UnbondingDelegationKey           = []byte{0x32} // key for an unbonding-delegation
@@ -43,9 +44,10 @@ var (
 	RedelegationByValSrcIndexKey     = []byte{0x35} // prefix for each key for an redelegation, by source validator operator
 	RedelegationByValDstIndexKey     = []byte{0x36} // prefix for each key for an redelegation, by destination validator operator
 
-	UnbondingQueueKey    = []byte{0x41} // prefix for the timestamps in unbonding queue
-	RedelegationQueueKey = []byte{0x42} // prefix for the timestamps in redelegations queue
-	ValidatorQueueKey    = []byte{0x43} // prefix for the timestamps in validator queue
+	UnbondingQueueKey       = []byte{0x41} // prefix for the timestamps in unbonding queue
+	RedelegationQueueKey    = []byte{0x42} // prefix for the timestamps in redelegations queue
+	ValidatorQueueKey       = []byte{0x43} // prefix for the timestamps in validator queue
+	ScheduledUnbondQueueKey = []byte{0x44} // prefix for the timestamps in scheduled force validator unbond queue
 
 	HistoricalInfoKey = []byte{0x50} // prefix for the historical info
 )
@@ -54,6 +56,12 @@ var (
 // VALUE: staking/Validator
 func GetValidatorKey(operatorAddr sdk.ValAddress) []byte {
 	return append(ValidatorsKey, operatorAddr.Bytes()...)
+}
+
+// gets the key for the validator staking state with address
+// VALUE: staking/Validator
+func GetValidatorStakingStateKey(operatorAddr sdk.ValAddress) []byte {
+	return append(ValidatorsStakingStateKey, operatorAddr.Bytes()...)
 }
 
 // gets the key for the validator with pubkey
@@ -123,6 +131,12 @@ func ParseValidatorPowerRankKey(key []byte) (operAddr []byte) {
 func GetValidatorQueueTimeKey(timestamp time.Time) []byte {
 	bz := sdk.FormatTimeBytes(timestamp)
 	return append(ValidatorQueueKey, bz...)
+}
+
+// gets the prefix for all scheduled unbonds
+func GetScheduledUnbondQueueTimeKey(timestamp time.Time) []byte {
+	bz := sdk.FormatTimeBytes(timestamp)
+	return append(ScheduledUnbondQueueKey, bz...)
 }
 
 //______________________________________________________________________________

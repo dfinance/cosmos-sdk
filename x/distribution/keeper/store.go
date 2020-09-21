@@ -12,6 +12,7 @@ func (k Keeper) GetDelegatorWithdrawAddr(ctx sdk.Context, delAddr sdk.AccAddress
 	if b == nil {
 		return delAddr
 	}
+
 	return sdk.AccAddress(b)
 }
 
@@ -41,24 +42,6 @@ func (k Keeper) IterateDelegatorWithdrawAddrs(ctx sdk.Context, handler func(del 
 	}
 }
 
-// get the global fee pool distribution info
-func (k Keeper) GetFeePool(ctx sdk.Context) (feePool types.FeePool) {
-	store := ctx.KVStore(k.storeKey)
-	b := store.Get(types.FeePoolKey)
-	if b == nil {
-		panic("Stored fee pool should not have been nil")
-	}
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &feePool)
-	return
-}
-
-// set the global fee pool distribution info
-func (k Keeper) SetFeePool(ctx sdk.Context, feePool types.FeePool) {
-	store := ctx.KVStore(k.storeKey)
-	b := k.cdc.MustMarshalBinaryLengthPrefixed(feePool)
-	store.Set(types.FeePoolKey, b)
-}
-
 // get the proposer public key for this block
 func (k Keeper) GetPreviousProposerConsAddr(ctx sdk.Context) (consAddr sdk.ConsAddress) {
 	store := ctx.KVStore(k.storeKey)
@@ -67,6 +50,7 @@ func (k Keeper) GetPreviousProposerConsAddr(ctx sdk.Context) (consAddr sdk.ConsA
 		panic("Previous proposer not set")
 	}
 	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &consAddr)
+
 	return
 }
 
@@ -82,6 +66,7 @@ func (k Keeper) GetDelegatorStartingInfo(ctx sdk.Context, val sdk.ValAddress, de
 	store := ctx.KVStore(k.storeKey)
 	b := store.Get(types.GetDelegatorStartingInfoKey(val, del))
 	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &period)
+
 	return
 }
 
@@ -95,6 +80,7 @@ func (k Keeper) SetDelegatorStartingInfo(ctx sdk.Context, val sdk.ValAddress, de
 // check existence of the starting info associated with a delegator
 func (k Keeper) HasDelegatorStartingInfo(ctx sdk.Context, val sdk.ValAddress, del sdk.AccAddress) bool {
 	store := ctx.KVStore(k.storeKey)
+
 	return store.Has(types.GetDelegatorStartingInfoKey(val, del))
 }
 
@@ -124,6 +110,7 @@ func (k Keeper) GetValidatorHistoricalRewards(ctx sdk.Context, val sdk.ValAddres
 	store := ctx.KVStore(k.storeKey)
 	b := store.Get(types.GetValidatorHistoricalRewardsKey(val, period))
 	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &rewards)
+
 	return
 }
 
@@ -185,6 +172,7 @@ func (k Keeper) GetValidatorHistoricalReferenceCount(ctx sdk.Context) (count uin
 		k.cdc.MustUnmarshalBinaryLengthPrefixed(iter.Value(), &rewards)
 		count += uint64(rewards.ReferenceCount)
 	}
+
 	return
 }
 
@@ -193,6 +181,7 @@ func (k Keeper) GetValidatorCurrentRewards(ctx sdk.Context, val sdk.ValAddress) 
 	store := ctx.KVStore(k.storeKey)
 	b := store.Get(types.GetValidatorCurrentRewardsKey(val))
 	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &rewards)
+
 	return
 }
 
@@ -232,6 +221,7 @@ func (k Keeper) GetValidatorAccumulatedCommission(ctx sdk.Context, val sdk.ValAd
 		return types.ValidatorAccumulatedCommission{}
 	}
 	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &commission)
+
 	return
 }
 
@@ -275,6 +265,7 @@ func (k Keeper) GetValidatorOutstandingRewards(ctx sdk.Context, val sdk.ValAddre
 	store := ctx.KVStore(k.storeKey)
 	b := store.Get(types.GetValidatorOutstandingRewardsKey(val))
 	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &rewards)
+
 	return
 }
 
@@ -314,6 +305,7 @@ func (k Keeper) GetValidatorSlashEvent(ctx sdk.Context, val sdk.ValAddress, heig
 		return types.ValidatorSlashEvent{}, false
 	}
 	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &event)
+
 	return event, true
 }
 
@@ -376,4 +368,46 @@ func (k Keeper) DeleteAllValidatorSlashEvents(ctx sdk.Context) {
 	for ; iter.Valid(); iter.Next() {
 		store.Delete(iter.Key())
 	}
+}
+
+// get reward distribution pools info
+func (k Keeper) GetRewardPools(ctx sdk.Context) (rewardPools types.RewardPools) {
+	store := ctx.KVStore(k.storeKey)
+
+	b := store.Get(types.RewardPoolsKey)
+	if b == nil {
+		panic("Stored rewardPools should not have been nil")
+	}
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &rewardPools)
+
+	return
+}
+
+// set reward distribution pools info
+func (k Keeper) SetRewardPools(ctx sdk.Context, rewardPools types.RewardPools) {
+	store := ctx.KVStore(k.storeKey)
+	b := k.cdc.MustMarshalBinaryLengthPrefixed(rewardPools)
+	store.Set(types.RewardPoolsKey, b)
+}
+
+// get validator locked rewards info
+func (k Keeper) GetValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress) (lockedRewards types.ValidatorLockedRewards) {
+	store := ctx.KVStore(k.storeKey)
+	b := store.Get(types.GetValidatorLockedRewardsKey(val))
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &lockedRewards)
+
+	return
+}
+
+// set validator locked rewards info
+func (k Keeper) SetValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress, lockedRewards types.ValidatorLockedRewards) {
+	store := ctx.KVStore(k.storeKey)
+	b := k.cdc.MustMarshalBinaryLengthPrefixed(lockedRewards)
+	store.Set(types.GetValidatorLockedRewardsKey(val), b)
+}
+
+// delete validator locked rewards info
+func (k Keeper) DeleteValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress) {
+	store := ctx.KVStore(k.storeKey)
+	store.Delete(types.GetValidatorLockedRewardsKey(val))
 }

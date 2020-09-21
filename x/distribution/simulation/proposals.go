@@ -11,27 +11,27 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/simulation"
 )
 
-// OpWeightSubmitCommunitySpendProposal app params key for community spend proposal
-const OpWeightSubmitCommunitySpendProposal = "op_weight_submit_community_spend_proposal"
+// OpWeightSubmitPublicTreasurySpendProposal app params key for public treasury spend proposal
+const OpWeightSubmitPublicTreasurySpendProposal = "op_weight_submit_public_treasury_spend_proposal"
 
 // ProposalContents defines the module weighted proposals' contents
 func ProposalContents(k keeper.Keeper) []simulation.WeightedProposalContent {
 	return []simulation.WeightedProposalContent{
 		{
-			AppParamsKey:       OpWeightSubmitCommunitySpendProposal,
-			DefaultWeight:      simappparams.DefaultWeightCommunitySpendProposal,
-			ContentSimulatorFn: SimulateCommunityPoolSpendProposalContent(k),
+			AppParamsKey:       OpWeightSubmitPublicTreasurySpendProposal,
+			DefaultWeight:      simappparams.DefaultWeightPublicTreasurySpendProposal,
+			ContentSimulatorFn: SimulatePublicTreasuryPoolSpendProposalContent(k),
 		},
 	}
 }
 
-// SimulateCommunityPoolSpendProposalContent generates random community-pool-spend proposal content
+// SimulatePublicTreasuryPoolSpendProposalContent generates random public-treasury-pool-spend proposal content
 // nolint: funlen
-func SimulateCommunityPoolSpendProposalContent(k keeper.Keeper) simulation.ContentSimulatorFn {
+func SimulatePublicTreasuryPoolSpendProposalContent(k keeper.Keeper) simulation.ContentSimulatorFn {
 	return func(r *rand.Rand, ctx sdk.Context, accs []simulation.Account) govtypes.Content {
 		simAccount, _ := simulation.RandomAcc(r, accs)
 
-		balance := k.GetFeePool(ctx).CommunityPool
+		balance := k.GetRewardPools(ctx).PublicTreasuryPool
 		if balance.Empty() {
 			return nil
 		}
@@ -42,7 +42,7 @@ func SimulateCommunityPoolSpendProposalContent(k keeper.Keeper) simulation.Conte
 			return nil
 		}
 
-		return types.NewCommunityPoolSpendProposal(
+		return types.NewPublicTreasuryPoolSpendProposal(
 			simulation.RandStringOfLength(r, 10),
 			simulation.RandStringOfLength(r, 100),
 			simAccount.Address,

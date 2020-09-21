@@ -54,7 +54,10 @@ var (
 		mint.AppModuleBasic{},
 		distr.AppModuleBasic{},
 		gov.NewAppModuleBasic(
-			paramsclient.ProposalHandler, distr.ProposalHandler, upgradeclient.ProposalHandler,
+			paramsclient.ProposalHandler,
+			distr.PublicTreasurySpendProposalHandler,
+			distr.TaxParamsUpdateProposalHandler,
+			upgradeclient.ProposalHandler,
 		),
 		params.AppModuleBasic{},
 		crisis.AppModuleBasic{},
@@ -65,7 +68,7 @@ var (
 
 	// module account permissions
 	maccPerms = map[string][]string{
-		auth.FeeCollectorName:     nil,
+		auth.FeeCollectorName:     {supply.Burner},
 		distr.ModuleName:          nil,
 		mint.ModuleName:           {supply.Minter},
 		staking.BondedPoolName:    {supply.Burner, supply.Staking},
@@ -211,7 +214,7 @@ func NewSimApp(
 	govRouter := gov.NewRouter()
 	govRouter.AddRoute(gov.RouterKey, gov.ProposalHandler).
 		AddRoute(params.RouterKey, params.NewParamChangeProposalHandler(app.ParamsKeeper)).
-		AddRoute(distr.RouterKey, distr.NewCommunityPoolSpendProposalHandler(app.DistrKeeper)).
+		AddRoute(distr.RouterKey, distr.NewProposalHandler(app.DistrKeeper)).
 		AddRoute(upgrade.RouterKey, upgrade.NewSoftwareUpgradeProposalHandler(app.UpgradeKeeper))
 	app.GovKeeper = gov.NewKeeper(
 		app.cdc, keys[gov.StoreKey], app.subspaces[gov.ModuleName], app.SupplyKeeper,
@@ -235,7 +238,7 @@ func NewSimApp(
 		gov.NewAppModule(app.GovKeeper, app.AccountKeeper, app.SupplyKeeper),
 		mint.NewAppModule(app.MintKeeper),
 		slashing.NewAppModule(app.SlashingKeeper, app.AccountKeeper, app.StakingKeeper),
-		distr.NewAppModule(app.DistrKeeper, app.AccountKeeper, app.SupplyKeeper, app.StakingKeeper),
+		distr.NewAppModule(app.DistrKeeper, app.AccountKeeper, app.SupplyKeeper, app.StakingKeeper, app.MintKeeper),
 		staking.NewAppModule(app.StakingKeeper, app.AccountKeeper, app.SupplyKeeper),
 		upgrade.NewAppModule(app.UpgradeKeeper),
 		evidence.NewAppModule(app.EvidenceKeeper),
@@ -269,7 +272,7 @@ func NewSimApp(
 		gov.NewAppModule(app.GovKeeper, app.AccountKeeper, app.SupplyKeeper),
 		mint.NewAppModule(app.MintKeeper),
 		staking.NewAppModule(app.StakingKeeper, app.AccountKeeper, app.SupplyKeeper),
-		distr.NewAppModule(app.DistrKeeper, app.AccountKeeper, app.SupplyKeeper, app.StakingKeeper),
+		distr.NewAppModule(app.DistrKeeper, app.AccountKeeper, app.SupplyKeeper, app.StakingKeeper, app.MintKeeper),
 		slashing.NewAppModule(app.SlashingKeeper, app.AccountKeeper, app.StakingKeeper),
 		params.NewAppModule(), // NOTE: only used for simulation to generate randomized param change proposals
 	)

@@ -9,7 +9,20 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking/exported"
 )
 
-// initialize rewards for a new validator
+// GetDistributionPower calculates distribution power based on validator stakingPower and lockedRewards ratio.
+func (k Keeper) GetDistributionPower(ctx sdk.Context, valAddr sdk.ValAddress, stakingPower int64) int64 {
+	lockedRewards := k.GetValidatorLockedRewards(ctx, valAddr)
+	if lockedRewards.LockedRatio.IsZero() {
+		return stakingPower
+	}
+
+	lockedPower := sdk.NewDec(stakingPower).Mul(lockedRewards.LockedRatio)
+	distrPower := stakingPower + lockedPower.TruncateInt64()
+
+	return distrPower
+}
+
+// initializeValidator initializes rewards for a new validator.
 func (k Keeper) initializeValidator(ctx sdk.Context, val exported.ValidatorI) {
 	// set initial historical rewards (period 0) with reference count of 1
 	k.SetValidatorHistoricalRewards(ctx, val.GetOperator(), 0, types.NewValidatorHistoricalRewards(sdk.DecCoins{}, 1))
@@ -22,9 +35,15 @@ func (k Keeper) initializeValidator(ctx sdk.Context, val exported.ValidatorI) {
 
 	// set outstanding rewards
 	k.SetValidatorOutstandingRewards(ctx, val.GetOperator(), sdk.DecCoins{})
+
+	// set empty locked rewards info
+	k.SetValidatorLockedRewards(ctx, val.GetOperator(), types.NewValidatorLockedRewards(sdk.ZeroDec()))
 }
 
-// increment validator period, returning the period just ended
+// incrementValidatorPeriod increments validator period, returning the period just ended.
+// Current rewards are converted to cumulative reward ratio, added to historical rewards of the previous period
+// and saved as historical rewards for the current period (which ends).
+// New period starts with empty rewards.
 func (k Keeper) incrementValidatorPeriod(ctx sdk.Context, val exported.ValidatorI) uint64 {
 	// fetch current rewards
 	rewards := k.GetValidatorCurrentRewards(ctx, val.GetOperator())
@@ -32,14 +51,12 @@ func (k Keeper) incrementValidatorPeriod(ctx sdk.Context, val exported.Validator
 	// calculate current ratio
 	var current sdk.DecCoins
 	if val.GetTokens().IsZero() {
-
 		// can't calculate ratio for zero-token validators
-		// ergo we instead add to the community pool
-		feePool := k.GetFeePool(ctx)
+		// ergo we instead add to the FoundationPool
+		k.AppendToFoundationPool(ctx, rewards.Rewards)
+
 		outstanding := k.GetValidatorOutstandingRewards(ctx, val.GetOperator())
-		feePool.CommunityPool = feePool.CommunityPool.Add(rewards.Rewards...)
 		outstanding = outstanding.Sub(rewards.Rewards)
-		k.SetFeePool(ctx, feePool)
 		k.SetValidatorOutstandingRewards(ctx, val.GetOperator(), outstanding)
 
 		current = sdk.DecCoins{}
@@ -63,7 +80,7 @@ func (k Keeper) incrementValidatorPeriod(ctx sdk.Context, val exported.Validator
 	return rewards.Period
 }
 
-// increment the reference count for a historical rewards value
+// incrementReferenceCount increments the reference count for a historical rewards value.
 func (k Keeper) incrementReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress, period uint64) {
 	historical := k.GetValidatorHistoricalRewards(ctx, valAddr, period)
 	if historical.ReferenceCount > 2 {
@@ -73,7 +90,8 @@ func (k Keeper) incrementReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress,
 	k.SetValidatorHistoricalRewards(ctx, valAddr, period, historical)
 }
 
-// decrement the reference count for a historical rewards value, and delete if zero references remain
+// decrementReferenceCount decrements the reference count for a historical rewards value.
+// Value is deleted if zero references remain.
 func (k Keeper) decrementReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress, period uint64) {
 	historical := k.GetValidatorHistoricalRewards(ctx, valAddr, period)
 	if historical.ReferenceCount == 0 {
@@ -87,7 +105,10 @@ func (k Keeper) decrementReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress,
 	}
 }
 
+// updateValidatorSlashFraction handles a new slash event.
+// This ends the current rewards period and adds a slash event for it.
 func (k Keeper) updateValidatorSlashFraction(ctx sdk.Context, valAddr sdk.ValAddress, fraction sdk.Dec) {
+	// sanity check
 	if fraction.GT(sdk.OneDec()) || fraction.IsNegative() {
 		panic(fmt.Sprintf("fraction must be >=0 and <=1, current fraction: %v", fraction))
 	}
@@ -104,4 +125,56 @@ func (k Keeper) updateValidatorSlashFraction(ctx sdk.Context, valAddr sdk.ValAdd
 	height := uint64(ctx.BlockHeight())
 
 	k.SetValidatorSlashEvent(ctx, valAddr, height, newPeriod, slashEvent)
+}
+
+// removeValidator removes rewards for a validator.
+// Commission rewards are transferred to an operator.
+// Commission remainder and outstanding rewards are transferred to FoundationPool.
+func (k Keeper) removeValidator(ctx sdk.Context, valAddr sdk.ValAddress) {
+	// fetch outstanding
+	outstanding := k.GetValidatorOutstandingRewards(ctx, valAddr)
+
+	// force-withdraw commission
+	commission := k.GetValidatorAccumulatedCommission(ctx, valAddr)
+	if !commission.IsZero() {
+		// subtract from outstanding
+		outstanding = outstanding.Sub(commission)
+
+		// split into integral & remainder
+		coins, remainder := commission.TruncateDecimal()
+
+		// remainder to FoundationPool
+		k.AppendToFoundationPool(ctx, remainder)
+
+		// add to validator account
+		if !coins.IsZero() {
+			accAddr := sdk.AccAddress(valAddr)
+			withdrawAddr := k.GetDelegatorWithdrawAddr(ctx, accAddr)
+			err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, withdrawAddr, coins)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	// add outstanding to FoundationPool
+	k.AppendToFoundationPool(ctx, outstanding)
+
+	// delete outstanding
+	k.DeleteValidatorOutstandingRewards(ctx, valAddr)
+
+	// remove commission record
+	k.DeleteValidatorAccumulatedCommission(ctx, valAddr)
+
+	// clear slashes
+	k.DeleteValidatorSlashEvents(ctx, valAddr)
+
+	// clear historical rewards
+	k.DeleteValidatorHistoricalRewards(ctx, valAddr)
+
+	// clear current rewards
+	k.DeleteValidatorCurrentRewards(ctx, valAddr)
+
+	// clear locked rewards info
+	k.DeleteValidatorLockedRewards(ctx, valAddr)
 }

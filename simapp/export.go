@@ -88,11 +88,11 @@ func (app *SimApp) prepForZeroHeightGenesis(ctx sdk.Context, jailWhiteList []str
 	// reinitialize all validators
 	app.StakingKeeper.IterateValidators(ctx, func(_ int64, val exported.ValidatorI) (stop bool) {
 
-		// donate any unwithdrawn outstanding reward fraction tokens to the community pool
+		// donate any unwithdrawn outstanding reward fraction tokens to the foundation pool
 		scraps := app.DistrKeeper.GetValidatorOutstandingRewards(ctx, val.GetOperator())
-		feePool := app.DistrKeeper.GetFeePool(ctx)
-		feePool.CommunityPool = feePool.CommunityPool.Add(scraps...)
-		app.DistrKeeper.SetFeePool(ctx, feePool)
+		rewardPools := app.DistrKeeper.GetRewardPools(ctx)
+		rewardPools.FoundationPool = rewardPools.FoundationPool.Add(scraps...)
+		app.DistrKeeper.SetRewardPools(ctx, rewardPools)
 
 		app.DistrKeeper.Hooks().AfterValidatorCreated(ctx, val.GetOperator())
 		return false

@@ -92,15 +92,19 @@ func getQueriedDelegatorTotalRewards(t *testing.T, ctx sdk.Context, cdc *codec.C
 	return
 }
 
-func getQueriedCommunityPool(t *testing.T, ctx sdk.Context, cdc *codec.Codec, querier sdk.Querier) (ptr []byte) {
+func getQueriedPool(t *testing.T, ctx sdk.Context, cdc *codec.Codec, querier sdk.Querier, poolName types.RewardPoolName, validQuery bool) (ptr []byte) {
 	query := abci.RequestQuery{
-		Path: strings.Join([]string{custom, types.QuerierRoute, types.QueryCommunityPool}, ""),
+		Path: strings.Join([]string{custom, types.QuerierRoute, types.QueryPool}, ""),
 		Data: []byte{},
 	}
 
-	cp, err := querier(ctx, []string{types.QueryCommunityPool}, query)
-	require.Nil(t, err)
-	require.Nil(t, cdc.UnmarshalJSON(cp, &ptr))
+	cp, err := querier(ctx, []string{types.QueryPool, poolName.String()}, query)
+	if validQuery {
+		require.Nil(t, err)
+		require.Nil(t, cdc.UnmarshalJSON(cp, &ptr))
+	} else {
+		require.Error(t, err)
+	}
 
 	return
 }
@@ -113,17 +117,16 @@ func TestQueries(t *testing.T) {
 	querier := NewQuerier(keeper)
 
 	// test param queries
-	params := types.Params{
-		CommunityTax:        sdk.NewDecWithPrec(3, 1),
-		BaseProposerReward:  sdk.NewDecWithPrec(2, 1),
-		BonusProposerReward: sdk.NewDecWithPrec(1, 1),
-		WithdrawAddrEnabled: true,
-	}
+	params := types.DefaultParams()
 
 	keeper.SetParams(ctx, params)
 
 	paramsRes := getQueriedParams(t, ctx, cdc, querier)
-	require.Equal(t, params.CommunityTax, paramsRes.CommunityTax)
+	require.Equal(t, params.ValidatorsPoolTax, paramsRes.ValidatorsPoolTax)
+	require.Equal(t, params.LiquidityProvidersPoolTax, paramsRes.LiquidityProvidersPoolTax)
+	require.Equal(t, params.PublicTreasuryPoolTax, paramsRes.PublicTreasuryPoolTax)
+	require.Equal(t, params.PublicTreasuryPoolCapacity, paramsRes.PublicTreasuryPoolCapacity)
+	require.Equal(t, params.HARPTax, paramsRes.HARPTax)
 	require.Equal(t, params.BaseProposerReward, paramsRes.BaseProposerReward)
 	require.Equal(t, params.BonusProposerReward, paramsRes.BonusProposerReward)
 	require.Equal(t, params.WithdrawAddrEnabled, paramsRes.WithdrawAddrEnabled)
@@ -187,7 +190,14 @@ func TestQueries(t *testing.T) {
 		[]types.DelegationDelegatorReward{expectedDelReward}, expectedDelReward.Reward)
 	require.Equal(t, wantDelRewards, delRewards)
 
-	// currently community pool hold nothing so we should return null
-	communityPool := getQueriedCommunityPool(t, ctx, cdc, querier)
-	require.Nil(t, communityPool)
+	// currently all pools hold nothing so we should return null
+	liquidityPool := getQueriedPool(t, ctx, cdc, querier, types.LiquidityProvidersPoolName, true)
+	require.Nil(t, liquidityPool)
+	treasuryPool := getQueriedPool(t, ctx, cdc, querier, types.PublicTreasuryPoolName, true)
+	require.Nil(t, treasuryPool)
+	foundationPool := getQueriedPool(t, ctx, cdc, querier, types.FoundationPoolName, true)
+	require.Nil(t, foundationPool)
+	harpPool := getQueriedPool(t, ctx, cdc, querier, types.HARPName, true)
+	require.Nil(t, harpPool)
+	getQueriedPool(t, ctx, cdc, querier, types.RewardPoolName("_"), false)
 }
