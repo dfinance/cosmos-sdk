@@ -268,12 +268,10 @@ func (k Keeper) UBDQueueIterator(ctx sdk.Context, endTime time.Time) sdk.Iterato
 
 // Returns a concatenated list of all the timeslices inclusively previous to
 // currTime, and deletes the timeslices from the queue
-func (k Keeper) DequeueAllMatureUBDQueue(ctx sdk.Context,
-	currTime time.Time) (matureUnbonds []types.DVPair) {
-
+func (k Keeper) DequeueAllMatureUBDQueue(ctx sdk.Context, currTime time.Time) (matureUnbonds []types.DVPair) {
 	store := ctx.KVStore(k.storeKey)
 	// gets an iterator for all timeslices from time 0 until the current Blockheader time
-	unbondingTimesliceIterator := k.UBDQueueIterator(ctx, ctx.BlockHeader().Time)
+	unbondingTimesliceIterator := k.UBDQueueIterator(ctx, currTime)
 	defer unbondingTimesliceIterator.Close()
 
 	for ; unbondingTimesliceIterator.Valid(); unbondingTimesliceIterator.Next() {
@@ -462,7 +460,7 @@ func (k Keeper) RedelegationQueueIterator(ctx sdk.Context, endTime time.Time) sd
 func (k Keeper) DequeueAllMatureRedelegationQueue(ctx sdk.Context, currTime time.Time) (matureRedelegations []types.DVVTriplet) {
 	store := ctx.KVStore(k.storeKey)
 	// gets an iterator for all timeslices from time 0 until the current Blockheader time
-	redelegationTimesliceIterator := k.RedelegationQueueIterator(ctx, ctx.BlockHeader().Time)
+	redelegationTimesliceIterator := k.RedelegationQueueIterator(ctx, currTime)
 	defer redelegationTimesliceIterator.Close()
 
 	for ; redelegationTimesliceIterator.Valid(); redelegationTimesliceIterator.Next() {
@@ -701,16 +699,16 @@ func (k Keeper) getBeginInfo(
 // are not exceeded and unbond the staked tokens (based on shares) by creating
 // an unbonding object and inserting it into the unbonding queue which will be
 // processed during the staking EndBlocker.
+// {ignoreUBLimit} ignores MaxUnbondingDelegationEntries and used for force undelegate operations.
 func (k Keeper) Undelegate(
-	ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress, sharesAmount sdk.Dec,
+	ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress, sharesAmount sdk.Dec, ignoreUBLimit bool,
 ) (time.Time, error) {
-
 	validator, found := k.GetValidator(ctx, valAddr)
 	if !found {
 		return time.Time{}, types.ErrNoDelegatorForAddress
 	}
 
-	if k.HasMaxUnbondingDelegationEntries(ctx, delAddr, valAddr) {
+	if !ignoreUBLimit && k.HasMaxUnbondingDelegationEntries(ctx, delAddr, valAddr) {
 		return time.Time{}, types.ErrMaxUnbondingDelegationEntries
 	}
 
@@ -734,7 +732,9 @@ func (k Keeper) Undelegate(
 // CompleteUnbondingWithAmount completes the unbonding of all mature entries in
 // the retrieved unbonding delegation object and returns the total unbonding
 // balance or an error upon failure.
-func (k Keeper) CompleteUnbondingWithAmount(ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (sdk.Coins, error) {
+func (k Keeper) CompleteUnbondingWithAmount(
+	ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress, currTime time.Time,
+) (sdk.Coins, error) {
 	ubd, found := k.GetUnbondingDelegation(ctx, delAddr, valAddr)
 	if !found {
 		return nil, types.ErrNoUnbondingDelegation
@@ -742,12 +742,11 @@ func (k Keeper) CompleteUnbondingWithAmount(ctx sdk.Context, delAddr sdk.AccAddr
 
 	bondDenom := k.GetParams(ctx).BondDenom
 	balances := sdk.NewCoins()
-	ctxTime := ctx.BlockHeader().Time
 
 	// loop through all the entries and complete unbonding mature entries
 	for i := 0; i < len(ubd.Entries); i++ {
 		entry := ubd.Entries[i]
-		if entry.IsMature(ctxTime) {
+		if entry.IsMature(currTime) {
 			ubd.RemoveEntry(int64(i))
 			i--
 
@@ -779,7 +778,7 @@ func (k Keeper) CompleteUnbondingWithAmount(ctx sdk.Context, delAddr sdk.AccAddr
 // CompleteUnbonding performs the same logic as CompleteUnbondingWithAmount except
 // it does not return the total unbonding amount.
 func (k Keeper) CompleteUnbonding(ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error {
-	_, err := k.CompleteUnbondingWithAmount(ctx, delAddr, valAddr)
+	_, err := k.CompleteUnbondingWithAmount(ctx, delAddr, valAddr, ctx.BlockTime())
 	return err
 }
 
@@ -844,7 +843,7 @@ func (k Keeper) BeginRedelegation(
 // retrieved redelegation object and returns the total redelegation (initial)
 // balance or an error upon failure.
 func (k Keeper) CompleteRedelegationWithAmount(
-	ctx sdk.Context, delAddr sdk.AccAddress, valSrcAddr, valDstAddr sdk.ValAddress,
+	ctx sdk.Context, delAddr sdk.AccAddress, valSrcAddr, valDstAddr sdk.ValAddress, currTime time.Time,
 ) (sdk.Coins, error) {
 
 	red, found := k.GetRedelegation(ctx, delAddr, valSrcAddr, valDstAddr)
@@ -854,12 +853,11 @@ func (k Keeper) CompleteRedelegationWithAmount(
 
 	bondDenom := k.GetParams(ctx).BondDenom
 	balances := sdk.NewCoins()
-	ctxTime := ctx.BlockHeader().Time
 
 	// loop through all the entries and complete mature redelegation entries
 	for i := 0; i < len(red.Entries); i++ {
 		entry := red.Entries[i]
-		if entry.IsMature(ctxTime) {
+		if entry.IsMature(currTime) {
 			red.RemoveEntry(int64(i))
 			i--
 
@@ -885,7 +883,7 @@ func (k Keeper) CompleteRedelegation(
 	ctx sdk.Context, delAddr sdk.AccAddress, valSrcAddr, valDstAddr sdk.ValAddress,
 ) error {
 
-	_, err := k.CompleteRedelegationWithAmount(ctx, delAddr, valSrcAddr, valDstAddr)
+	_, err := k.CompleteRedelegationWithAmount(ctx, delAddr, valSrcAddr, valDstAddr, ctx.BlockTime())
 	return err
 }
 
@@ -930,4 +928,166 @@ func (k Keeper) ValidateUnbondAmount(
 	}
 
 	return shares, nil
+}
+
+// ForceRemoveDelegator removes all delegations and redelegations for the specified delegator.
+// That action also updates corresponding unbonding queues.
+func (k Keeper) ForceRemoveDelegator(ctx sdk.Context, delAddr sdk.AccAddress) error {
+	// complete all redelegations
+	if err := k.forceStopAllRedelegations(ctx, delAddr); err != nil {
+		return err
+	}
+
+	// undelegate all delegations ignoring the limit
+	// that would add undelegation to the UBQueue
+	for _, delegation := range k.GetAllDelegatorDelegations(ctx, delAddr) {
+		_, err := k.Undelegate(ctx, delAddr, delegation.ValidatorAddress, delegation.Shares, true)
+		if err != nil {
+			return fmt.Errorf("undelegating delegation for validator %s: %w", delegation.ValidatorAddress, err)
+		}
+	}
+
+	// complete all undelegations
+	if err := k.forceStopAllUnbondingDelegations(ctx, delAddr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// forceStopAllRedelegations modifies the RedelegationQueue removing all
+// scheduled redelegation completions and completes them.
+func (k Keeper) forceStopAllRedelegations(ctx sdk.Context, delAddr sdk.AccAddress) error {
+	store := ctx.KVStore(k.storeKey)
+	fakeCurrTime := ctx.BlockTime().Add(types.MaxUnbondingTime)
+	rdTriplets := make([]types.DVVTriplet, 0)
+
+	// we fake the endTime for RedelegationQueue to get all redelegation triplets
+	iterator := k.RedelegationQueueIterator(ctx, fakeCurrTime)
+	defer iterator.Close()
+	for ; iterator.Valid(); iterator.Next() {
+		rcvTimeSlice := []types.DVVTriplet{}
+		value := iterator.Value()
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(value, &rcvTimeSlice)
+
+		// filter out redelegations for the specific delegator
+		updTimeSlice := make([]types.DVVTriplet, 0, len(rcvTimeSlice))
+		for _, triplet := range rcvTimeSlice {
+			if triplet.DelegatorAddress.Equals(delAddr) {
+				// add only if not duplicated
+				found := false
+				for _, addedTriplet := range rdTriplets {
+					if addedTriplet.Equal(triplet) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					rdTriplets = append(rdTriplets, triplet)
+				}
+
+				continue
+			}
+
+			updTimeSlice = append(updTimeSlice, triplet)
+		}
+
+		// update / remove timeSlice
+		if len(updTimeSlice) != len(rcvTimeSlice) {
+			if len(updTimeSlice) == 0 {
+				store.Delete(iterator.Key())
+			} else {
+				store.Set(iterator.Key(), k.cdc.MustMarshalBinaryLengthPrefixed(updTimeSlice))
+			}
+		}
+	}
+
+	// complete redelegations
+	for _, triplet := range rdTriplets {
+		// we fake curTime for redelegation to be "mature"
+		balances, err := k.CompleteRedelegationWithAmount(ctx, triplet.DelegatorAddress, triplet.ValidatorSrcAddress, triplet.ValidatorDstAddress, fakeCurrTime)
+		if err != nil {
+			return fmt.Errorf("completing redelegation for srcValidator %s and dstValidator %s: %w", triplet.ValidatorSrcAddress, triplet.ValidatorDstAddress, err)
+		}
+
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent(
+				types.EventTypeCompleteRedelegation,
+				sdk.NewAttribute(sdk.AttributeKeyAmount, balances.String()),
+				sdk.NewAttribute(types.AttributeKeyDelegator, triplet.DelegatorAddress.String()),
+				sdk.NewAttribute(types.AttributeKeySrcValidator, triplet.ValidatorSrcAddress.String()),
+				sdk.NewAttribute(types.AttributeKeyDstValidator, triplet.ValidatorDstAddress.String()),
+			),
+		)
+	}
+
+	return nil
+}
+
+// forceStopAllUnbondingDelegations modifies the UBQueue removing all
+// scheduled undelegation completions and completes them.
+func (k Keeper) forceStopAllUnbondingDelegations(ctx sdk.Context, delAddr sdk.AccAddress) error {
+	store := ctx.KVStore(k.storeKey)
+	fakeCurrTime := ctx.BlockTime().Add(types.MaxUnbondingTime)
+	ubPairs := make([]types.DVPair, 0)
+
+	// we fake the endTime for UBQueue to get all undelegation pairs
+	iterator := k.UBDQueueIterator(ctx, fakeCurrTime)
+	defer iterator.Close()
+	for ; iterator.Valid(); iterator.Next() {
+		rcvTimeSlice := []types.DVPair{}
+		value := iterator.Value()
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(value, &rcvTimeSlice)
+
+		// filter out undelegations for the specific delegator
+		updTimeSlice := make([]types.DVPair, 0, len(rcvTimeSlice))
+		for _, pair := range rcvTimeSlice {
+			if pair.DelegatorAddress.Equals(delAddr) {
+				// add only if not duplicated
+				found := false
+				for _, addedPair := range ubPairs {
+					if addedPair.Equal(pair) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					ubPairs = append(ubPairs, pair)
+				}
+
+				continue
+			}
+
+			updTimeSlice = append(updTimeSlice, pair)
+		}
+
+		// update / remove timeSlice
+		if len(updTimeSlice) != len(rcvTimeSlice) {
+			if len(updTimeSlice) == 0 {
+				store.Delete(iterator.Key())
+			} else {
+				store.Set(iterator.Key(), k.cdc.MustMarshalBinaryLengthPrefixed(updTimeSlice))
+			}
+		}
+	}
+
+	// complete unbondings
+	for _, pair := range ubPairs {
+		// we fake curTime for undelegation to be "mature"
+		balances, err := k.CompleteUnbondingWithAmount(ctx, pair.DelegatorAddress, pair.ValidatorAddress, fakeCurrTime)
+		if err != nil {
+			return fmt.Errorf("completing unbonding delegation for validator %s: %w", pair.ValidatorAddress, err)
+		}
+
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent(
+				types.EventTypeCompleteUnbonding,
+				sdk.NewAttribute(sdk.AttributeKeyAmount, balances.String()),
+				sdk.NewAttribute(types.AttributeKeyValidator, pair.ValidatorAddress.String()),
+				sdk.NewAttribute(types.AttributeKeyDelegator, pair.DelegatorAddress.String()),
+			),
+		)
+	}
+
+	return nil
 }

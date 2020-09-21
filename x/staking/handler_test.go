@@ -1735,7 +1735,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		unDelShares, err := keeper.ValidateUnbondAmount(ctx, valOpAddr, valAddr, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares)
+		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares, false)
 		require.NoError(t, err)
 		checkScheduled()
 		checkInvariant()
@@ -1763,13 +1763,13 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		unDelShares, err := keeper.ValidateUnbondAmount(ctx, valOpAddr, valAddr, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares)
+		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares, false)
 		require.NoError(t, err)
 		checkScheduled()
 		scheduledBlock := getUpdatedVal().ScheduledUnbondHeight
 		scheduledTime := getUpdatedVal().ScheduledUnbondStartTime
 
-		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares)
+		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares, false)
 		require.NoError(t, err)
 		checkScheduled()
 		require.Equal(t, scheduledBlock, getUpdatedVal().ScheduledUnbondHeight)
@@ -1788,7 +1788,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		unDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, valAddr, overflowDiff)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, del1Addr, valAddr, unDelShares)
+		_, err = keeper.Undelegate(ctx, del1Addr, valAddr, unDelShares, false)
 		require.NoError(t, err)
 		checkUnscheduled()
 
@@ -1880,7 +1880,7 @@ func TestForceUnbondCompletion(t *testing.T) {
 		unDelShares, err := keeper.ValidateUnbondAmount(ctx, valOpAddr, valAddr, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares)
+		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares, false)
 		require.NoError(t, err)
 		scheduledStartTime = checkScheduled()
 	}
@@ -2194,7 +2194,7 @@ func TestForceUnbondSafeBoat1(t *testing.T) {
 		unDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del2Idx].Addr, val1Addr, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, unDelShares)
+		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, unDelShares, false)
 		require.NoError(t, err)
 	}
 
@@ -2465,7 +2465,7 @@ func TestForceUnbondSafeBoat2(t *testing.T) {
 		unDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del2Idx].Addr, val1Addr, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, unDelShares)
+		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, unDelShares, false)
 		require.NoError(t, err)
 	}
 
@@ -2491,4 +2491,164 @@ func TestForceUnbondSafeBoat2(t *testing.T) {
 
 	// check undelegation done
 	checkUndelegation(Del2Idx, 1, false)
+}
+
+// Test force removing delegators operations (delegation, unbonding delegations, active redelegations)
+func TestForceRemoveDelegator(t *testing.T) {
+	initPower := int64(100000)
+	ctx, ak, keeper, _ := keep.CreateTestInput(t, false, initPower)
+
+	del1Addr, del2Addr := keep.Addrs[2], keep.Addrs[3]
+	val1OpAddr, val2OpAddr := keep.Addrs[0], keep.Addrs[1]
+	val1Addr, val1PubKey, val2Addr, val2PubKey := sdk.ValAddress(val1OpAddr), keep.PKs[0], sdk.ValAddress(val2OpAddr), keep.PKs[1]
+
+	// helpers
+	getVal := func(valID int) types.Validator {
+		var valAddr sdk.ValAddress
+		switch valID {
+		case 1:
+			valAddr = val1Addr
+		case 2:
+			valAddr = val2Addr
+		}
+
+		val, ok := keeper.GetValidator(ctx, valAddr)
+		require.True(t, ok)
+
+		return val
+	}
+
+	// create validators
+	{
+		selfStakeAmt := sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val1Addr, val1PubKey, selfStakeAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msgCreateValidator = NewTestMsgCreateValidator(val2Addr, val2PubKey, selfStakeAmt)
+		res, err = handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	// enbBlock for validators to be Bonded (that would create redelegation queue item)
+	EndBlocker(ctx, keeper)
+
+	// delegator 1:
+	//  - delegate to val1
+	//  - delegate to val2
+	//  - redelegate from val1 to val2
+	//  - undelegate from val2
+	del1InitialBalance := ak.GetAccount(ctx, del1Addr).GetCoins()
+	{
+		delAmt := sdk.TokensFromConsensusPower(5)
+		rdAmt := sdk.TokensFromConsensusPower(2)
+		udAmt := sdk.TokensFromConsensusPower(2)
+
+		_, err := keeper.Delegate(ctx, del1Addr, delAmt, sdk.Unbonded, getVal(1), true)
+		require.NoError(t, err)
+
+		_, err = keeper.Delegate(ctx, del1Addr, delAmt, sdk.Unbonded, getVal(2), true)
+		require.NoError(t, err)
+
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val1Addr, rdAmt)
+		require.NoError(t, err)
+		_, err = keeper.BeginRedelegation(ctx, del1Addr, val1Addr, val2Addr, reDelShares)
+		require.NoError(t, err)
+
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val2Addr, udAmt)
+		require.NoError(t, err)
+		_, err = keeper.Undelegate(ctx, del1Addr, val2Addr, unDelShares, false)
+		require.NoError(t, err)
+	}
+	// delegator 2:
+	// - delegate to val1
+	// - delegate to val2
+	// - redelegate from val2 to val1
+	// - undelegate from val1
+	del2InitialBalance := ak.GetAccount(ctx, del2Addr).GetCoins()
+	{
+		delAmt := sdk.TokensFromConsensusPower(5)
+		rdAmt := sdk.TokensFromConsensusPower(2)
+		udAmt := sdk.TokensFromConsensusPower(2)
+
+		_, err := keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getVal(1), true)
+		require.NoError(t, err)
+
+		_, err = keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getVal(2), true)
+		require.NoError(t, err)
+
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del2Addr, val2Addr, rdAmt)
+		require.NoError(t, err)
+		_, err = keeper.BeginRedelegation(ctx, del2Addr, val2Addr, val1Addr, reDelShares)
+		require.NoError(t, err)
+
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, del2Addr, val1Addr, udAmt)
+		require.NoError(t, err)
+		_, err = keeper.Undelegate(ctx, del2Addr, val1Addr, unDelShares, false)
+		require.NoError(t, err)
+	}
+
+	// check all delegation, unbonding delegations and redelegations exists
+	EndBlocker(ctx, keeper)
+	{
+		dels := keeper.GetAllDelegatorDelegations(ctx, del1Addr)
+		require.Len(t, dels, 2)
+
+		rdels := keeper.GetAllRedelegations(ctx, del1Addr, sdk.ValAddress{}, sdk.ValAddress{})
+		require.Len(t, rdels, 1)
+
+		ubDels := keeper.GetAllUnbondingDelegations(ctx, del1Addr)
+		require.Len(t, ubDels, 1)
+	}
+	{
+		dels := keeper.GetAllDelegatorDelegations(ctx, del2Addr)
+		require.Len(t, dels, 2)
+
+		rdels := keeper.GetAllRedelegations(ctx, del2Addr, sdk.ValAddress{}, sdk.ValAddress{})
+		require.Len(t, rdels, 1)
+
+		ubDels := keeper.GetAllUnbondingDelegations(ctx, del2Addr)
+		require.Len(t, ubDels, 1)
+	}
+
+	// force remove delegator 1
+	// endBlock to check all queues aren't corrupted
+	require.NoError(t, keeper.ForceRemoveDelegator(ctx, del1Addr))
+	EndBlocker(ctx, keeper)
+
+	// check delegator 2 operations stays intact
+	{
+		dels := keeper.GetAllDelegatorDelegations(ctx, del2Addr)
+		require.Len(t, dels, 2)
+
+		rdels := keeper.GetAllRedelegations(ctx, del2Addr, sdk.ValAddress{}, sdk.ValAddress{})
+		require.Len(t, rdels, 1)
+
+		ubDels := keeper.GetAllUnbondingDelegations(ctx, del2Addr)
+		require.Len(t, ubDels, 1)
+	}
+
+	// check delegator 1 operations do not exist
+	{
+		dels := keeper.GetAllDelegatorDelegations(ctx, del1Addr)
+		require.Len(t, dels, 0)
+
+		rdels := keeper.GetAllRedelegations(ctx, del1Addr, sdk.ValAddress{}, sdk.ValAddress{})
+		require.Len(t, rdels, 0)
+
+		ubDels := keeper.GetAllUnbondingDelegations(ctx, del1Addr)
+		require.Len(t, ubDels, 0)
+	}
+
+	// check delegators balances
+	{
+		del1CurBalance := ak.GetAccount(ctx, del1Addr).GetCoins()
+		require.True(t, del1InitialBalance.IsEqual(del1CurBalance))
+
+		del2CurBalance := ak.GetAccount(ctx, del2Addr).GetCoins()
+		require.False(t, del2InitialBalance.IsEqual(del2CurBalance))
+	}
 }

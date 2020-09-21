@@ -16,7 +16,8 @@ const (
 	// DefaultUnbondingTime reflects three weeks in seconds as the default
 	// unbonding time.
 	// TODO: Justify our choice of default here.
-	DefaultUnbondingTime time.Duration = time.Hour * 24 * 7 * 3
+	DefaultUnbondingTime = time.Hour * 24 * 7 * 3
+	MaxUnbondingTime     = time.Hour * 24 * 7 * 4 * 3
 
 	// Default maximum number of bonded validators
 	DefaultMaxValidators uint16 = 100
@@ -204,6 +205,9 @@ func validateUnbondingTime(i interface{}) error {
 
 	if v <= 0 {
 		return fmt.Errorf("%s: must be positive: %d", paramName, v)
+	}
+	if v > MaxUnbondingTime {
+		return fmt.Errorf("%s: must be LT %v: %v", paramName, MaxUnbondingTime, v)
 	}
 
 	return nil

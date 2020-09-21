@@ -35,7 +35,7 @@ func (k Keeper) BlockValidatorUpdates(ctx sdk.Context) []abci.ValidatorUpdate {
 	// Remove all mature unbonding delegations from the ubd queue.
 	matureUnbonds := k.DequeueAllMatureUBDQueue(ctx, ctx.BlockHeader().Time)
 	for _, dvPair := range matureUnbonds {
-		balances, err := k.CompleteUnbondingWithAmount(ctx, dvPair.DelegatorAddress, dvPair.ValidatorAddress)
+		balances, err := k.CompleteUnbondingWithAmount(ctx, dvPair.DelegatorAddress, dvPair.ValidatorAddress, ctx.BlockTime())
 		if err != nil {
 			continue
 		}
@@ -53,12 +53,7 @@ func (k Keeper) BlockValidatorUpdates(ctx sdk.Context) []abci.ValidatorUpdate {
 	// Remove all mature redelegations from the red queue.
 	matureRedelegations := k.DequeueAllMatureRedelegationQueue(ctx, ctx.BlockHeader().Time)
 	for _, dvvTriplet := range matureRedelegations {
-		balances, err := k.CompleteRedelegationWithAmount(
-			ctx,
-			dvvTriplet.DelegatorAddress,
-			dvvTriplet.ValidatorSrcAddress,
-			dvvTriplet.ValidatorDstAddress,
-		)
+		balances, err := k.CompleteRedelegationWithAmount(ctx, dvvTriplet.DelegatorAddress, dvvTriplet.ValidatorSrcAddress, dvvTriplet.ValidatorDstAddress, ctx.BlockTime())
 		if err != nil {
 			continue
 		}
@@ -346,7 +341,7 @@ func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Va
 	delegations := append(state.Delegators, state.Operator)
 
 	for _, delegation := range delegations {
-		completionTime, err := k.Undelegate(ctx, delegation.Address, validator.OperatorAddress, delegation.Shares)
+		completionTime, err := k.Undelegate(ctx, delegation.Address, validator.OperatorAddress, delegation.Shares, true)
 		if err != nil {
 			panic(fmt.Errorf(
 				"force unbond delegation %s for validator %s: %v",

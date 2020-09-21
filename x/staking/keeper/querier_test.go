@@ -333,7 +333,7 @@ func TestQueryDelegation(t *testing.T) {
 
 	// Query unbonging delegation
 	unbondingTokens := sdk.TokensFromConsensusPower(10)
-	_, err = keeper.Undelegate(ctx, addrAcc2, val1.OperatorAddress, unbondingTokens.ToDec())
+	_, err = keeper.Undelegate(ctx, addrAcc2, val1.OperatorAddress, unbondingTokens.ToDec(), false)
 	require.NoError(t, err)
 
 	queryBondParams = types.NewQueryBondsParams(addrAcc2, addrVal1)
@@ -494,7 +494,7 @@ func TestQueryUnbondingDelegation(t *testing.T) {
 
 	// undelegate
 	undelAmount := sdk.TokensFromConsensusPower(20)
-	_, err = keeper.Undelegate(ctx, addrAcc1, val1.GetOperator(), undelAmount.ToDec())
+	_, err = keeper.Undelegate(ctx, addrAcc1, val1.GetOperator(), undelAmount.ToDec(), false)
 	require.NoError(t, err)
 	keeper.ApplyAndReturnValidatorSetUpdates(ctx)
 
