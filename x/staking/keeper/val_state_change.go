@@ -339,7 +339,7 @@ func (k Keeper) completeUnbondingValidator(ctx sdk.Context, validator types.Vali
 
 // completeForceUnbondValidator performs validator force unbond operations.
 // Validator might be deleted during the operation, so the return value is a pointer.
-func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Validator) (retValidator *types.Validator) {
+func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Validator) *types.Validator {
 	k.Logger(ctx).Info(fmt.Sprintf("Validator %s ScheduledUnbond processing", validator.OperatorAddress))
 
 	state := k.GetValidatorStakingState(ctx, validator.OperatorAddress)
@@ -373,10 +373,10 @@ func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Va
 
 	updValidator, found := k.GetValidator(ctx, validator.OperatorAddress)
 	if found {
-		retValidator = &updValidator
+		return &updValidator
 	}
 
-	return
+	return nil
 }
 
 // map of operator addresses to serialized power

@@ -14,7 +14,7 @@ func TestNextMinMaxInflation(t *testing.T) {
 
 	tests := []struct {
 		inMin, inMax, inInflation sdk.Dec
-		outMin, outMax sdk.Dec
+		outMin, outMax            sdk.Dec
 	}{
 		// increased max
 		{
@@ -59,7 +59,7 @@ func TestNextInflationPower(t *testing.T) {
 
 	tests := []struct {
 		bondedLockedRatio, inBondedRatio, inLockedRatio sdk.Dec
-		outPwr sdk.Dec
+		outPwr                                          sdk.Dec
 	}{
 		// no bonded shoulder
 		{
@@ -119,7 +119,7 @@ func TestNextInflationRate(t *testing.T) {
 
 	tests := []struct {
 		inMin, inMax, inPwr sdk.Dec
-		outInf sdk.Dec
+		outInf              sdk.Dec
 	}{
 		// zero min, max
 		{
@@ -173,7 +173,7 @@ func TestNextFoundationInflationRate(t *testing.T) {
 
 	tests := []struct {
 		inMax, inAllocRatio, inInf sdk.Dec
-		outFInf sdk.Dec
+		outFInf                    sdk.Dec
 	}{
 		// 1st min
 		{
@@ -218,8 +218,8 @@ func TestBlockProvision(t *testing.T) {
 
 	tests := []struct {
 		inProv, inFProv sdk.Dec
-		inBPY uint64
-		outCoinAmt int64
+		inBPY           uint64
+		outCoinAmt      int64
 	}{
 		// 2.5 truncated
 		{

@@ -562,15 +562,13 @@ func (k Keeper) Delegate(
 			"current tokens limit for %s: %s",
 			validator.OperatorAddress, valStakeLimit,
 		)
-	} else {
+	} else if validator.ScheduledToUnbond {
 		// If overflow is fixed by this delegation, undo
-		if validator.ScheduledToUnbond {
-			k.unscheduleValidatorForceUnbond(ctx, validator)
-			k.Logger(ctx).Info(fmt.Sprintf(
-				"Validator %s ScheduledUnbond status revoked due to delegation from %s: selfStaked / totalStaked / limit: %s / %s / %s",
-				validator.OperatorAddress, delegation.DelegatorAddress, valSelfStaked, valTotalStaked, valStakeLimit,
-			))
-		}
+		k.unscheduleValidatorForceUnbond(ctx, validator)
+		k.Logger(ctx).Info(fmt.Sprintf(
+			"Validator %s ScheduledUnbond status revoked due to delegation from %s: selfStaked / totalStaked / limit: %s / %s / %s",
+			validator.OperatorAddress, delegation.DelegatorAddress, valSelfStaked, valTotalStaked, valStakeLimit,
+		))
 	}
 
 	// Call the after-modification hook

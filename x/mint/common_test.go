@@ -28,8 +28,8 @@ var (
 
 	priv1 = secp256k1.GenPrivKey()
 	addr1 = sdk.AccAddress(priv1.PubKey().Address())
-	priv2 = secp256k1.GenPrivKey()
-	addr2 = sdk.AccAddress(priv2.PubKey().Address())
+	//priv2 = secp256k1.GenPrivKey()
+	//addr2 = sdk.AccAddress(priv2.PubKey().Address())
 )
 
 // getMockApp returns an initialized mock application for this module.
@@ -139,7 +139,7 @@ func getNextABCIHeader(mApp *mock.App) abci.Header {
 
 	return abci.Header{
 		Height: nextHeight,
-		Time: startTime.Add(time.Duration(nextHeight) * 5 * time.Second),
+		Time:   startTime.Add(time.Duration(nextHeight) * 5 * time.Second),
 	}
 }
 
@@ -147,7 +147,7 @@ func getNextABCIHeader(mApp *mock.App) abci.Header {
 func getNextABCIHeaderWithTime(mApp *mock.App, blockTime time.Time) abci.Header {
 	return abci.Header{
 		Height: mApp.LastBlockHeight() + 1,
-		Time: blockTime,
+		Time:   blockTime,
 	}
 }
 

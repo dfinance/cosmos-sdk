@@ -629,6 +629,7 @@ func (s ValidatorStakingState) SetDelegator(validatorAddr sdk.ValAddress, delega
 }
 
 // RemoveDelegator removes delegation info.
+// nolint: interfacer
 func (s ValidatorStakingState) RemoveDelegator(delegatorAddr sdk.AccAddress) ValidatorStakingState {
 	if s.Operator.Address.Equals(delegatorAddr) {
 		s.Operator.Address = sdk.AccAddress{}
@@ -683,12 +684,12 @@ func (s ValidatorStakingState) InvariantCheck(validator Validator, delegation De
 
 	if s.Operator.Address.Equals(delegation.DelegatorAddress) {
 		if !s.Operator.Address.Equals(validator.OperatorAddress) {
-			return fmt.Errorf(msgPrefixFmt+"\tinvalid operator address: %s\n",
+			return fmt.Errorf(msgPrefixFmt+"\tinvalid operator address: %s",
 				validator.OperatorAddress, delegation.DelegatorAddress, s.Operator.Address,
 			)
 		}
 		if !s.Operator.Shares.Equal(delegation.Shares) {
-			return fmt.Errorf(msgPrefixFmt+"\tinvalid operator shares: %s / %s\n",
+			return fmt.Errorf(msgPrefixFmt+"\tinvalid operator shares: %s / %s",
 				validator.OperatorAddress, delegation.DelegatorAddress, s.Operator.Shares, delegation.Shares,
 			)
 		}
@@ -699,7 +700,7 @@ func (s ValidatorStakingState) InvariantCheck(validator Validator, delegation De
 		stateDel := &s.Delegators[i]
 		if delegation.DelegatorAddress.Equals(stateDel.Address) {
 			if !delegation.Shares.Equal(stateDel.Shares) {
-				return fmt.Errorf(msgPrefixFmt+"\tinvalid shares: %s / %s\n",
+				return fmt.Errorf(msgPrefixFmt+"\tinvalid shares: %s / %s",
 					validator.OperatorAddress, delegation.DelegatorAddress, stateDel.Shares, delegation.Shares,
 				)
 			}

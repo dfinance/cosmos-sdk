@@ -126,7 +126,7 @@ func TestNewYearCatch(t *testing.T) {
 	// rough block monthly skipper
 	curBlockTime := time.Date(2000, 1, 2, 0, 0, 0, 0, time.UTC)
 	skipMonth := func() {
-		curBlockTime = curBlockTime.AddDate(0 , 1, 0)
+		curBlockTime = curBlockTime.AddDate(0, 1, 0)
 
 		mApp.BeginBlock(abci.RequestBeginBlock{Header: getNextABCIHeaderWithTime(mApp, curBlockTime)})
 		mApp.EndBlock(abci.RequestEndBlock{})

@@ -2054,8 +2054,6 @@ func TestForceUnbondSafeBoat1(t *testing.T) {
 
 		scheduledVals := keeper.GetAllScheduledUnbondQueueMatureValidators(ctx, future)
 		require.Contains(t, scheduledVals, val.OperatorAddress)
-
-		return
 	}
 
 	checkUnscheduled := func(valID int) {
@@ -2323,8 +2321,6 @@ func TestForceUnbondSafeBoat2(t *testing.T) {
 
 		scheduledVals := keeper.GetAllScheduledUnbondQueueMatureValidators(ctx, future)
 		require.Contains(t, scheduledVals, val.OperatorAddress)
-
-		return
 	}
 
 	checkUnscheduled := func(valID int) {

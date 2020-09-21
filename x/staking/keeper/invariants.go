@@ -172,7 +172,7 @@ func DelegatorSharesInvariant(k Keeper) sdk.Invariant {
 
 				if err := valStakingState.InvariantCheck(validator, delegation); err != nil {
 					broken = true
-					msg += err.Error()
+					msg += err.Error() + "\n"
 				}
 			}
 
