@@ -19,7 +19,9 @@ func TestHandleMsgWithdrawFoundationPool(t *testing.T) {
 	params := DefaultParams()
 	params.FoundationNominees = append(params.FoundationNominees, nominee)
 
-	ctx, accountKeeper, _, keeper, _, _, supplyKeeper, _ := CreateTestInputAdvanced(t, false, 10, params)
+	ctx, accountKeeper, _, keeper, _, _, supplyKeeper, mk := CreateTestInputAdvanced(t, false, 10, params)
+
+	_ = mk // linter fix
 
 	// add coins to the module account
 	{
@@ -73,7 +75,9 @@ func TestHandleMsgSetFoundationAllocationRatio(t *testing.T) {
 	params := DefaultParams()
 	params.FoundationNominees = append(params.FoundationNominees, nominee)
 
-	ctx, accountKeeper, _, keeper, _, _, _, mintKeeper := CreateTestInputAdvanced(t, false, 10, params)
+	ctx, accountKeeper, _, keeper, _, _, sk, mintKeeper := CreateTestInputAdvanced(t, false, 10, params)
+
+	_ = sk // linter fix
 
 	p := mintKeeper.GetParams(ctx)
 	p.AvgBlockTimeWindow = 2
