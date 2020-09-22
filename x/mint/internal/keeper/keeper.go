@@ -58,7 +58,7 @@ func (k Keeper) MintCoins(ctx sdk.Context, newCoins sdk.Coins) error {
 	return k.supplyKeeper.MintCoins(ctx, types.ModuleName, newCoins)
 }
 
-// BurnFeeCoins burns collected fees withing FeeCollector pool by params.FeeBurningRatio.
+// BurnFeeCoins burns collected fees within FeeCollector pool by params.FeeBurningRatio.
 func (k Keeper) BurnFeeCoins(ctx sdk.Context) {
 	params := k.GetParams(ctx)
 	mintDenom, burnRatio := params.MintDenom, params.FeeBurningRatio

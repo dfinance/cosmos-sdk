@@ -15,11 +15,11 @@ import (
 
 // Simulation parameter constants
 const (
-	Inflation                 = "inflation"
-	InflationMax              = "inflation_max"
-	InflationMin              = "inflation_min"
-	FeeBurningRatio           = "fee_burning_ratio"
-	InfPwrBondedLockedRatio   = "infpwr_bondedlocked_ratio"
+	Inflation               = "inflation"
+	InflationMax            = "inflation_max"
+	InflationMin            = "inflation_min"
+	FeeBurningRatio         = "fee_burning_ratio"
+	InfPwrBondedLockedRatio = "infpwr_bondedlocked_ratio"
 )
 
 // GenInflation randomized Inflation

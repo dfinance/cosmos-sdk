@@ -17,12 +17,14 @@ type BlockDurFilter struct {
 // Push pushes a new value back and trims slice if needed.
 func (f *BlockDurFilter) Push(blockTime time.Time, window uint16) {
 	value := blockTime.UnixNano()
-	f.Values = append(f.Values, value)
 
-	fWindow, fLen := int(window), len(f.Values)
-	if fLen > fWindow {
-		f.Values = f.Values[fLen-fWindow:]
+	if len(f.Values) < int(window) {
+		f.Values = append(f.Values, value)
+		return
 	}
+
+	f.Values = f.Values[1:]
+	f.Values = append(f.Values, value)
 }
 
 // GetAvg returns moving average value of blockTime duration if filter window is full.

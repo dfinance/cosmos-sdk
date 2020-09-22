@@ -84,6 +84,22 @@ func (k Keeper) GetDelegatorDelegations(ctx sdk.Context, delegator sdk.AccAddres
 	return delegations[:i] // trim if the array length < maxRetrieve
 }
 
+// HasValidatorDelegationsOverflow checks if current validator total staked coins are GT than the limit.
+func (k Keeper) HasValidatorDelegationsOverflow(ctx sdk.Context, selfStaked, totalStaked sdk.Int) (overflow bool, maxDelegatedLimit sdk.Int) {
+	// True for unbonding / unbonded validators
+	if selfStaked.IsZero() {
+		return
+	}
+
+	maxDelegationsRatio := k.MaxDelegationsRatio(ctx)
+	maxDelegatedLimit = sdk.NewDecFromInt(selfStaked).Mul(maxDelegationsRatio).TruncateInt()
+	if totalStaked.GT(maxDelegatedLimit) {
+		overflow = true
+	}
+
+	return
+}
+
 // set a delegation
 func (k Keeper) SetDelegation(ctx sdk.Context, delegation types.Delegation) {
 	store := ctx.KVStore(k.storeKey)
@@ -534,6 +550,27 @@ func (k Keeper) Delegate(
 	delegation.Shares = delegation.Shares.Add(newShares)
 	k.SetDelegation(ctx, delegation)
 
+	// Update validator staking state
+	valStakingState := k.SetValidatorStakingStateDelegation(ctx, validator.OperatorAddress, delegation.DelegatorAddress, delegation.Shares)
+
+	// Check if max delegations overflow occurs after this delegation
+	valSelfStaked, valTotalStaked := valStakingState.GetSelfAndTotalStakes(validator)
+	overflow, valStakeLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfStaked, valTotalStaked)
+	if overflow {
+		return sdk.Dec{}, sdkerrors.Wrapf(
+			types.ErrMaxDelegationsLimit,
+			"current tokens limit for %s: %s",
+			validator.OperatorAddress, valStakeLimit,
+		)
+	} else if validator.ScheduledToUnbond {
+		// If overflow is fixed by this delegation, undo
+		k.unscheduleValidatorForceUnbond(ctx, validator)
+		k.Logger(ctx).Info(fmt.Sprintf(
+			"Validator %s ScheduledUnbond status revoked due to delegation from %s: selfStaked / totalStaked / limit: %s / %s / %s",
+			validator.OperatorAddress, delegation.DelegatorAddress, valSelfStaked, valTotalStaked, valStakeLimit,
+		))
+	}
+
 	// Call the after-modification hook
 	k.AfterDelegationModified(ctx, delegation.DelegatorAddress, delegation.ValidatorAddress)
 
@@ -591,6 +628,36 @@ func (k Keeper) unbond(
 	// remove the shares and coins from the validator
 	// NOTE that the amount is later (in keeper.Delegation) moved between staking module pools
 	validator, amount = k.RemoveValidatorTokensAndShares(ctx, validator, shares)
+
+	// Update validator staking state
+	var valStakingState types.ValidatorStakingState
+	if delegation.Shares.IsZero() {
+		valStakingState = k.RemoveValidatorStakingStateDelegation(ctx, validator.OperatorAddress, delegation.DelegatorAddress)
+	} else {
+		valStakingState = k.SetValidatorStakingStateDelegation(ctx, validator.OperatorAddress, delegation.DelegatorAddress, delegation.Shares)
+	}
+
+	// Check if max delegations overflow occurs after this delegation (primary by undelegating selfStake)
+	valSelfStaked, valTotalStaked := valStakingState.GetSelfAndTotalStakes(validator)
+	overflow, valStakeLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfStaked, valTotalStaked)
+	if overflow {
+		if !validator.ScheduledToUnbond {
+			k.scheduleValidatorForceUnbond(ctx, validator)
+			k.Logger(ctx).Info(fmt.Sprintf(
+				"Validator %s ScheduledUnbond status set due to undelegation/redelegation from %s: selfStaked / totalStaked / limit: %s / %s / %s",
+				validator.OperatorAddress, delegation.DelegatorAddress, valSelfStaked, valTotalStaked, valStakeLimit,
+			))
+		}
+	} else {
+		// Overflow might be fixed by lowering current delegations amount
+		if validator.ScheduledToUnbond {
+			k.unscheduleValidatorForceUnbond(ctx, validator)
+			k.Logger(ctx).Info(fmt.Sprintf(
+				"Validator %s ScheduledUnbond status revoked due to undelegation/redelegation from %s: selfStaked / totalStaked / limit: %s / %s / %s",
+				validator.OperatorAddress, delegation.DelegatorAddress, valSelfStaked, valTotalStaked, valStakeLimit,
+			))
+		}
+	}
 
 	if validator.DelegatorShares.IsZero() && validator.IsUnbonded() {
 		// if not unbonded, we must instead remove validator in EndBlocker once it finishes its unbonding period

@@ -8,7 +8,10 @@ const (
 	EventTypeEditValidator        = "edit_validator"
 	EventTypeDelegate             = "delegate"
 	EventTypeUnbond               = "unbond"
+	EventTypeForceUnbond          = "force_unbond"
 	EventTypeRedelegate           = "redelegate"
+	EventTypeScheduleUnbond       = "schedule_unbond"
+	EventTypeUnscheduleUnbond     = "unschedule_unbond"
 
 	AttributeKeyValidator         = "validator"
 	AttributeKeyCommissionRate    = "commission_rate"

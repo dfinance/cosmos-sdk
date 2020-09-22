@@ -21,7 +21,7 @@ func makeTestCodec() (cdc *codec.Codec) {
 
 func TestDecodeStore(t *testing.T) {
 	cdc := makeTestCodec()
-	minter := types.NewMinter(sdk.OneDec(), sdk.NewDec(15))
+	minter := types.NewMinter(sdk.OneDec(), sdk.OneDec(), sdk.NewDec(15), sdk.NewDec(15), 100)
 
 	kvPairs := tmkv.Pairs{
 		tmkv.Pair{Key: types.MinterKey, Value: cdc.MustMarshalBinaryLengthPrefixed(minter)},

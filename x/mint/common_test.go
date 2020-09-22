@@ -28,8 +28,8 @@ var (
 
 	priv1 = secp256k1.GenPrivKey()
 	addr1 = sdk.AccAddress(priv1.PubKey().Address())
-	priv2 = secp256k1.GenPrivKey()
-	addr2 = sdk.AccAddress(priv2.PubKey().Address())
+	//priv2 = secp256k1.GenPrivKey()
+	//addr2 = sdk.AccAddress(priv2.PubKey().Address())
 )
 
 // getMockApp returns an initialized mock application for this module.

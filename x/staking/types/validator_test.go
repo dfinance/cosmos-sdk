@@ -286,6 +286,7 @@ func TestValidatorMarshalYAML(t *testing.T) {
   operatoraddress: %s
   conspubkey: %s
   jailed: false
+  scheduledtounbond: false
   status: 0
   tokens: "0"
   delegatorshares: "0.000000000000000000"
@@ -297,6 +298,8 @@ func TestValidatorMarshalYAML(t *testing.T) {
     details: ""
   unbondingheight: 0
   unbondingcompletiontime: 1970-01-01T00:00:00Z
+  scheduledunbondheight: 0
+  scheduledunbondstarttime: 1970-01-01T00:00:00Z
   commission:
     commission_rates:
       rate: "0.000000000000000000"

@@ -57,4 +57,5 @@ var (
 	ErrInvalidHistoricalInfo           = sdkerrors.Register(ModuleName, 44, "invalid historical info")
 	ErrNoHistoricalInfo                = sdkerrors.Register(ModuleName, 45, "no historical info found")
 	ErrInvalidMinSelfDelegation        = sdkerrors.Register(ModuleName, 46, "invalid min self-delegation")
+	ErrMaxDelegationsLimit             = sdkerrors.Register(ModuleName, 47, "validator max delegations level reached")
 )

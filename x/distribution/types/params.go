@@ -73,7 +73,7 @@ func DefaultParams() Params {
 		BonusProposerReward: sdk.NewDecWithPrec(4, 2), // 4%
 		//
 		WithdrawAddrEnabled: true,
-		FoundationNominees: make([]sdk.AccAddress, 0),
+		FoundationNominees:  make([]sdk.AccAddress, 0),
 	}
 }
 

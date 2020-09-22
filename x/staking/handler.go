@@ -151,7 +151,7 @@ func handleMsgEditValidator(ctx sdk.Context, msg types.MsgEditValidator, k keepe
 			return nil, ErrSelfDelegationBelowMinimum
 		}
 
-		validator.MinSelfDelegation = (*msg.MinSelfDelegation)
+		validator.MinSelfDelegation = *msg.MinSelfDelegation
 	}
 
 	k.SetValidator(ctx, validator)

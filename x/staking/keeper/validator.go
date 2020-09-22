@@ -84,6 +84,55 @@ func (k Keeper) mustGetValidatorByConsAddr(ctx sdk.Context, consAddr sdk.ConsAdd
 	return validator
 }
 
+// GetValidatorStakingState gets validator staking state.
+func (k Keeper) GetValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress) (state types.ValidatorStakingState) {
+	store := ctx.KVStore(k.storeKey)
+	key := types.GetValidatorStakingStateKey(addr)
+
+	bz := store.Get(key)
+	if bz == nil {
+		return types.NewValidatorStakingState()
+	}
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(bz, &state)
+
+	return
+}
+
+// SetValidatorStakingState sets validator staking state for specified validator address.
+func (k Keeper) SetValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress, state types.ValidatorStakingState) {
+	store := ctx.KVStore(k.storeKey)
+	key := types.GetValidatorStakingStateKey(addr)
+
+	bz := k.cdc.MustMarshalBinaryLengthPrefixed(state)
+	store.Set(key, bz)
+}
+
+// DeleteValidatorStakingState removes validator staking state for specified validator address.
+func (k Keeper) DeleteValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress) {
+	store := ctx.KVStore(k.storeKey)
+	key := types.GetValidatorStakingStateKey(addr)
+
+	store.Delete(key)
+}
+
+// SetValidatorStakingStateDelegation adds / sets validator staking state delegation info.
+func (k Keeper) SetValidatorStakingStateDelegation(ctx sdk.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress, delShares sdk.Dec) types.ValidatorStakingState {
+	state := k.GetValidatorStakingState(ctx, valAddr)
+	state = state.SetDelegator(valAddr, delAddr, delShares)
+	k.SetValidatorStakingState(ctx, valAddr, state)
+
+	return state
+}
+
+// RemoveValidatorStakingStateDelegation removes validator staking state delegation info.
+func (k Keeper) RemoveValidatorStakingStateDelegation(ctx sdk.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress) types.ValidatorStakingState {
+	state := k.GetValidatorStakingState(ctx, valAddr)
+	state = state.RemoveDelegator(delAddr)
+	k.SetValidatorStakingState(ctx, valAddr, state)
+
+	return state
+}
+
 // set the main record holding validator details
 func (k Keeper) SetValidator(ctx sdk.Context, validator types.Validator) {
 	store := ctx.KVStore(k.storeKey)
@@ -435,5 +484,113 @@ func (k Keeper) UnbondAllMatureValidatorQueue(ctx sdk.Context) {
 		}
 
 		store.Delete(validatorTimesliceIterator.Key())
+	}
+}
+
+//_______________________________________________________________________
+// Scheduled validator force unbond Queue
+
+// GetScheduledUnbondQueueValidators gets validator addresses for specific timestamp scheduled unbond queue.
+func (k Keeper) GetScheduledUnbondQueueValidators(ctx sdk.Context, timestamp time.Time) (valAddrs []sdk.ValAddress) {
+	store := ctx.KVStore(k.storeKey)
+	bz := store.Get(types.GetScheduledUnbondQueueTimeKey(timestamp))
+	if bz == nil {
+		return []sdk.ValAddress{}
+	}
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(bz, &valAddrs)
+
+	return valAddrs
+}
+
+// SetScheduledUnbondQueueValidators sets validator addresses for specific timestamp scheduled unbond queue.
+func (k Keeper) SetScheduledUnbondQueueValidators(ctx sdk.Context, timestamp time.Time, valAddrs []sdk.ValAddress) {
+	store := ctx.KVStore(k.storeKey)
+	bz := k.cdc.MustMarshalBinaryLengthPrefixed(valAddrs)
+	store.Set(types.GetScheduledUnbondQueueTimeKey(timestamp), bz)
+}
+
+// DeleteScheduledUnbondQueueValidators removes all validator addresses for specific timestamp scheduled unbond queue.
+func (k Keeper) DeleteScheduledUnbondQueueValidators(ctx sdk.Context, timestamp time.Time) {
+	store := ctx.KVStore(k.storeKey)
+	store.Delete(types.GetScheduledUnbondQueueTimeKey(timestamp))
+}
+
+// InsertScheduledUnbondQueueValidator inserts a validator address for an appropriate timestamp scheduled unbond queue.
+func (k Keeper) InsertScheduledUnbondQueueValidator(ctx sdk.Context, val types.Validator) {
+	timestamp := val.ScheduledUnbondStartTime
+
+	valAddrs := k.GetScheduledUnbondQueueValidators(ctx, timestamp)
+	valAddrs = append(valAddrs, val.OperatorAddress)
+
+	k.SetScheduledUnbondQueueValidators(ctx, val.ScheduledUnbondStartTime, valAddrs)
+}
+
+// DeleteScheduledUnbondQueueValidator removes a validator address for an appropriate timestamp scheduled unbond queue.
+func (k Keeper) DeleteScheduledUnbondQueueValidator(ctx sdk.Context, val types.Validator) {
+	timestamp := val.ScheduledUnbondStartTime
+	valAddrs := k.GetScheduledUnbondQueueValidators(ctx, timestamp)
+	newValAddrs := []sdk.ValAddress{}
+
+	for _, valAddr := range valAddrs {
+		if !bytes.Equal(valAddr, val.OperatorAddress) {
+			newValAddrs = append(newValAddrs, valAddr)
+		}
+	}
+
+	if len(newValAddrs) == 0 {
+		k.DeleteScheduledUnbondQueueValidators(ctx, timestamp)
+	} else {
+		k.SetScheduledUnbondQueueValidators(ctx, timestamp, newValAddrs)
+	}
+}
+
+// ScheduledUnbondQueueIterator returns iterator for all the scheduled unbond queue validator addresses from time 0 until endTime.
+func (k Keeper) ScheduledUnbondQueueIterator(ctx sdk.Context, endTime time.Time) sdk.Iterator {
+	store := ctx.KVStore(k.storeKey)
+	endKey := types.GetScheduledUnbondQueueTimeKey(endTime)
+
+	return store.Iterator(types.ScheduledUnbondQueueKey, sdk.InclusiveEndBytes(endKey))
+}
+
+// GetAllScheduledUnbondQueueMatureValidators returns all the scheduled unbond queue validator addresses from time 0 until endTime.
+func (k Keeper) GetAllScheduledUnbondQueueMatureValidators(ctx sdk.Context, endTime time.Time) (valsAddrs []sdk.ValAddress) {
+	iterator := k.ScheduledUnbondQueueIterator(ctx, endTime)
+	defer iterator.Close()
+
+	for ; iterator.Valid(); iterator.Next() {
+		curAddrs := []sdk.ValAddress{}
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &curAddrs)
+		valsAddrs = append(valsAddrs, curAddrs...)
+	}
+
+	return
+}
+
+// ProcessAllScheduledUnbondQueueMatureValidators processes all the scheduled unbond queue validator addresses from time 0 until current blockTime.
+// Validator addresses are removed from the queue after the processing is done.
+func (k Keeper) ProcessAllScheduledUnbondQueueMatureValidators(ctx sdk.Context) {
+	store := ctx.KVStore(k.storeKey)
+	iterator := k.ScheduledUnbondQueueIterator(ctx, ctx.BlockHeader().Time)
+	defer iterator.Close()
+
+	for ; iterator.Valid(); iterator.Next() {
+		valsAddrs := []sdk.ValAddress{}
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &valsAddrs)
+
+		for _, valAddr := range valsAddrs {
+			val, found := k.GetValidator(ctx, valAddr)
+			if !found {
+				panic("validator in the scheduled unbond queue was not found")
+			}
+			if !val.ScheduledToUnbond {
+				panic("unexpected validator in the scheduled unbond queue; ScheduledToUnbond flag was not set")
+			}
+
+			if updVal := k.completeForceUnbondValidator(ctx, val); updVal != nil {
+				k.SetValidator(ctx, updVal.UnscheduleValidatorForceUnbond())
+			}
+		}
+
+		store.Delete(iterator.Key())
 	}
 }

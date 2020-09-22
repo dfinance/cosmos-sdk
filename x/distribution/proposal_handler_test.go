@@ -76,7 +76,7 @@ func TestTaxParamsUpdateHandler(t *testing.T) {
 		sdk.NewDecWithPrec(35, 2),
 		sdk.NewDecWithPrec(15, 2),
 		sdk.NewDecWithPrec(10, 2),
-		)
+	)
 	hdlr := NewProposalHandler(keeper)
 	require.NoError(t, hdlr(ctx, tp))
 

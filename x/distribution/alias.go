@@ -120,6 +120,7 @@ var (
 	ParamKeyBaseProposerReward           = types.ParamKeyBaseProposerReward
 	ParamKeyBonusProposerReward          = types.ParamKeyBonusProposerReward
 	ParamKeyWithdrawAddrEnabled          = types.ParamKeyWithdrawAddrEnabled
+	ParamKeyFoundationNominees           = types.ParamKeyFoundationNominees
 	ModuleCdc                            = types.ModuleCdc
 	EventTypeSetWithdrawAddress          = types.EventTypeSetWithdrawAddress
 	EventTypeRewards                     = types.EventTypeRewards

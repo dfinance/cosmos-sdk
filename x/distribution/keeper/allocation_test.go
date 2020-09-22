@@ -78,14 +78,14 @@ func TestAllocateTokensToManyValidators(t *testing.T) {
 
 	votes := types.ABCIVotes{
 		{
-			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
+			Validator:         k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
 			DistributionPower: 100,
-			SignedLastBlock: true,
+			SignedLastBlock:   true,
 		},
 		{
-			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk2.Address())),
+			Validator:         k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk2.Address())),
 			DistributionPower: 100,
-			SignedLastBlock: true,
+			SignedLastBlock:   true,
 		},
 	}
 
@@ -175,19 +175,19 @@ func TestAllocateTokensTruncation(t *testing.T) {
 
 	votes := types.ABCIVotes{
 		{
-			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
+			Validator:         k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
 			DistributionPower: 11,
-			SignedLastBlock: true,
+			SignedLastBlock:   true,
 		},
 		{
-			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk2.Address())),
+			Validator:         k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk2.Address())),
 			DistributionPower: 10,
-			SignedLastBlock: true,
+			SignedLastBlock:   true,
 		},
 		{
-			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk3.Address())),
+			Validator:         k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk3.Address())),
 			DistributionPower: 10,
-			SignedLastBlock: true,
+			SignedLastBlock:   true,
 		},
 	}
 
@@ -265,14 +265,14 @@ func TestAllocateTokensPools(t *testing.T) {
 	// validator1 is a proposer
 	votes := types.ABCIVotes{
 		{
-			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
+			Validator:         k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
 			DistributionPower: 10,
-			SignedLastBlock: true,
+			SignedLastBlock:   true,
 		},
 		{
-			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk2.Address())),
+			Validator:         k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk2.Address())),
 			DistributionPower: 10,
-			SignedLastBlock: false,
+			SignedLastBlock:   false,
 		},
 	}
 
@@ -451,9 +451,9 @@ func TestAllocatePublicTreasuryOverflow(t *testing.T) {
 	// prepare voting results
 	votes := types.ABCIVotes{
 		{
-			Validator:       k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
+			Validator:         k.ValidatorByConsAddr(ctx, sdk.ConsAddress(valConsPk1.Address())),
 			DistributionPower: 10,
-			SignedLastBlock: true,
+			SignedLastBlock:   true,
 		},
 	}
 
