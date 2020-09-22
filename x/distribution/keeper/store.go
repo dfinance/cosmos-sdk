@@ -411,3 +411,53 @@ func (k Keeper) DeleteValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress
 	store := ctx.KVStore(k.storeKey)
 	store.Delete(types.GetValidatorLockedRewardsKey(val))
 }
+
+// get delegator RewardsBankPool coins.
+func (k Keeper) GetDelegatorRewardsBankCoins(ctx sdk.Context, delAddr sdk.AccAddress) sdk.Coins {
+	store := ctx.KVStore(k.storeKey)
+	key := types.GetDelegatorRewardsBankCoinsKey(delAddr)
+
+	bz := store.Get(key)
+	if bz == nil {
+		return sdk.NewCoins()
+	}
+
+	var coins sdk.Coins
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(bz, &coins)
+
+	return coins
+}
+
+// set delegator RewardsBankPool coins.
+func (k Keeper) SetDelegatorRewardsBankCoins(ctx sdk.Context, delAddr sdk.AccAddress, coins sdk.Coins) {
+	store := ctx.KVStore(k.storeKey)
+	key := types.GetDelegatorRewardsBankCoinsKey(delAddr)
+
+	bz := k.cdc.MustMarshalBinaryLengthPrefixed(coins)
+	store.Set(key, bz)
+}
+
+// delete delegator RewardsBankPool coins.
+func (k Keeper) DeleteDelegatorRewardsBankCoins(ctx sdk.Context, delAddr sdk.AccAddress) {
+	store := ctx.KVStore(k.storeKey)
+	key := types.GetDelegatorRewardsBankCoinsKey(delAddr)
+	store.Delete(key)
+}
+
+// iterate over all delegator RewardsBankPool coins entries.
+func (k Keeper) IterateDelegatorRewardsBankCoins(ctx sdk.Context, handler func(delAddr sdk.AccAddress, coins sdk.Coins) (stop bool)) {
+	store := ctx.KVStore(k.storeKey)
+
+	iter := sdk.KVStorePrefixIterator(store, types.DelegatorRewardsBankCoinsPrefix)
+	defer iter.Close()
+
+	for ; iter.Valid(); iter.Next() {
+		var coins sdk.Coins
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iter.Value(), &coins)
+		delAddr := types.GetDelegatorRewardsBankCoinsAddress(iter.Key())
+
+		if handler(delAddr, coins) {
+			break
+		}
+	}
+}

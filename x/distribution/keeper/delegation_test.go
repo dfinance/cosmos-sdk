@@ -653,3 +653,165 @@ func TestCalculateRewardsMultiDelegatorMultWithdraw(t *testing.T) {
 	// commission should be zero
 	require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr1).IsZero())
 }
+
+// Test staking keeper hooks and RewardsBank pool.
+func TestRewardsBank(t *testing.T) {
+	ctx, ak, k, sk, _ := CreateTestInputDefault(t, false, 1000)
+	sh := staking.NewHandler(sk)
+
+	checkInvariants := func() {
+		msg, broken := RewardsBankPoolInvariant(k)(ctx)
+		require.False(t, broken, msg)
+	}
+
+	// set module account coins
+	distrAcc := k.GetDistributionAccount(ctx)
+	distrAcc.SetCoins(sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(1000))))
+	k.supplyKeeper.SetModuleAccount(ctx, distrAcc)
+
+	// create validator and endBlock to bond the validator
+	{
+		commission := staking.NewCommissionRates(sdk.NewDecWithPrec(1, 1), sdk.NewDecWithPrec(1, 1), sdk.NewDec(0))
+		msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
+			sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, minSelfDelegation)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		staking.EndBlocker(ctx, sk)
+	}
+
+	val := sk.Validator(ctx, valOpAddr1)
+	del := sk.Delegation(ctx, sdk.AccAddress(valOpAddr1), valOpAddr1)
+
+	// next block
+	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
+
+	// allocate some rewards
+	{
+		tokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(10))}
+		k.AllocateTokensToValidator(ctx, val, tokens)
+	}
+
+	// pre delegation checks
+	var prevTotalRewards sdk.DecCoins
+	var prevDistrAccCoins sdk.Coins
+	{
+		// RewardsBank delegator coins should be empty, as BeforeDelegationSharesModified hook wasn't triggered
+		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+		require.True(t, bankCoins.Empty())
+
+		// RewardsBankPool should be empty
+		rewardsBankAcc := k.GetRewardsBankPoolAccount(ctx)
+		require.True(t, rewardsBankAcc.GetCoins().Empty())
+
+		// current total rewards shouldn't be empty
+		cacheCtx, _ := ctx.CacheContext()
+		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
+		rewards := k.calculateDelegationTotalRewards(cacheCtx, val, del, endingPeriod)
+		require.False(t, rewards.Empty())
+		prevTotalRewards = rewards
+
+		prevDistrAccCoins = k.GetDistributionAccount(ctx).GetCoins()
+	}
+
+	checkInvariants()
+
+	// delegate more to validator triggering the BeforeDelegationSharesModified hook
+	{
+		tokens := sdk.Coin{sdk.DefaultBondDenom, sdk.NewInt(10)}
+		msg := staking.NewMsgDelegate(del.GetDelegatorAddr(), val.GetOperator(), tokens)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		staking.EndBlocker(ctx, sk)
+	}
+
+	// post delegation checks
+	{
+		// RewardsBank delegator coins should not be empty
+		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+		require.False(t, bankCoins.Empty())
+
+		// RewardsBankPool acc should not be empty
+		rewardsBankAcc := k.GetRewardsBankPoolAccount(ctx)
+		require.False(t, rewardsBankAcc.GetCoins().Empty())
+
+		// Distr module acc balance should decrease (part was transferred to RewardsBankPool)
+		curDistrAccCoins := k.GetDistributionAccount(ctx).GetCoins()
+		require.True(t, curDistrAccCoins.AmountOf(sdk.DefaultBondDenom).LT(prevDistrAccCoins.AmountOf(sdk.DefaultBondDenom)))
+		prevDistrAccCoins = curDistrAccCoins
+
+		// current total rewards should not change (as there were no new allocations)
+		cacheCtx, _ := ctx.CacheContext()
+		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
+		curTotalRewards := k.calculateDelegationTotalRewards(cacheCtx, val, del, endingPeriod)
+		require.True(t, curTotalRewards.IsEqual(prevTotalRewards))
+
+		// current total rewards should be equal to current bankCoins (as current validator delegator rewards are empty)
+		require.True(t, curTotalRewards.IsEqual(sdk.NewDecCoinsFromCoins(bankCoins...)))
+	}
+
+	checkInvariants()
+
+	// next block
+	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
+
+	// allocate more rewards to raise the main pool rewards
+	{
+		// update staking vars
+		val = sk.Validator(ctx, del.GetValidatorAddr())
+		del = sk.Delegation(ctx, del.GetDelegatorAddr(), del.GetValidatorAddr())
+
+		tokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(10))}
+		k.AllocateTokensToValidator(ctx, val, tokens)
+
+		// check accumulated delegation bank rewards are not empty
+		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+		require.False(t, bankCoins.Empty())
+
+		// check current validator delegation rewards are not empty
+		cacheCtx, _ := ctx.CacheContext()
+		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
+		curRewards := k.calculateDelegationRewards(cacheCtx, val, del, endingPeriod)
+		require.False(t, curRewards.Empty())
+	}
+
+	checkInvariants()
+
+	// transfer all delegators rewards
+	prevDelBalance := ak.GetAccount(ctx, del.GetDelegatorAddr()).GetCoins()
+	{
+		// update staking vars
+		val = sk.Validator(ctx, del.GetValidatorAddr())
+		del = sk.Delegation(ctx, del.GetDelegatorAddr(), del.GetValidatorAddr())
+
+		// transfer
+		_, err := k.transferDelegationTotalRewardsToAccount(ctx, val, del)
+		require.NoError(t, err)
+		k.initializeDelegation(ctx, val.GetOperator(), del.GetDelegatorAddr())
+
+		// check delegator balance increased
+		curDelBalance := ak.GetAccount(ctx, del.GetDelegatorAddr()).GetCoins()
+		require.True(t, curDelBalance.AmountOf(sdk.DefaultBondDenom).GT(prevDelBalance.AmountOf(sdk.DefaultBondDenom)))
+
+		// RewardsBank pool acc should be empty
+		rewardsBankAcc := k.GetRewardsBankPoolAccount(ctx)
+		require.True(t, rewardsBankAcc.GetCoins().Empty())
+
+		// Distr module acc balance should decrease
+		curDistrAccCoins := k.GetDistributionAccount(ctx).GetCoins()
+		require.True(t, curDistrAccCoins.AmountOf(sdk.DefaultBondDenom).LT(prevDistrAccCoins.AmountOf(sdk.DefaultBondDenom)))
+
+		// total delegator rewards should be empty
+		cacheCtx, _ := ctx.CacheContext()
+		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
+		curRewards := k.calculateDelegationRewards(cacheCtx, val, del, endingPeriod)
+		require.True(t, curRewards.Empty())
+	}
+
+	checkInvariants()
+}

@@ -54,7 +54,8 @@ var (
 		valAccAddr1, valAccAddr2, valAccAddr3,
 	}
 
-	distrAcc = supply.NewEmptyModuleAccount(types.ModuleName)
+	distrAcc            = supply.NewEmptyModuleAccount(types.ModuleName)
+	distrRewardsBankAcc = supply.NewEmptyModuleAccount(types.RewardsBankPoolName)
 
 	minSelfDelegation = sdk.NewInt(staking.DefaultMinSelfDelegationLvl)
 )
@@ -117,6 +118,7 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 	blacklistedAddrs[notBondedPool.GetAddress().String()] = true
 	blacklistedAddrs[bondPool.GetAddress().String()] = true
 	blacklistedAddrs[distrAcc.GetAddress().String()] = true
+	blacklistedAddrs[distrRewardsBankAcc.GetAddress().String()] = true
 
 	cdc := MakeTestCodec()
 	pk := params.NewKeeper(cdc, keyParams, tkeyParams)
@@ -129,6 +131,7 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 		types.ModuleName:          nil,
 		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
 		staking.BondedPoolName:    {supply.Burner, supply.Staking},
+		types.RewardsBankPoolName: nil,
 	}
 	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bankKeeper, maccPerms)
 
@@ -154,6 +157,7 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 	keeper.supplyKeeper.SetModuleAccount(ctx, notBondedPool)
 	keeper.supplyKeeper.SetModuleAccount(ctx, bondPool)
 	keeper.supplyKeeper.SetModuleAccount(ctx, distrAcc)
+	keeper.supplyKeeper.SetModuleAccount(ctx, distrRewardsBankAcc)
 
 	// set the distribution hooks on staking
 	sk.SetHooks(keeper.Hooks())

@@ -29,6 +29,7 @@ func (k Keeper) initializeDelegation(ctx sdk.Context, val sdk.ValAddress, del sd
 
 // calculateDelegationRewardsBetween calculates the rewards accrued by a delegation between two periods.
 // Cumulative reward rate difference is used to get rewards from a stake.
+// RewardsBankPool balance is not included in the calculation.
 func (k Keeper) calculateDelegationRewardsBetween(ctx sdk.Context, val exported.ValidatorI, startingPeriod, endingPeriod uint64, stake sdk.Dec) (rewards sdk.DecCoins) {
 	// sanity check
 	if startingPeriod > endingPeriod {
@@ -56,6 +57,7 @@ func (k Keeper) calculateDelegationRewardsBetween(ctx sdk.Context, val exported.
 // calculateDelegationRewards calculates the total rewards accrued by a delegation.
 // Start period is taken from delegationStaringInfo.
 // Delegator stake is reduced iterating over slash events.
+// RewardsBankPool balance is not included in the calculation.
 func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI, endingPeriod uint64) (rewards sdk.DecCoins) {
 	// fetch starting info for delegation
 	startingInfo := k.GetDelegatorStartingInfo(ctx, del.GetValidatorAddr(), del.GetDelegatorAddr())
@@ -140,8 +142,21 @@ func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.Validat
 	return rewards
 }
 
+// calculateDelegationTotalRewards sums current validator delegator rewards and stored RewardsBank coins.
+func (k Keeper) calculateDelegationTotalRewards(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI, endingPeriod uint64) (rewards sdk.DecCoins) {
+	// calculate rewards from the main pool
+	curDecCoins := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	// get accumulated coins from the RewardsBankPool
+	bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+
+	totalDecCoins := curDecCoins.Add(sdk.NewDecCoinsFromCoins(bankCoins...)...)
+
+	return totalDecCoins
+}
+
 // withdrawDelegationRewards calculates delegator rewards and withdraws it from a validator.
 // Also decreases outstanding rewards and removes delegationStartingInfo.
+// Result coins must be transferred to module / user account afterwards.
 func (k Keeper) withdrawDelegationRewards(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI) (sdk.Coins, error) {
 	// check existence of delegator starting info
 	if !k.HasDelegatorStartingInfo(ctx, del.GetValidatorAddr(), del.GetDelegatorAddr()) {
@@ -166,15 +181,6 @@ func (k Keeper) withdrawDelegationRewards(ctx sdk.Context, val exported.Validato
 	// truncate coins, return remainder to FoundationPool
 	coins, remainder := rewards.TruncateDecimal()
 
-	// add coins to user account
-	if !coins.IsZero() {
-		withdrawAddr := k.GetDelegatorWithdrawAddr(ctx, del.GetDelegatorAddr())
-		err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, withdrawAddr, coins)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// update the outstanding rewards and the FoundationPool only if the transaction was successful
 	k.SetValidatorOutstandingRewards(ctx, del.GetValidatorAddr(), outstanding.Sub(rewards))
 	k.AppendToFoundationPool(ctx, remainder)
@@ -188,4 +194,63 @@ func (k Keeper) withdrawDelegationRewards(ctx sdk.Context, val exported.Validato
 	k.DeleteDelegatorStartingInfo(ctx, del.GetValidatorAddr(), del.GetDelegatorAddr())
 
 	return coins, nil
+}
+
+// transferDelegationRewardsToRewardsBankPool transfers current validator delegator rewards to the RewardsBankPool.
+func (k Keeper) transferDelegationRewardsToRewardsBankPool(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI) (sdk.Coins, error) {
+	// withdraw from the main pool
+	curCoins, err := k.withdrawDelegationRewards(ctx, val, del)
+	if err != nil {
+		return nil, fmt.Errorf("withdrawDelegationRewards: %w", err)
+	}
+
+	// add coins to RewardsBankPool module account and update RewardsBankPool delegator coins
+	if !curCoins.IsZero() {
+		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+		bankCoins = bankCoins.Add(curCoins...)
+		k.SetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr(), bankCoins)
+
+		err := k.supplyKeeper.SendCoinsFromModuleToModule(ctx, types.ModuleName, types.RewardsBankPoolName, curCoins)
+		if err != nil {
+			return nil, fmt.Errorf("supplyKeeper.SendCoinsFromModuleToModule: %w", err)
+		}
+	}
+
+	return curCoins, nil
+}
+
+// transferDelegationTotalRewardsToAccount transfers sum of current validator delegator rewards
+// and stored RewardsBank coins to user account.
+func (k Keeper) transferDelegationTotalRewardsToAccount(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI) (sdk.Coins, error) {
+	withdrawAddr := k.GetDelegatorWithdrawAddr(ctx, del.GetDelegatorAddr())
+
+	// withdraw from the main pool
+	curCoins, err := k.withdrawDelegationRewards(ctx, val, del)
+	if err != nil {
+		return nil, fmt.Errorf("withdrawDelegationRewards: %w", err)
+	}
+
+	// get accumulated coins from the RewardsBankPool
+	bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+	k.DeleteDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+
+	// add coins to user account from the main pool
+	if !curCoins.IsZero() {
+		err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, withdrawAddr, curCoins)
+		if err != nil {
+			return nil, fmt.Errorf("supplyKeeper.SendCoinsFromModuleToAccount (Distribution macc): %w", err)
+		}
+	}
+
+	// add coins to user account from the RewardsBank pool
+	if !bankCoins.IsZero() {
+		err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.RewardsBankPoolName, withdrawAddr, bankCoins)
+		if err != nil {
+			return nil, fmt.Errorf("supplyKeeper.SendCoinsFromModuleToAccount (RewardsBankPool macc): %w", err)
+		}
+	}
+
+	totalCoins := curCoins.Add(bankCoins...)
+
+	return totalCoins, nil
 }

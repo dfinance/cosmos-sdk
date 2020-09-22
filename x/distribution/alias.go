@@ -10,6 +10,7 @@ import (
 
 const (
 	ModuleName                          = types.ModuleName
+	RewardsBankPoolName                 = types.RewardsBankPoolName
 	StoreKey                            = types.StoreKey
 	RouterKey                           = types.RouterKey
 	QuerierRoute                        = types.QuerierRoute
