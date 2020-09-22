@@ -153,7 +153,6 @@ func NewProposalHandler(k Keeper) govtypes.Handler {
 	}
 }
 
-// Handle MsgSetFoundationAllocationRatio.
 func handleMsgSetFoundationAllocationRatio(
 	ctx sdk.Context,
 	msg types.MsgSetFoundationAllocationRatio,
@@ -161,7 +160,7 @@ func handleMsgSetFoundationAllocationRatio(
 	mk mint.Keeper,
 ) (*sdk.Result, error) {
 	hasPermission := false
-	for _, nominee := range k.GetFoundationNominees(ctx) {
+	for _, nominee := range k.GetParams(ctx).FoundationNominees {
 		if nominee.Equals(msg.FromAddress) {
 			hasPermission = true
 			break

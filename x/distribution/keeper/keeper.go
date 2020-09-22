@@ -155,8 +155,3 @@ func (k Keeper) GetTotalRewards(ctx sdk.Context) (totalRewards sdk.DecCoins) {
 
 	return totalRewards
 }
-
-// GetFoundationNominees returns the foundation nominee address list
-func (k Keeper) GetFoundationNominees(ctx sdk.Context) []sdk.AccAddress {
-	return k.GetParams(ctx).FoundationNominees
-}
