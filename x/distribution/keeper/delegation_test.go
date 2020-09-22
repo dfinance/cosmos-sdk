@@ -790,9 +790,8 @@ func TestRewardsBank(t *testing.T) {
 		del = sk.Delegation(ctx, del.GetDelegatorAddr(), del.GetValidatorAddr())
 
 		// transfer
-		_, err := k.transferDelegationTotalRewardsToAccount(ctx, val, del)
+		_, err := k.WithdrawDelegationRewards(ctx, del.GetDelegatorAddr(), val.GetOperator())
 		require.NoError(t, err)
-		k.initializeDelegation(ctx, val.GetOperator(), del.GetDelegatorAddr())
 
 		// check delegator balance increased
 		curDelBalance := ak.GetAccount(ctx, del.GetDelegatorAddr()).GetCoins()
@@ -814,4 +813,89 @@ func TestRewardsBank(t *testing.T) {
 	}
 
 	checkInvariants()
+
+	// check delegator can't withdraw more
+	{
+		// update staking vars
+		val = sk.Validator(ctx, del.GetValidatorAddr())
+		del = sk.Delegation(ctx, del.GetDelegatorAddr(), del.GetValidatorAddr())
+
+		// transfer
+		rewards, err := k.WithdrawDelegationRewards(ctx, del.GetDelegatorAddr(), val.GetOperator())
+		require.NoError(t, err)
+		require.True(t, rewards.IsZero())
+	}
+}
+
+// Test rewards withdraw when delegation is reduced to zero.
+func TestRewardsBankUndelegatingToZero(t *testing.T) {
+	ctx, _, k, sk, _ := CreateTestInputDefault(t, false, 1000)
+	sh := staking.NewHandler(sk)
+
+	// set module account coins
+	distrAcc := k.GetDistributionAccount(ctx)
+	distrAcc.SetCoins(sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(1000))))
+	k.supplyKeeper.SetModuleAccount(ctx, distrAcc)
+
+	// create validator and endBlock to bond the validator
+	{
+		commission := staking.NewCommissionRates(sdk.NewDecWithPrec(1, 1), sdk.NewDecWithPrec(1, 1), sdk.NewDec(0))
+		msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
+			sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, minSelfDelegation)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		staking.EndBlocker(ctx, sk)
+	}
+
+	val := sk.Validator(ctx, valOpAddr1)
+	delAddr := delAddr1
+
+	// next block
+	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
+
+	// delegate tokens
+	delTokens := sdk.Coin{sdk.DefaultBondDenom, sdk.NewInt(10)}
+	{
+		msg := staking.NewMsgDelegate(delAddr, val.GetOperator(), delTokens)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		staking.EndBlocker(ctx, sk)
+
+		del := sk.Delegation(ctx, delAddr, val.GetOperator())
+		require.NotNil(t, del)
+	}
+
+	// allocate some rewards
+	{
+		tokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(10))}
+		k.AllocateTokensToValidator(ctx, val, tokens)
+	}
+
+	// undelegate twice (till zero)
+	{
+		for i := 0; i < 2; i++ {
+			udTokens := delTokens
+			udTokens.Amount = udTokens.Amount.QuoRaw(2)
+
+			msg := staking.NewMsgUndelegate(delAddr, val.GetOperator(), udTokens)
+
+			res, err := sh(ctx, msg)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+
+			staking.EndBlocker(ctx, sk)
+		}
+	}
+
+	// transfer all rewards
+	{
+		_, err := k.WithdrawDelegationRewards(ctx, delAddr, val.GetOperator())
+		require.Error(t, err)
+	}
 }
