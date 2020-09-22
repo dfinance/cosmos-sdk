@@ -18,6 +18,11 @@ const (
 
 	// QuerierRoute is the querier route for distribution
 	QuerierRoute = ModuleName
+
+	// Foundation limits
+	ChangeFoundationAllocationRatioTTL      = 3 // 3 years
+	ChangeFoundationAllocationRatioMaxValue = 45
+	ChangeFoundationAllocationRatioMinValue = 0
 )
 
 // Keys for distribution store

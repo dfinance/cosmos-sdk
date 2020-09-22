@@ -8,17 +8,14 @@ import (
 )
 
 const (
-	ModuleName                              = types.ModuleName
-	DefaultParamspace                       = types.DefaultParamspace
-	StoreKey                                = types.StoreKey
-	QuerierRoute                            = types.QuerierRoute
-	QueryParameters                         = types.QueryParameters
-	QueryInflation                          = types.QueryInflation
-	QueryAnnualProvisions                   = types.QueryAnnualProvisions
-	QueryBlocksPerYear                      = types.QueryBlocksPerYear
-	ChangeFoundationAllocationRatioTTL      = types.ChangeFoundationAllocationRatioTTL
-	ChangeFoundationAllocationRatioMaxValue = types.ChangeFoundationAllocationRatioMaxValue
-	ChangeFoundationAllocationRatioMinValue = types.ChangeFoundationAllocationRatioMinValue
+	ModuleName            = types.ModuleName
+	DefaultParamspace     = types.DefaultParamspace
+	StoreKey              = types.StoreKey
+	QuerierRoute          = types.QuerierRoute
+	QueryParameters       = types.QueryParameters
+	QueryInflation        = types.QueryInflation
+	QueryAnnualProvisions = types.QueryAnnualProvisions
+	QueryBlocksPerYear    = types.QueryBlocksPerYear
 )
 
 var (
@@ -28,7 +25,6 @@ var (
 	NewGenesisState      = types.NewGenesisState
 	DefaultGenesisState  = types.DefaultGenesisState
 	ValidateGenesis      = types.ValidateGenesis
-	RegisterCodec        = types.RegisterCodec
 	NewMinter            = types.NewMinter
 	InitialMinter        = types.InitialMinter
 	DefaultInitialMinter = types.DefaultInitialMinter
@@ -38,17 +34,15 @@ var (
 	DefaultParams        = types.DefaultParams
 
 	// variable aliases
-	ErrWrongFoundationAllocationRatio = types.ErrWrongFoundationAllocationRatio
-	ErrExceededTimeLimit              = types.ErrExceededTimeLimit
-	ModuleCdc                         = types.ModuleCdc
-	MinterKey                         = types.MinterKey
-	KeyMintDenom                      = types.KeyMintDenom
-	KeyInflationMax                   = types.KeyInflationMax
-	KeyInflationMin                   = types.KeyInflationMin
-	KeyFeeBurningRatio                = types.KeyFeeBurningRatio
-	KeyInfPwrBondedLockedRatio        = types.KeyInfPwrBondedLockedRatio
-	KeyFoundationAllocationRatio      = types.KeyFoundationAllocationRatio
-	KeyAvgBlockTimeWindow             = types.KeyAvgBlockTimeWindow
+	ModuleCdc                    = types.ModuleCdc
+	MinterKey                    = types.MinterKey
+	KeyMintDenom                 = types.KeyMintDenom
+	KeyInflationMax              = types.KeyInflationMax
+	KeyInflationMin              = types.KeyInflationMin
+	KeyFeeBurningRatio           = types.KeyFeeBurningRatio
+	KeyInfPwrBondedLockedRatio   = types.KeyInfPwrBondedLockedRatio
+	KeyFoundationAllocationRatio = types.KeyFoundationAllocationRatio
+	KeyAvgBlockTimeWindow        = types.KeyAvgBlockTimeWindow
 )
 
 type (

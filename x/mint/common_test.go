@@ -11,7 +11,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/bank"
-	"github.com/cosmos/cosmos-sdk/x/distribution"
 	"github.com/cosmos/cosmos-sdk/x/mint/internal/types"
 	"github.com/cosmos/cosmos-sdk/x/mock"
 	"github.com/cosmos/cosmos-sdk/x/staking"
@@ -42,7 +41,6 @@ func getMockApp(t *testing.T, mintParams Params) (*mock.App, supply.Keeper, stak
 
 	keyStaking := sdk.NewKVStoreKey(staking.StoreKey)
 	keySupply := sdk.NewKVStoreKey(supply.StoreKey)
-	keyDistribution := sdk.NewKVStoreKey(distribution.StoreKey)
 	keyMint := sdk.NewKVStoreKey(StoreKey)
 
 	feeCollector := supply.NewEmptyModuleAccount(auth.FeeCollectorName, maccPerms[auth.FeeCollectorName]...)
@@ -60,12 +58,7 @@ func getMockApp(t *testing.T, mintParams Params) (*mock.App, supply.Keeper, stak
 	bankKeeper := bank.NewBaseKeeper(mApp.AccountKeeper, mApp.ParamsKeeper.Subspace(bank.DefaultParamspace), blacklistedAddrs)
 	supplyKeeper := supply.NewKeeper(mApp.Cdc, keySupply, mApp.AccountKeeper, bankKeeper, maccPerms)
 	stakingKeeper := staking.NewKeeper(mApp.Cdc, keyStaking, supplyKeeper, mApp.ParamsKeeper.Subspace(staking.DefaultParamspace))
-	distKeeper := distribution.NewKeeper(
-		mApp.Cdc, keyDistribution, mApp.ParamsKeeper.Subspace(distribution.DefaultParamspace),
-		stakingKeeper, supplyKeeper, auth.FeeCollectorName, blacklistedAddrs)
-	keeper := NewKeeper(
-		mApp.Cdc, keyMint, mApp.ParamsKeeper.Subspace(DefaultParamspace), &stakingKeeper,
-		supplyKeeper, distKeeper, auth.FeeCollectorName)
+	keeper := NewKeeper(mApp.Cdc, keyMint, mApp.ParamsKeeper.Subspace(DefaultParamspace), &stakingKeeper, supplyKeeper, auth.FeeCollectorName)
 
 	mApp.Router().AddRoute(staking.RouterKey, staking.NewHandler(stakingKeeper))
 	mApp.SetBeginBlocker(getBeginBlocker(keeper))

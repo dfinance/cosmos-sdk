@@ -29,9 +29,4 @@ const (
 	QueryAnnualProvisions       = "annual_provisions"
 	QueryBlocksPerYear          = "blocks_per_year"
 	QueryNextAnnualParamsUpdate = "next_annual_params_update"
-
-	// Foundation limits
-	ChangeFoundationAllocationRatioTTL      = 3 // 3 years
-	ChangeFoundationAllocationRatioMaxValue = 45
-	ChangeFoundationAllocationRatioMinValue = 0
 )
