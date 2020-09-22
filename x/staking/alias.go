@@ -126,6 +126,7 @@ var (
 	ErrNoHistoricalInfo                = types.ErrNoHistoricalInfo
 	ErrInvalidMinSelfDelegation        = types.ErrInvalidMinSelfDelegation
 	ErrMaxDelegationsLimit             = types.ErrMaxDelegationsLimit
+	ErrDeniedStakingOps                = types.ErrDeniedStakingOps
 	NewGenesisState                    = types.NewGenesisState
 	DefaultGenesisState                = types.DefaultGenesisState
 	NewMultiStakingHooks               = types.NewMultiStakingHooks

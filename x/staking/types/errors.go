@@ -58,4 +58,5 @@ var (
 	ErrNoHistoricalInfo                = sdkerrors.Register(ModuleName, 45, "no historical info found")
 	ErrInvalidMinSelfDelegation        = sdkerrors.Register(ModuleName, 46, "invalid min self-delegation")
 	ErrMaxDelegationsLimit             = sdkerrors.Register(ModuleName, 47, "validator max delegations level reached")
+	ErrDeniedStakingOps                = sdkerrors.Register(ModuleName, 48, "account cannot perform any staking operations (banned)")
 )

@@ -42,6 +42,11 @@ func NewHandler(k keeper.Keeper) sdk.Handler {
 // now we just perform action and save
 
 func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k keeper.Keeper) (*sdk.Result, error) {
+	// check if staking ops are denied
+	if k.IsAccountBanned(ctx, msg.DelegatorAddress) {
+		return nil, ErrDeniedStakingOps
+	}
+
 	// check to see if the pubkey or sender has been registered before
 	if _, found := k.GetValidator(ctx, msg.ValidatorAddress); found {
 		return nil, ErrValidatorOwnerExists
@@ -117,6 +122,11 @@ func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k k
 }
 
 func handleMsgEditValidator(ctx sdk.Context, msg types.MsgEditValidator, k keeper.Keeper) (*sdk.Result, error) {
+	// check if staking ops are denied
+	if k.IsAccountBanned(ctx, sdk.AccAddress(msg.ValidatorAddress)) {
+		return nil, ErrDeniedStakingOps
+	}
+
 	// validator must already be registered
 	validator, found := k.GetValidator(ctx, msg.ValidatorAddress)
 	if !found {
@@ -173,6 +183,11 @@ func handleMsgEditValidator(ctx sdk.Context, msg types.MsgEditValidator, k keepe
 }
 
 func handleMsgDelegate(ctx sdk.Context, msg types.MsgDelegate, k keeper.Keeper) (*sdk.Result, error) {
+	// check if staking ops are denied
+	if k.IsAccountBanned(ctx, msg.DelegatorAddress) {
+		return nil, ErrDeniedStakingOps
+	}
+
 	validator, found := k.GetValidator(ctx, msg.ValidatorAddress)
 	if !found {
 		return nil, ErrNoValidatorFound
@@ -205,6 +220,11 @@ func handleMsgDelegate(ctx sdk.Context, msg types.MsgDelegate, k keeper.Keeper) 
 }
 
 func handleMsgUndelegate(ctx sdk.Context, msg types.MsgUndelegate, k keeper.Keeper) (*sdk.Result, error) {
+	// check if staking ops are denied
+	if k.IsAccountBanned(ctx, msg.DelegatorAddress) {
+		return nil, ErrDeniedStakingOps
+	}
+
 	shares, err := k.ValidateUnbondAmount(
 		ctx, msg.DelegatorAddress, msg.ValidatorAddress, msg.Amount.Amount,
 	)
@@ -240,6 +260,11 @@ func handleMsgUndelegate(ctx sdk.Context, msg types.MsgUndelegate, k keeper.Keep
 }
 
 func handleMsgBeginRedelegate(ctx sdk.Context, msg types.MsgBeginRedelegate, k keeper.Keeper) (*sdk.Result, error) {
+	// check if staking ops are denied
+	if k.IsAccountBanned(ctx, msg.DelegatorAddress) {
+		return nil, ErrDeniedStakingOps
+	}
+
 	shares, err := k.ValidateUnbondAmount(
 		ctx, msg.DelegatorAddress, msg.ValidatorSrcAddress, msg.Amount.Amount,
 	)

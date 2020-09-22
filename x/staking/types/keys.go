@@ -50,6 +50,8 @@ var (
 	ScheduledUnbondQueueKey = []byte{0x44} // prefix for the timestamps in scheduled force validator unbond queue
 
 	HistoricalInfoKey = []byte{0x50} // prefix for the historical info
+
+	BannedAccKey = []byte{0x60} // prefix for banned account info (denied staking ops)
 )
 
 // gets the key for the validator with address
@@ -301,4 +303,10 @@ func GetREDsByDelToValDstIndexKey(delAddr sdk.AccAddress, valDstAddr sdk.ValAddr
 // GetHistoricalInfoKey gets the key for the historical info
 func GetHistoricalInfoKey(height int64) []byte {
 	return append(HistoricalInfoKey, []byte(strconv.FormatInt(height, 10))...)
+}
+
+//___
+// GetBannedAccKey gets the key for storing banned account blockHeight
+func GetBannedAccKey(accAddr sdk.AccAddress) []byte {
+	return append(BannedAccKey, accAddr.Bytes()...)
 }

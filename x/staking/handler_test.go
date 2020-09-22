@@ -2652,3 +2652,62 @@ func TestForceRemoveDelegator(t *testing.T) {
 		require.False(t, del2InitialBalance.IsEqual(del2CurBalance))
 	}
 }
+
+// Test account ban.
+func TestBannedAccounts(t *testing.T) {
+	initPower := int64(100000)
+	ctx, _, keeper, _ := keep.CreateTestInput(t, false, initPower)
+
+	valOpAddr := keep.Addrs[0]
+	valAddr, valPubKey := sdk.ValAddress(valOpAddr), keep.PKs[0]
+
+	// create validators
+	{
+		selfStakeAmt := sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(valAddr, valPubKey, selfStakeAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	// enbBlock for validators to be Bonded
+	EndBlocker(ctx, keeper)
+
+	// ban the delegator
+	keeper.BanAccount(ctx, valOpAddr)
+
+	// try to delegate
+	{
+		msg := NewMsgDelegate(valOpAddr, valAddr, sdk.NewCoin(sdk.DefaultBondDenom, sdk.OneInt()))
+		_, err := handleMsgDelegate(ctx, msg, keeper)
+		require.Error(t, err)
+		require.True(t, ErrDeniedStakingOps.Is(err))
+	}
+
+	// try to undelegate
+	{
+		msg := NewMsgUndelegate(valOpAddr, valAddr, sdk.NewCoin(sdk.DefaultBondDenom, sdk.OneInt()))
+		_, err := handleMsgUndelegate(ctx, msg, keeper)
+		require.Error(t, err)
+		require.True(t, ErrDeniedStakingOps.Is(err))
+	}
+
+	// try to redelegate
+	{
+		msg := NewMsgBeginRedelegate(valOpAddr, valAddr, valAddr, sdk.NewCoin(sdk.DefaultBondDenom, sdk.OneInt()))
+		_, err := handleMsgBeginRedelegate(ctx, msg, keeper)
+		require.Error(t, err)
+		require.True(t, ErrDeniedStakingOps.Is(err))
+	}
+
+	// unban the delegator
+	keeper.UnbanAccount(ctx, valOpAddr)
+
+	// try to delegate
+	{
+		msg := NewMsgDelegate(valOpAddr, valAddr, sdk.NewCoin(sdk.DefaultBondDenom, sdk.OneInt()))
+		_, err := handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+	}
+}
