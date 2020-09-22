@@ -9,25 +9,23 @@ import (
 // nolint
 
 const (
-	ModuleName                              = types.ModuleName
-	StoreKey                                = types.StoreKey
-	RouterKey                               = types.RouterKey
-	QuerierRoute                            = types.QuerierRoute
-	ProposalTypePublicTreasuryPoolSpend     = types.ProposalTypePublicTreasuryPoolSpend
-	QueryParams                             = types.QueryParams
-	QueryValidatorOutstandingRewards        = types.QueryValidatorOutstandingRewards
-	QueryValidatorCommission                = types.QueryValidatorCommission
-	QueryValidatorSlashes                   = types.QueryValidatorSlashes
-	QueryDelegationRewards                  = types.QueryDelegationRewards
-	QueryDelegatorTotalRewards              = types.QueryDelegatorTotalRewards
-	QueryDelegatorValidators                = types.QueryDelegatorValidators
-	QueryWithdrawAddr                       = types.QueryWithdrawAddr
-	QueryPool                               = types.QueryPool
-	DefaultParamspace                       = types.DefaultParamspace
-	TypeMsgFundPublicTreasuryPool           = types.TypeMsgFundPublicTreasuryPool
-	ChangeFoundationAllocationRatioTTL      = types.ChangeFoundationAllocationRatioTTL
-	ChangeFoundationAllocationRatioMaxValue = types.ChangeFoundationAllocationRatioMaxValue
-	ChangeFoundationAllocationRatioMinValue = types.ChangeFoundationAllocationRatioMinValue
+	ModuleName                          = types.ModuleName
+	StoreKey                            = types.StoreKey
+	RouterKey                           = types.RouterKey
+	QuerierRoute                        = types.QuerierRoute
+	ProposalTypePublicTreasuryPoolSpend = types.ProposalTypePublicTreasuryPoolSpend
+	QueryParams                         = types.QueryParams
+	QueryValidatorOutstandingRewards    = types.QueryValidatorOutstandingRewards
+	QueryValidatorCommission            = types.QueryValidatorCommission
+	QueryValidatorSlashes               = types.QueryValidatorSlashes
+	QueryDelegationRewards              = types.QueryDelegationRewards
+	QueryDelegatorTotalRewards          = types.QueryDelegatorTotalRewards
+	QueryDelegatorValidators            = types.QueryDelegatorValidators
+	QueryWithdrawAddr                   = types.QueryWithdrawAddr
+	QueryPool                           = types.QueryPool
+	DefaultParamspace                   = types.DefaultParamspace
+	TypeMsgFundPublicTreasuryPool       = types.TypeMsgFundPublicTreasuryPool
+	ChangeFoundationAllocationRatioTTL  = types.ChangeFoundationAllocationRatioTTL
 )
 
 var (

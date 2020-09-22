@@ -8,14 +8,15 @@ import (
 )
 
 const (
-	ModuleName            = types.ModuleName
-	DefaultParamspace     = types.DefaultParamspace
-	StoreKey              = types.StoreKey
-	QuerierRoute          = types.QuerierRoute
-	QueryParameters       = types.QueryParameters
-	QueryInflation        = types.QueryInflation
-	QueryAnnualProvisions = types.QueryAnnualProvisions
-	QueryBlocksPerYear    = types.QueryBlocksPerYear
+	ModuleName                        = types.ModuleName
+	DefaultParamspace                 = types.DefaultParamspace
+	StoreKey                          = types.StoreKey
+	QuerierRoute                      = types.QuerierRoute
+	QueryParameters                   = types.QueryParameters
+	QueryInflation                    = types.QueryInflation
+	QueryAnnualProvisions             = types.QueryAnnualProvisions
+	QueryBlocksPerYear                = types.QueryBlocksPerYear
+	FoundationAllocationRatioMaxValue = types.FoundationAllocationRatioMaxValue
 )
 
 var (

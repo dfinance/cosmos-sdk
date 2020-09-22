@@ -13,7 +13,7 @@ import (
 // Test ingres -> PublicTreasuryPool transfer.
 func TestFundPublicTreasuryPool(t *testing.T) {
 	// nolint dogsled
-	ctx, _, bk, keeper, _, _, _ := CreateTestInputAdvanced(t, false, 1000, types.DefaultParams())
+	ctx, _, bk, keeper, _, _, _, _ := CreateTestInputAdvanced(t, false, 1000, types.DefaultParams())
 
 	amount := sdk.NewCoins(sdk.NewInt64Coin("stake", 100))
 	_ = bk.SetCoins(ctx, delAddr1, amount)
@@ -31,7 +31,7 @@ func TestFundPublicTreasuryPool(t *testing.T) {
 // Test PublicTreasuryPool -> ingres transfer.
 func TestDistributeFromPublicTreasuryPool(t *testing.T) {
 	// nolint dogsled
-	ctx, ak, _, k, _, _, sk := CreateTestInputAdvanced(t, false, 1000, types.DefaultParams())
+	ctx, ak, _, k, _, _, sk, _ := CreateTestInputAdvanced(t, false, 1000, types.DefaultParams())
 
 	// allocate distr module tokens
 	poolCoins := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(10000)))
@@ -63,7 +63,7 @@ func TestDistributeFromPublicTreasuryPool(t *testing.T) {
 // Test FoundationPool -> other pools transfer.
 func TestDistributeFromFoundationPoolToPool(t *testing.T) {
 	// nolint dogsled
-	ctx, ak, _, k, _, _, sk := CreateTestInputAdvanced(t, false, 1000, types.DefaultParams())
+	ctx, ak, _, k, _, _, sk, _ := CreateTestInputAdvanced(t, false, 1000, types.DefaultParams())
 
 	// allocate distr module tokens
 	poolCoins := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(90000)))
@@ -102,7 +102,7 @@ func TestDistributeFromFoundationPoolToPool(t *testing.T) {
 // Test FoundationPool -> ingres transfer.
 func TestDistributeFromFoundationPoolToWallet(t *testing.T) {
 	// nolint dogsled
-	ctx, ak, _, k, _, _, sk := CreateTestInputAdvanced(t, false, 1000, types.DefaultParams())
+	ctx, ak, _, k, _, _, sk, _ := CreateTestInputAdvanced(t, false, 1000, types.DefaultParams())
 
 	// allocate distr module tokens
 	poolCoins := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(10000)))

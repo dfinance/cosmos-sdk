@@ -253,12 +253,6 @@ func (msg MsgSetFoundationAllocationRatio) ValidateBasic() error {
 	if msg.FromAddress.Empty() {
 		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "missing sender address")
 	}
-	if msg.Ratio.GT(sdk.NewDec(ChangeFoundationAllocationRatioMaxValue)) {
-		return sdkerrors.Wrap(ErrWrongFoundationAllocationRatio, "ratio is greater than the maximum value for FoundationAllocationRatio")
-	}
-	if msg.Ratio.LT(sdk.NewDec(ChangeFoundationAllocationRatioMinValue)) {
-		return sdkerrors.Wrap(ErrWrongFoundationAllocationRatio, "ratio is lower than the maximum value for FoundationAllocationRatio")
-	}
 	return nil
 }
 

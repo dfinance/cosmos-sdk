@@ -20,9 +20,7 @@ const (
 	QuerierRoute = ModuleName
 
 	// Foundation limits
-	ChangeFoundationAllocationRatioTTL      = 3 // 3 years
-	ChangeFoundationAllocationRatioMaxValue = 45
-	ChangeFoundationAllocationRatioMinValue = 0
+	ChangeFoundationAllocationRatioTTL = 3 // 3 years
 )
 
 // Keys for distribution store
