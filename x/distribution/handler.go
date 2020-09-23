@@ -186,5 +186,5 @@ func handleMsgSetFoundationAllocationRatio(
 	params.FoundationAllocationRatio = msg.Ratio
 	mk.SetParams(ctx, params)
 
-	return nil, nil
+	return &sdk.Result{}, nil
 }
