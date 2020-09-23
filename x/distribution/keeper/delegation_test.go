@@ -720,7 +720,7 @@ func TestRewardsBank(t *testing.T) {
 
 	// delegate more to validator triggering the BeforeDelegationSharesModified hook
 	{
-		tokens := sdk.Coin{sdk.DefaultBondDenom, sdk.NewInt(10)}
+		tokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(10))
 		msg := staking.NewMsgDelegate(del.GetDelegatorAddr(), val.GetOperator(), tokens)
 
 		res, err := sh(ctx, msg)
@@ -857,7 +857,7 @@ func TestRewardsBankUndelegatingToZero(t *testing.T) {
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 
 	// delegate tokens
-	delTokens := sdk.Coin{sdk.DefaultBondDenom, sdk.NewInt(10)}
+	delTokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(10))
 	{
 		msg := staking.NewMsgDelegate(delAddr, val.GetOperator(), delTokens)
 
