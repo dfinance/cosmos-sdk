@@ -2,6 +2,7 @@ package staking
 
 import (
 	"fmt"
+	"time"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -90,6 +91,19 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeep
 		}
 	}
 
+	for _, entry := range data.StakingStates {
+		fmt.Printf("InitGenesis: %s: %v\n", entry.ValAddr, entry.State.Delegators)
+		keeper.SetValidatorStakingState(ctx, entry.ValAddr, entry.State)
+	}
+
+	for _, entry := range data.ScheduledUnbonds {
+		keeper.SetScheduledUnbondQueueValidators(ctx, entry.Timestamp, entry.ValAddrs)
+	}
+
+	for _, entry := range data.BannedAccounts {
+		keeper.BanAccount(ctx, entry.AccAddress, entry.BanHeight)
+	}
+
 	bondedCoins := sdk.NewCoins(sdk.NewCoin(data.Params.BondDenom, bondedTokens))
 	notBondedCoins := sdk.NewCoins(sdk.NewCoin(data.Params.BondDenom, notBondedTokens))
 
@@ -162,6 +176,31 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 		lastValidatorPowers = append(lastValidatorPowers, types.LastValidatorPower{Address: addr, Power: power})
 		return false
 	})
+	var stakingStates []types.StakingStateEntry
+	keeper.IterateValidatorStakingStates(ctx, func(valAddr sdk.ValAddress, state types.ValidatorStakingState) (stop bool) {
+		fmt.Printf("ExportGenesis: %s: %v\n", valAddr, state.Delegators)
+		stakingStates = append(stakingStates, types.StakingStateEntry{
+			ValAddr: valAddr,
+			State:   state,
+		})
+		return false
+	})
+	var scheduledUnbonds []types.ScheduledUnbondEntry
+	keeper.IterateScheduledUnbondQueue(ctx, func(timestamp time.Time, valAddrs []sdk.ValAddress) (stop bool) {
+		scheduledUnbonds = append(scheduledUnbonds, types.ScheduledUnbondEntry{
+			Timestamp: timestamp,
+			ValAddrs:  valAddrs,
+		})
+		return false
+	})
+	var bannedAccounts []types.BannedAccountEntry
+	keeper.IterateBannedAccounts(ctx, func(accAddr sdk.AccAddress, banHeight int64) (stop bool) {
+		bannedAccounts = append(bannedAccounts, types.BannedAccountEntry{
+			AccAddress: accAddr,
+			BanHeight:  banHeight,
+		})
+		return false
+	})
 
 	return types.GenesisState{
 		Params:               params,
@@ -171,6 +210,8 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 		Delegations:          delegations,
 		UnbondingDelegations: unbondingDelegations,
 		Redelegations:        redelegations,
+		ScheduledUnbonds:     scheduledUnbonds,
+		BannedAccounts:       bannedAccounts,
 		Exported:             true,
 	}
 }

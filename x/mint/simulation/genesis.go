@@ -5,6 +5,7 @@ package simulation
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 
@@ -96,7 +97,7 @@ func RandomizedGenState(simState *module.SimulationState) {
 		avgBlocksTimeWindow,
 	)
 
-	mintGenesis := types.NewGenesisState(types.InitialMinter(inflation), params)
+	mintGenesis := types.NewGenesisState(types.InitialMinter(inflation), params, types.BlockDurFilter{}, time.Time{})
 
 	fmt.Printf("Selected randomly generated minting parameters:\n%s\n", codec.MustMarshalJSONIndent(simState.Cdc, mintGenesis))
 	simState.GenState[types.ModuleName] = simState.Cdc.MustMarshalJSON(mintGenesis)

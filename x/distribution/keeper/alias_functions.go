@@ -24,6 +24,11 @@ func (k Keeper) GetDistributionAccount(ctx sdk.Context) exported.ModuleAccountI 
 	return k.supplyKeeper.GetModuleAccount(ctx, types.ModuleName)
 }
 
+// GetRewardsBankPoolAccount returns the RewardsBankPool ModuleAccount.
+func (k Keeper) GetRewardsBankPoolAccount(ctx sdk.Context) exported.ModuleAccountI {
+	return k.supplyKeeper.GetModuleAccount(ctx, types.RewardsBankPoolName)
+}
+
 // ValidatorByConsAddr returns validator by consensus voter address.
 func (k Keeper) ValidatorByConsAddr(ctx sdk.Context, address sdk.ConsAddress) staking.ValidatorI {
 	return k.stakingKeeper.ValidatorByConsAddr(ctx, address)

@@ -35,7 +35,11 @@ func AllInvariants(k Keeper) sdk.Invariant {
 		if stop {
 			return res, stop
 		}
-		return ModuleAccountInvariant(k)(ctx)
+		res, stop = ModuleAccountInvariant(k)(ctx)
+		if stop {
+			return res, stop
+		}
+		return RewardsBankPoolInvariant(k)(ctx)
 	}
 }
 
@@ -159,6 +163,29 @@ func ModuleAccountInvariant(k Keeper) sdk.Invariant {
 					"\treward pools dec coins:           %s\n"+
 					"\texpected dec coins:               %s\n",
 					expectedInt, macc.GetCoins(), outstandingRewardCoins, poolCoins, expectedCoins,
+				)),
+			broken
+	}
+}
+
+// RewardsBankPoolInvariant checks that the coins held by the RewardsBankPool ModuleAccount
+// is consistent with the sum of delegators rewards in the RewardsBankPool.
+func RewardsBankPoolInvariant(k Keeper) sdk.Invariant {
+	return func(ctx sdk.Context) (string, bool) {
+		expectedCoins := sdk.NewCoins()
+		k.IterateDelegatorRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, coins sdk.Coins) (stop bool) {
+			expectedCoins = expectedCoins.Add(coins...)
+			return false
+		})
+
+		macc := k.GetRewardsBankPoolAccount(ctx)
+
+		broken := !macc.GetCoins().IsEqual(expectedCoins)
+		return sdk.FormatInvariant(types.ModuleName, "RewardsBankPool ModuleAccount coins",
+				fmt.Sprintf(""+
+					"\texpected ModuleAccount coins:          %s\n"+
+					"\trewards_bank_pool ModuleAccount coins: %s\n",
+					expectedCoins, macc.GetCoins(),
 				)),
 			broken
 	}

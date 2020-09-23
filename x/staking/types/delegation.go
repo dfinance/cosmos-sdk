@@ -20,6 +20,17 @@ type DVPair struct {
 	ValidatorAddress sdk.ValAddress
 }
 
+func (p DVPair) Equal(p2 DVPair) bool {
+	if !p.DelegatorAddress.Equals(p2.DelegatorAddress) {
+		return false
+	}
+	if !p.ValidatorAddress.Equals(p2.ValidatorAddress) {
+		return false
+	}
+
+	return true
+}
+
 // DVVTriplet is struct that just has a delegator-validator-validator triplet with no other data.
 // It is intended to be used as a marshalable pointer. For example, a DVVTriplet can be used to construct the
 // key to getting a Redelegation from state.
@@ -27,6 +38,20 @@ type DVVTriplet struct {
 	DelegatorAddress    sdk.AccAddress
 	ValidatorSrcAddress sdk.ValAddress
 	ValidatorDstAddress sdk.ValAddress
+}
+
+func (t DVVTriplet) Equal(t2 DVVTriplet) bool {
+	if !t.DelegatorAddress.Equals(t2.DelegatorAddress) {
+		return false
+	}
+	if !t.ValidatorSrcAddress.Equals(t2.ValidatorSrcAddress) {
+		return false
+	}
+	if !t.ValidatorDstAddress.Equals(t2.ValidatorDstAddress) {
+		return false
+	}
+
+	return true
 }
 
 // Implements Delegation interface

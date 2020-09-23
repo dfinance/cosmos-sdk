@@ -52,6 +52,7 @@ var (
 	ValidatorAccumulatedCommissionPrefix = []byte{0x07} // key for accumulated validator commission
 	ValidatorSlashEventPrefix            = []byte{0x08} // key for validator slash fraction
 	ValidatorLockedRewardsPrefix         = []byte{0x09} // key for validator locked rewards info
+	DelegatorRewardsBankCoinsPrefix      = []byte{0x0A} // key for delegator RewardsBankPool coins
 )
 
 // gets an address from a validator's outstanding rewards key
@@ -196,4 +197,24 @@ func GetValidatorSlashEventKey(v sdk.ValAddress, height, period uint64) []byte {
 // gets the key for a validator's locked rewards info
 func GetValidatorLockedRewardsKey(v sdk.ValAddress) []byte {
 	return append(ValidatorLockedRewardsPrefix, v.Bytes()...)
+}
+
+// parses validator address from the ValidatorLockedRewardsKey
+func ParseValidatorLockedRewardsKey(key []byte) (valAddr sdk.ValAddress) {
+	return key[1:]
+}
+
+// gets the key for delegator's RewardsBankPool coins.
+func GetDelegatorRewardsBankCoinsKey(delAddr sdk.AccAddress) []byte {
+	return append(DelegatorRewardsBankCoinsPrefix, delAddr.Bytes()...)
+}
+
+// gets the delegator address from a DelegatorRewardsBankCoins key.
+func GetDelegatorRewardsBankCoinsAddress(key []byte) (delAddr sdk.AccAddress) {
+	addr := key[1:]
+	if len(addr) != sdk.AddrLen {
+		panic("unexpected key length")
+	}
+
+	return sdk.AccAddress(addr)
 }

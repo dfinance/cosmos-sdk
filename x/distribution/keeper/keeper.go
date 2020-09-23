@@ -37,6 +37,11 @@ func NewKeeper(
 		panic(fmt.Sprintf("%s module account has not been set", types.ModuleName))
 	}
 
+	// ensure RewardsBankPool module account is set
+	if addr := supplyKeeper.GetModuleAddress(types.RewardsBankPoolName); addr == nil {
+		panic(fmt.Sprintf("%s module account has not been set", types.RewardsBankPoolName))
+	}
+
 	// set KeyTable if it has not already been set
 	if !paramSpace.HasKeyTable() {
 		paramSpace = paramSpace.WithKeyTable(types.ParamKeyTable())
@@ -76,6 +81,7 @@ func (k Keeper) SetWithdrawAddr(ctx sdk.Context, delegatorAddr sdk.AccAddress, w
 	)
 
 	k.SetDelegatorWithdrawAddr(ctx, delegatorAddr, withdrawAddr)
+
 	return nil
 }
 
@@ -92,7 +98,7 @@ func (k Keeper) WithdrawDelegationRewards(ctx sdk.Context, delAddr sdk.AccAddres
 	}
 
 	// withdraw rewards
-	rewards, err := k.withdrawDelegationRewards(ctx, val, del)
+	rewards, err := k.transferDelegationTotalRewardsToAccount(ctx, val, del)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +113,7 @@ func (k Keeper) WithdrawDelegationRewards(ctx sdk.Context, delAddr sdk.AccAddres
 
 	// reinitialize the delegation
 	k.initializeDelegation(ctx, valAddr, delAddr)
+
 	return rewards, nil
 }
 

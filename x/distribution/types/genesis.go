@@ -51,6 +51,17 @@ type ValidatorSlashEventRecord struct {
 	Event            ValidatorSlashEvent `json:"validator_slash_event" yaml:"validator_slash_event"`
 }
 
+type ValidatorLockedRewardsRecord struct {
+	ValidatorAddress sdk.ValAddress         `json:"validator_address" yaml:"validator_address"`
+	LockedInfo       ValidatorLockedRewards `json:"locked_info" yaml:"locked_info"`
+}
+
+// used for import / export via genesis json
+type RewardsBankPoolRecord struct {
+	AccAddress sdk.AccAddress `json:"acc_address" yaml:"acc_address"`
+	Coins      sdk.Coins      `json:"coins" yaml:"coins"`
+}
+
 // GenesisState - all distribution state that must be provided at genesis
 type GenesisState struct {
 	Params                          Params                                 `json:"params" yaml:"params"`
@@ -63,12 +74,15 @@ type GenesisState struct {
 	ValidatorCurrentRewards         []ValidatorCurrentRewardsRecord        `json:"validator_current_rewards" yaml:"validator_current_rewards"`
 	DelegatorStartingInfos          []DelegatorStartingInfoRecord          `json:"delegator_starting_infos" yaml:"delegator_starting_infos"`
 	ValidatorSlashEvents            []ValidatorSlashEventRecord            `json:"validator_slash_events" yaml:"validator_slash_events"`
+	ValidatorLockedRewards          []ValidatorLockedRewardsRecord         `json:"validator_locked_rewards" yaml:"validator_locked_rewards"`
+	RewardBankPool                  []RewardsBankPoolRecord                `json:"reward_bank_pool" yaml:"reward_bank_pool"`
 }
 
 func NewGenesisState(
 	params Params, rp RewardPools, dwis []DelegatorWithdrawInfo, pp sdk.ConsAddress, r []ValidatorOutstandingRewardsRecord,
 	acc []ValidatorAccumulatedCommissionRecord, historical []ValidatorHistoricalRewardsRecord,
 	cur []ValidatorCurrentRewardsRecord, dels []DelegatorStartingInfoRecord, slashes []ValidatorSlashEventRecord,
+	validatorLockedRewards []ValidatorLockedRewardsRecord, rewardBankPool []RewardsBankPoolRecord,
 ) GenesisState {
 
 	return GenesisState{
@@ -82,6 +96,8 @@ func NewGenesisState(
 		ValidatorCurrentRewards:         cur,
 		DelegatorStartingInfos:          dels,
 		ValidatorSlashEvents:            slashes,
+		ValidatorLockedRewards:          validatorLockedRewards,
+		RewardBankPool:                  rewardBankPool,
 	}
 }
 
@@ -98,6 +114,8 @@ func DefaultGenesisState() GenesisState {
 		ValidatorCurrentRewards:         []ValidatorCurrentRewardsRecord{},
 		DelegatorStartingInfos:          []DelegatorStartingInfoRecord{},
 		ValidatorSlashEvents:            []ValidatorSlashEventRecord{},
+		ValidatorLockedRewards:          []ValidatorLockedRewardsRecord{},
+		RewardBankPool:                  []RewardsBankPoolRecord{},
 	}
 }
 

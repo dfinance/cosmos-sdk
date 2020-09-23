@@ -3,6 +3,7 @@ package simulation
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	tmkv "github.com/tendermint/tendermint/libs/kv"
 
@@ -50,6 +51,33 @@ func DecodeStore(cdc *codec.Codec, kvA, kvB tmkv.Pair) string {
 		cdc.MustUnmarshalBinaryLengthPrefixed(kvA.Value, &redA)
 		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &redB)
 		return fmt.Sprintf("%v\n%v", redA, redB)
+
+	case bytes.Equal(kvA.Key[:1], types.ValidatorsStakingStateKey):
+		var stateA, stateB types.ValidatorStakingState
+		var valAddrA, valAddrB sdk.ValAddress
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvA.Value, &stateA)
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &stateB)
+		valAddrA = types.ParseValidatorStakingStateKey(kvA.Key)
+		valAddrB = types.ParseValidatorStakingStateKey(kvB.Key)
+		return fmt.Sprintf("%s: %v\n%s: %v", valAddrA, stateA, valAddrB, stateB)
+
+	case bytes.Equal(kvA.Key[:1], types.ScheduledUnbondQueueKey):
+		var valAddrsA, valAddrsB []sdk.ValAddress
+		var timestampA, timestampB time.Time
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvA.Value, &valAddrsA)
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &valAddrsB)
+		timestampA = types.ParseUnbondingDelegationTimeKey(kvA.Key)
+		timestampB = types.ParseUnbondingDelegationTimeKey(kvB.Key)
+		return fmt.Sprintf("%v: %v\n%v: %v", timestampA, valAddrsA, timestampB, valAddrsB)
+
+	case bytes.Equal(kvA.Key[:1], types.BannedAccKey):
+		var accAddrsA, accAddrsB sdk.AccAddress
+		var heightA, heightB int64
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvA.Value, &heightA)
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &heightB)
+		accAddrsA = types.ParseBannedAccKey(kvA.Key)
+		accAddrsB = types.ParseBannedAccKey(kvB.Key)
+		return fmt.Sprintf("%s: %d\n%s: %d", accAddrsA, heightA, accAddrsB, heightB)
 
 	default:
 		panic(fmt.Sprintf("invalid staking key prefix %X", kvA.Key[:1]))

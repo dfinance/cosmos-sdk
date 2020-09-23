@@ -62,6 +62,15 @@ func DecodeStore(cdc *codec.Codec, kvA, kvB tmkv.Pair) string {
 		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &eventB)
 		return fmt.Sprintf("%v\n%v", eventA, eventB)
 
+	case bytes.Equal(kvA.Key[:1], types.DelegatorRewardsBankCoinsPrefix):
+		var coinsA, coinsB sdk.Coins
+		var delAddrA, delAddrB sdk.AccAddress
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvA.Value, &coinsA)
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &coinsB)
+		delAddrA = types.GetDelegatorRewardsBankCoinsAddress(kvA.Key)
+		delAddrB = types.GetDelegatorRewardsBankCoinsAddress(kvB.Key)
+		return fmt.Sprintf("%s: %v\n%s: %v", delAddrA, coinsA, delAddrB, coinsB)
+
 	default:
 		panic(fmt.Sprintf("invalid distribution key prefix %X", kvA.Key[:1]))
 	}

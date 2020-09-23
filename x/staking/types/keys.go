@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/binary"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -50,6 +51,8 @@ var (
 	ScheduledUnbondQueueKey = []byte{0x44} // prefix for the timestamps in scheduled force validator unbond queue
 
 	HistoricalInfoKey = []byte{0x50} // prefix for the historical info
+
+	BannedAccKey = []byte{0x60} // prefix for banned account info (denied staking ops)
 )
 
 // gets the key for the validator with address
@@ -62,6 +65,11 @@ func GetValidatorKey(operatorAddr sdk.ValAddress) []byte {
 // VALUE: staking/Validator
 func GetValidatorStakingStateKey(operatorAddr sdk.ValAddress) []byte {
 	return append(ValidatorsStakingStateKey, operatorAddr.Bytes()...)
+}
+
+// parse validator address from the ValidatorStakingStateKey.
+func ParseValidatorStakingStateKey(key []byte) (valAddr sdk.ValAddress) {
+	return key[1:]
 }
 
 // gets the key for the validator with pubkey
@@ -191,10 +199,22 @@ func GetUBDsByValIndexKey(valAddr sdk.ValAddress) []byte {
 	return append(UnbondingDelegationByValIndexKey, valAddr.Bytes()...)
 }
 
-// gets the prefix for all unbonding delegations from a delegator
+// GetUnbondingDelegationTimeKey gets the prefix for all unbonding delegations from a delegator
 func GetUnbondingDelegationTimeKey(timestamp time.Time) []byte {
 	bz := sdk.FormatTimeBytes(timestamp)
+
 	return append(UnbondingQueueKey, bz...)
+}
+
+// ParseUnbondingDelegationTimeKey parses timestamp from UnbondingDelegationTimeKey
+func ParseUnbondingDelegationTimeKey(key []byte) (timestamp time.Time) {
+	bz := key[1:]
+	ts, err := sdk.ParseTimeBytes(bz)
+	if err != nil {
+		panic(fmt.Errorf("parsing UnbondingDelegationTimeKey %v: %w", key, err))
+	}
+
+	return ts
 }
 
 //________________________________________________________________________________
@@ -301,4 +321,20 @@ func GetREDsByDelToValDstIndexKey(delAddr sdk.AccAddress, valDstAddr sdk.ValAddr
 // GetHistoricalInfoKey gets the key for the historical info
 func GetHistoricalInfoKey(height int64) []byte {
 	return append(HistoricalInfoKey, []byte(strconv.FormatInt(height, 10))...)
+}
+
+//___
+// GetBannedAccKey gets the key for storing banned account blockHeight.
+func GetBannedAccKey(accAddr sdk.AccAddress) []byte {
+	return append(BannedAccKey, accAddr.Bytes()...)
+}
+
+// ParseBannedAccKey parses account address from the BannedAccKey.
+func ParseBannedAccKey(key []byte) (accAddr sdk.AccAddress) {
+	if len(key) != 1+sdk.AddrLen {
+		panic(fmt.Errorf("invalid banned account key length: %v", key))
+	}
+	accAddr = key[1:]
+
+	return
 }

@@ -36,7 +36,7 @@ func (h Hooks) BeforeDelegationCreated(ctx sdk.Context, delAddr sdk.AccAddress, 
 func (h Hooks) BeforeDelegationSharesModified(ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) {
 	val := h.k.stakingKeeper.Validator(ctx, valAddr)
 	del := h.k.stakingKeeper.Delegation(ctx, delAddr, valAddr)
-	if _, err := h.k.withdrawDelegationRewards(ctx, val, del); err != nil {
+	if _, err := h.k.transferDelegationRewardsToRewardsBankPool(ctx, val, del); err != nil {
 		panic(err)
 	}
 }

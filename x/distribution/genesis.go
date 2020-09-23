@@ -37,6 +37,12 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, supplyKeeper types.SupplyKeeper
 	for _, evt := range data.ValidatorSlashEvents {
 		keeper.SetValidatorSlashEvent(ctx, evt.ValidatorAddress, evt.Height, evt.Period, evt.Event)
 	}
+	for _, entry := range data.ValidatorLockedRewards {
+		keeper.SetValidatorLockedRewards(ctx, entry.ValidatorAddress, entry.LockedInfo)
+	}
+	for _, entry := range data.RewardBankPool {
+		keeper.SetDelegatorRewardsBankCoins(ctx, entry.AccAddress, entry.Coins)
+	}
 
 	moduleHoldings = moduleHoldings.Add(data.RewardPools.TotalCoins()...)
 	moduleHoldingsInt, _ := moduleHoldings.TruncateDecimal()
@@ -139,5 +145,27 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 		},
 	)
 
-	return types.NewGenesisState(params, rewardPools, dwi, pp, outstanding, acc, his, cur, dels, slashes)
+	lockedRewards := make([]types.ValidatorLockedRewardsRecord, 0)
+	keeper.IterateValidatorLockedRewards(ctx,
+		func(valAddr sdk.ValAddress, info types.ValidatorLockedRewards) (stop bool) {
+			lockedRewards = append(lockedRewards, types.ValidatorLockedRewardsRecord{
+				ValidatorAddress: valAddr,
+				LockedInfo:       info,
+			})
+			return false
+		},
+	)
+
+	rewardsPool := make([]types.RewardsBankPoolRecord, 0)
+	keeper.IterateDelegatorRewardsBankCoins(ctx,
+		func(accAddr sdk.AccAddress, coins sdk.Coins) (stop bool) {
+			rewardsPool = append(rewardsPool, types.RewardsBankPoolRecord{
+				AccAddress: accAddr,
+				Coins:      coins,
+			})
+			return false
+		},
+	)
+
+	return types.NewGenesisState(params, rewardPools, dwi, pp, outstanding, acc, his, cur, dels, slashes, lockedRewards, rewardsPool)
 }
