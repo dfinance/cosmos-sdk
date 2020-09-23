@@ -30,6 +30,12 @@ func (k Keeper) CheckAnnualParamsAdjust(ctx sdk.Context) bool {
 	return false
 }
 
+// HasAnnualUpdateTimestamp checks if next annual update timestamp is set.
+func (k Keeper) HasAnnualUpdateTimestamp(ctx sdk.Context) bool {
+	store := ctx.KVStore(k.storeKey)
+	return store.Has(types.AnnualUpdateTimestampKey)
+}
+
 // GetAnnualUpdateTimestamp reads current annual update timestamp (if exists).
 func (k Keeper) GetAnnualUpdateTimestamp(ctx sdk.Context) time.Time {
 	store := ctx.KVStore(k.storeKey)
@@ -39,20 +45,28 @@ func (k Keeper) GetAnnualUpdateTimestamp(ctx sdk.Context) time.Time {
 		return time.Time{}
 	}
 
-	t := time.Time{}
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(tBz, &t)
+	t, err := sdk.ParseTimeBytes(tBz)
+	if err != nil {
+		panic(fmt.Errorf("AnnualUpdateTimestamp parse: %w", err))
+	}
 
 	return t
 }
 
+// SetAnnualUpdateTimestamp sets next annual update timestamp.
+func (k Keeper) SetAnnualUpdateTimestamp(ctx sdk.Context, timestamp time.Time) {
+	store := ctx.KVStore(k.storeKey)
+
+	tBz := sdk.FormatTimeBytes(timestamp)
+	store.Set(types.AnnualUpdateTimestampKey, tBz)
+}
+
 // setNextAnnualUpdateTimestamp estimates and stores next annual update timestamp.
 func (k Keeper) setNextAnnualUpdateTimestamp(ctx sdk.Context) {
-	store := ctx.KVStore(k.storeKey)
 	curTs := ctx.BlockTime()
 
 	nextAnnualUpdateTs := curTs.AddDate(1, 0, 0)
-	nextAnnualUpdateBz := k.cdc.MustMarshalBinaryLengthPrefixed(nextAnnualUpdateTs)
-	store.Set(types.AnnualUpdateTimestampKey, nextAnnualUpdateBz)
+	k.SetAnnualUpdateTimestamp(ctx, nextAnnualUpdateTs)
 
 	k.Logger(ctx).Info(fmt.Sprintf("Next annual params update is set to: %v", nextAnnualUpdateTs))
 }

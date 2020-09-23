@@ -46,8 +46,9 @@ var (
 )
 
 type (
-	Keeper       = keeper.Keeper
-	GenesisState = types.GenesisState
-	Minter       = types.Minter
-	Params       = types.Params
+	Keeper         = keeper.Keeper
+	GenesisState   = types.GenesisState
+	Minter         = types.Minter
+	Params         = types.Params
+	BlockDurFilter = types.BlockDurFilter
 )

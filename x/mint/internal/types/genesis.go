@@ -1,24 +1,32 @@
 package types
 
+import "time"
+
 // GenesisState - minter state
 type GenesisState struct {
-	Minter Minter `json:"minter" yaml:"minter"` // minter object
-	Params Params `json:"params" yaml:"params"` // inflation params
+	Minter         Minter         `json:"minter" yaml:"minter"`                     // minter object
+	BlockDurFilter BlockDurFilter `json:"block_dur_filter" yaml:"block_dur_filter"` // block duration estimation filter
+	AnnualUpdateTS time.Time      `json:"annual_update_ts" yaml:"annual_update_ts"` // annual params update timestamp
+	Params         Params         `json:"params" yaml:"params"`                     // inflation params
 }
 
 // NewGenesisState creates a new GenesisState object
-func NewGenesisState(minter Minter, params Params) GenesisState {
+func NewGenesisState(minter Minter, params Params, blockDurFilter BlockDurFilter, annualUpdateTs time.Time) GenesisState {
 	return GenesisState{
-		Minter: minter,
-		Params: params,
+		Minter:         minter,
+		BlockDurFilter: blockDurFilter,
+		AnnualUpdateTS: annualUpdateTs,
+		Params:         params,
 	}
 }
 
 // DefaultGenesisState creates a default GenesisState object
 func DefaultGenesisState() GenesisState {
 	return GenesisState{
-		Minter: DefaultInitialMinter(),
-		Params: DefaultParams(),
+		Minter:         DefaultInitialMinter(),
+		BlockDurFilter: BlockDurFilter{},
+		AnnualUpdateTS: time.Time{},
+		Params:         DefaultParams(),
 	}
 }
 

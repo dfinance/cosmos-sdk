@@ -11,20 +11,20 @@ import (
 func (k Keeper) AdjustAvgBLockDurEstimation(ctx sdk.Context) {
 	params := k.GetParams(ctx)
 
-	filter := k.getBlockDurFilter(ctx)
+	filter := k.GetBlockDurFilter(ctx)
 	if filter == nil {
 		newFilter := types.NewBlockDurFilter(params.AvgBlockTimeWindow)
 		filter = &newFilter
 	}
 
 	filter.Push(ctx.BlockTime(), params.AvgBlockTimeWindow)
-	k.setBlockDurFilter(ctx, *filter)
+	k.SetBlockDurFilter(ctx, *filter)
 }
 
 // GetAvgBlocksPerYear returns blocksPerYear estimation if estimation can be calculated.
 // BlockDurFilter has to be filled up in order to get the estimation.
 func (k Keeper) GetAvgBlocksPerYear(ctx sdk.Context) (uint64, error) {
-	filter := k.getBlockDurFilter(ctx)
+	filter := k.GetBlockDurFilter(ctx)
 	if filter == nil {
 		return 0, fmt.Errorf("filter is not created")
 	}
@@ -34,8 +34,8 @@ func (k Keeper) GetAvgBlocksPerYear(ctx sdk.Context) (uint64, error) {
 	return filter.GetBlocksPerYear(params.AvgBlockTimeWindow)
 }
 
-// getBlockDurFilter gets the BlockDurFilter from the storage if exists.
-func (k Keeper) getBlockDurFilter(ctx sdk.Context) *types.BlockDurFilter {
+// GetBlockDurFilter gets the BlockDurFilter from the storage if exists.
+func (k Keeper) GetBlockDurFilter(ctx sdk.Context) *types.BlockDurFilter {
 	store := ctx.KVStore(k.storeKey)
 	if !store.Has(types.BlockDurFilterKey) {
 		return nil
@@ -48,8 +48,8 @@ func (k Keeper) getBlockDurFilter(ctx sdk.Context) *types.BlockDurFilter {
 	return &filter
 }
 
-// setBlockDurFilter sets the BlockDurFilter to the storage.
-func (k Keeper) setBlockDurFilter(ctx sdk.Context, filter types.BlockDurFilter) {
+// SetBlockDurFilter sets the BlockDurFilter to the storage.
+func (k Keeper) SetBlockDurFilter(ctx sdk.Context, filter types.BlockDurFilter) {
 	store := ctx.KVStore(k.storeKey)
 	bz := k.cdc.MustMarshalBinaryLengthPrefixed(filter)
 	store.Set(types.BlockDurFilterKey, bz)

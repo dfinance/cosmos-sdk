@@ -605,6 +605,27 @@ type DelegationTruncated struct {
 	Shares  sdk.Dec        `json:"shares"`
 }
 
+// Sort sorts state.Delegators.
+// Sort is performed on every store.Set operation to achieve genesis consistency.
+func (s ValidatorStakingState) Sort() {
+	sort.Sort(s)
+}
+
+// Len implements sort interface for state.Delegators.
+func (s ValidatorStakingState) Len() int {
+	return len(s.Delegators)
+}
+
+// Less implements sort interface for state.Delegators.
+func (s ValidatorStakingState) Less(i, j int) bool {
+	return bytes.Compare(s.Delegators[i].Address, s.Delegators[j].Address) == -1
+}
+
+// Swap implements sort interface for state.Delegators.
+func (s ValidatorStakingState) Swap(i, j int) {
+	s.Delegators[i], s.Delegators[j] = s.Delegators[j], s.Delegators[i]
+}
+
 // SetDelegator adds / updates delegation info.
 func (s ValidatorStakingState) SetDelegator(validatorAddr sdk.ValAddress, delegatorAddr sdk.AccAddress, delegatedShares sdk.Dec) ValidatorStakingState {
 	if validatorAddr.Equals(delegatorAddr) {

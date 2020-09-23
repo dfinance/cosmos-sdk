@@ -391,18 +391,18 @@ func (k Keeper) SetRewardPools(ctx sdk.Context, rewardPools types.RewardPools) {
 }
 
 // get validator locked rewards info
-func (k Keeper) GetValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress) (lockedRewards types.ValidatorLockedRewards) {
+func (k Keeper) GetValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress) (info types.ValidatorLockedRewards) {
 	store := ctx.KVStore(k.storeKey)
 	b := store.Get(types.GetValidatorLockedRewardsKey(val))
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &lockedRewards)
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &info)
 
 	return
 }
 
 // set validator locked rewards info
-func (k Keeper) SetValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress, lockedRewards types.ValidatorLockedRewards) {
+func (k Keeper) SetValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress, info types.ValidatorLockedRewards) {
 	store := ctx.KVStore(k.storeKey)
-	b := k.cdc.MustMarshalBinaryLengthPrefixed(lockedRewards)
+	b := k.cdc.MustMarshalBinaryLengthPrefixed(info)
 	store.Set(types.GetValidatorLockedRewardsKey(val), b)
 }
 
@@ -410,6 +410,24 @@ func (k Keeper) SetValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress, l
 func (k Keeper) DeleteValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress) {
 	store := ctx.KVStore(k.storeKey)
 	store.Delete(types.GetValidatorLockedRewardsKey(val))
+}
+
+// iterate over all validators locked rewards info.
+func (k Keeper) IterateValidatorLockedRewards(ctx sdk.Context, handler func(valAddr sdk.ValAddress, info types.ValidatorLockedRewards) (stop bool)) {
+	store := ctx.KVStore(k.storeKey)
+
+	iter := sdk.KVStorePrefixIterator(store, types.ValidatorLockedRewardsPrefix)
+	defer iter.Close()
+
+	for ; iter.Valid(); iter.Next() {
+		var info types.ValidatorLockedRewards
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iter.Value(), &info)
+		valAddr := types.ParseValidatorLockedRewardsKey(iter.Key())
+
+		if handler(valAddr, info) {
+			break
+		}
+	}
 }
 
 // get delegator RewardsBankPool coins.

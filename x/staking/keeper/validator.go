@@ -102,6 +102,7 @@ func (k Keeper) GetValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress) (
 func (k Keeper) SetValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress, state types.ValidatorStakingState) {
 	store := ctx.KVStore(k.storeKey)
 	key := types.GetValidatorStakingStateKey(addr)
+	state.Sort()
 
 	bz := k.cdc.MustMarshalBinaryLengthPrefixed(state)
 	store.Set(key, bz)
@@ -113,6 +114,23 @@ func (k Keeper) DeleteValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress
 	key := types.GetValidatorStakingStateKey(addr)
 
 	store.Delete(key)
+}
+
+// IterateValidatorStakingStates iterates over all validators staking state entries.
+func (k Keeper) IterateValidatorStakingStates(ctx sdk.Context, handler func(valAddr sdk.ValAddress, state types.ValidatorStakingState) (stop bool)) {
+	store := ctx.KVStore(k.storeKey)
+	iterator := sdk.KVStorePrefixIterator(store, types.ValidatorsStakingStateKey)
+	defer iterator.Close()
+
+	for ; iterator.Valid(); iterator.Next() {
+		valAddr := types.ParseValidatorStakingStateKey(iterator.Key())
+		var state types.ValidatorStakingState
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &state)
+
+		if handler(valAddr, state) {
+			break
+		}
+	}
 }
 
 // SetValidatorStakingStateDelegation adds / sets validator staking state delegation info.
@@ -541,6 +559,23 @@ func (k Keeper) DeleteScheduledUnbondQueueValidator(ctx sdk.Context, val types.V
 		k.DeleteScheduledUnbondQueueValidators(ctx, timestamp)
 	} else {
 		k.SetScheduledUnbondQueueValidators(ctx, timestamp, newValAddrs)
+	}
+}
+
+// IterateScheduledUnbondQueue iterates over ScheduledUnbondQueue.
+func (k Keeper) IterateScheduledUnbondQueue(ctx sdk.Context, handler func(timestamp time.Time, valAddrs []sdk.ValAddress) (stop bool)) {
+	store := ctx.KVStore(k.storeKey)
+	iterator := sdk.KVStorePrefixIterator(store, types.ScheduledUnbondQueueKey)
+	defer iterator.Close()
+
+	for ; iterator.Valid(); iterator.Next() {
+		timestamp := types.ParseUnbondingDelegationTimeKey(iterator.Key())
+		var valAddrs []sdk.ValAddress
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &valAddrs)
+
+		if handler(timestamp, valAddrs) {
+			break
+		}
 	}
 }
 

@@ -2675,7 +2675,7 @@ func TestBannedAccounts(t *testing.T) {
 	EndBlocker(ctx, keeper)
 
 	// ban the delegator
-	keeper.BanAccount(ctx, valOpAddr)
+	keeper.BanAccount(ctx, valOpAddr, ctx.BlockHeight())
 
 	// try to delegate
 	{

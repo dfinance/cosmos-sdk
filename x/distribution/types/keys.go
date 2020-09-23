@@ -199,6 +199,11 @@ func GetValidatorLockedRewardsKey(v sdk.ValAddress) []byte {
 	return append(ValidatorLockedRewardsPrefix, v.Bytes()...)
 }
 
+// parses validator address from the ValidatorLockedRewardsKey
+func ParseValidatorLockedRewardsKey(key []byte) (valAddr sdk.ValAddress) {
+	return key[1:]
+}
+
 // gets the key for delegator's RewardsBankPool coins.
 func GetDelegatorRewardsBankCoinsKey(delAddr sdk.AccAddress) []byte {
 	return append(DelegatorRewardsBankCoinsPrefix, delAddr.Bytes()...)
