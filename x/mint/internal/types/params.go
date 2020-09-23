@@ -186,8 +186,8 @@ func validateFoundationAllocationRatio(i interface{}) error {
 		return fmt.Errorf("%s: cannot be nagative: %s", paramName, v)
 	}
 
-	if v.GT(sdk.NewDec(FoundationAllocationRatioMaxValue)) {
-		return fmt.Errorf("%s: cannot be greater than %d: %s", paramName, FoundationAllocationRatioMaxValue, v)
+	if v.GT(FoundationAllocationRatioMaxValue) {
+		return fmt.Errorf("%s: cannot be greater than %s: %s", paramName, FoundationAllocationRatioMaxValue, v)
 	}
 
 	return nil

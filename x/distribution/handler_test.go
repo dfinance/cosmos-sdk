@@ -81,7 +81,7 @@ func TestHandleMsgSetFoundationAllocationRatio(t *testing.T) {
 
 	p := mintKeeper.GetParams(ctx)
 	p.AvgBlockTimeWindow = 2
-	stdRatio := sdk.NewDec(5)
+	stdRatio := mint.FoundationAllocationRatioMaxValue
 	p.FoundationAllocationRatio = stdRatio
 	mintKeeper.SetParams(ctx, p)
 
@@ -124,7 +124,7 @@ func TestHandleMsgSetFoundationAllocationRatio(t *testing.T) {
 					require.Contains(t, r, "cannot be greater")
 				}
 			}()
-			ratio := sdk.NewDec(mint.FoundationAllocationRatioMaxValue + 1)
+			ratio := mint.FoundationAllocationRatioMaxValue.Add(sdk.NewDecWithPrec(1, 2))
 			msg := types.NewMsgSetFoundationAllocationRatio(nominee, ratio)
 			_, err := handleMsgSetFoundationAllocationRatio(ctx, msg, keeper, mintKeeper)
 			require.Error(t, err)
@@ -146,12 +146,45 @@ func TestHandleMsgSetFoundationAllocationRatio(t *testing.T) {
 		}()
 	}
 
+	// check ChangeFoundationAllocationRatioTTL
+	{
+		abpy, err := mintKeeper.GetAvgBlocksPerYear(ctx)
+		require.NoError(t, err)
+
+		targetBlockHeight := int64(abpy * ChangeFoundationAllocationRatioTTL)
+
+		// block limit - 1 block
+		{
+			ctx := ctx.WithBlockHeight(targetBlockHeight - 1)
+			msg := types.NewMsgSetFoundationAllocationRatio(nominee, stdRatio)
+			_, err = handleMsgSetFoundationAllocationRatio(ctx, msg, keeper, mintKeeper)
+			require.NoError(t, err)
+		}
+
+		// block limit == block height
+		{
+			ctx := ctx.WithBlockHeight(targetBlockHeight)
+			msg := types.NewMsgSetFoundationAllocationRatio(nominee, stdRatio)
+			_, err = handleMsgSetFoundationAllocationRatio(ctx, msg, keeper, mintKeeper)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "is not allowed to change after")
+		}
+
+		// block limit > block height
+		{
+			ctx := ctx.WithBlockHeight(targetBlockHeight + 1)
+			msg := types.NewMsgSetFoundationAllocationRatio(nominee, stdRatio)
+			_, err = handleMsgSetFoundationAllocationRatio(ctx, msg, keeper, mintKeeper)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "is not allowed to change after")
+		}
+	}
+
 	// check ok
 	{
-		ratio := stdRatio.Add(sdk.NewDec(1))
-		msg := types.NewMsgSetFoundationAllocationRatio(nominee, ratio)
+		msg := types.NewMsgSetFoundationAllocationRatio(nominee, stdRatio)
 		_, err := handleMsgSetFoundationAllocationRatio(ctx, msg, keeper, mintKeeper)
 		require.NoError(t, err)
-		require.Equal(t, ratio, mintKeeper.GetParams(ctx).FoundationAllocationRatio)
+		require.Equal(t, stdRatio, mintKeeper.GetParams(ctx).FoundationAllocationRatio)
 	}
 }

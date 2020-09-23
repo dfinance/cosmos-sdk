@@ -1,5 +1,7 @@
 package types
 
+import sdk "github.com/cosmos/cosmos-sdk/types"
+
 var (
 	// MinterKey is used for the keeper store
 	MinterKey = []byte{0x00}
@@ -7,6 +9,8 @@ var (
 	BlockDurFilterKey = []byte("BlockDurFilter")
 	// AnnualUpdateTimestampKey is used to store timestamp of the next annual params update (new year)
 	AnnualUpdateTimestampKey = []byte("AnnualUpdateTimestamp")
+	// FoundationAllocationRatioMaxValue is used to validate max value of the FoundationAllocationRatio
+	FoundationAllocationRatioMaxValue = sdk.NewDecWithPrec(45, 2)
 )
 
 // nolint
@@ -29,7 +33,4 @@ const (
 	QueryAnnualProvisions       = "annual_provisions"
 	QueryBlocksPerYear          = "blocks_per_year"
 	QueryNextAnnualParamsUpdate = "next_annual_params_update"
-
-	// Foundation limits
-	FoundationAllocationRatioMaxValue = 45
 )

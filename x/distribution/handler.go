@@ -168,7 +168,7 @@ func handleMsgSetFoundationAllocationRatio(
 	}
 
 	if !hasPermission {
-		return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "operation is allowed just for foundation nominee")
+		return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "operation is allowed only for foundation nominee")
 	}
 
 	abpy, err := mk.GetAvgBlocksPerYear(ctx)
@@ -176,9 +176,9 @@ func handleMsgSetFoundationAllocationRatio(
 		return nil, err
 	}
 
-	chainAge := float64(ctx.BlockHeight()) / float64(abpy)
+	chainAge := sdk.NewInt(ctx.BlockHeight()).QuoRaw(int64(abpy))
 
-	if chainAge > ChangeFoundationAllocationRatioTTL {
+	if chainAge.GTE(sdk.NewInt(ChangeFoundationAllocationRatioTTL)) {
 		return nil, sdkerrors.Wrapf(ErrExceededTimeLimit, "is not allowed to change after %d year", ChangeFoundationAllocationRatioTTL)
 	}
 
@@ -186,12 +186,5 @@ func handleMsgSetFoundationAllocationRatio(
 	params.FoundationAllocationRatio = msg.Ratio
 	mk.SetParams(ctx, params)
 
-	ctx.EventManager().EmitEvent(
-		sdk.NewEvent(
-			sdk.EventTypeMessage,
-			sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
-		),
-	)
-
-	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
+	return nil, nil
 }
