@@ -20,4 +20,6 @@ var (
 	ErrNoDelegationExists             = sdkerrors.Register(ModuleName, 12, "delegation does not exist")
 	ErrWrongFoundationAllocationRatio = sdkerrors.Register(ModuleName, 13, "foundation allocation ratio is wrong")
 	ErrExceededTimeLimit              = sdkerrors.Register(ModuleName, 14, "exceeded time limit")
+	ErrWithdrawLocked                 = sdkerrors.Register(ModuleName, 15, "rewards withdraw is locked")
+	ErrInvalidLockOperation           = sdkerrors.Register(ModuleName, 16, "invalid rewards lock operation")
 )

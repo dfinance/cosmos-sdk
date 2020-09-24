@@ -3,6 +3,7 @@ package simulation
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	tmkv "github.com/tendermint/tendermint/libs/kv"
 
@@ -70,6 +71,15 @@ func DecodeStore(cdc *codec.Codec, kvA, kvB tmkv.Pair) string {
 		delAddrA = types.GetDelegatorRewardsBankCoinsAddress(kvA.Key)
 		delAddrB = types.GetDelegatorRewardsBankCoinsAddress(kvB.Key)
 		return fmt.Sprintf("%s: %v\n%s: %v", delAddrA, coinsA, delAddrB, coinsB)
+
+	case bytes.Equal(kvA.Key[:1], types.RewardsUnlockQueueKey):
+		var tsA, tsB time.Time
+		var valAddrsA, valAddrsB []sdk.ValAddress
+		tsA = types.ParseRewardsUnlockQueueTimeKey(kvA.Key)
+		tsB = types.ParseRewardsUnlockQueueTimeKey(kvB.Key)
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvA.Value, &valAddrsA)
+		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &valAddrsB)
+		return fmt.Sprintf("%v: %v\n%v: %v", tsA, valAddrsA, tsB, valAddrsB)
 
 	default:
 		panic(fmt.Sprintf("invalid distribution key prefix %X", kvA.Key[:1]))

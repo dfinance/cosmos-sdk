@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -12,6 +13,8 @@ import (
 const (
 	// default paramspace for params keeper
 	DefaultParamspace = ModuleName
+	//
+	AvgYearDur = time.Duration(60*60*8766) * time.Second // 365.25 days
 )
 
 // Parameter keys
@@ -25,6 +28,8 @@ var (
 	//
 	ParamKeyBaseProposerReward  = []byte("BaseProposerReward")
 	ParamKeyBonusProposerReward = []byte("BonusProposerReward")
+	ParamKeyLockedRatio         = []byte("LockedRatio")
+	ParamKeyLockedDuration      = []byte("LockedDuration")
 	//
 	ParamKeyWithdrawAddrEnabled = []byte("WithdrawAddrEnabled")
 	ParamKeyFoundationNominees  = []byte("FoundationNominees")
@@ -48,6 +53,10 @@ type Params struct {
 	BaseProposerReward sdk.Dec `json:"base_proposer_reward" yaml:"base_proposer_reward"`
 	// Block proposer bonus reward ratio
 	BonusProposerReward sdk.Dec `json:"bonus_proposer_reward" yaml:"bonus_proposer_reward"`
+	// Validator distribution power calculation coefficient
+	LockedRatio sdk.Dec `json:"locked_ratio" yaml:"locked_ratio"`
+	// Rewards lock duration
+	LockedDuration time.Duration `json:"locked_dur" yaml:"locked_dur"`
 
 	//
 	WithdrawAddrEnabled bool             `json:"withdraw_addr_enabled" yaml:"withdraw_addr_enabled"`
@@ -71,6 +80,8 @@ func DefaultParams() Params {
 		//
 		BaseProposerReward:  sdk.NewDecWithPrec(1, 2), // 1%
 		BonusProposerReward: sdk.NewDecWithPrec(4, 2), // 4%
+		LockedRatio:         sdk.NewDecWithPrec(5, 1), // 0.5
+		LockedDuration:      AvgYearDur,
 		//
 		WithdrawAddrEnabled: true,
 		FoundationNominees:  make([]sdk.AccAddress, 0),
@@ -92,6 +103,8 @@ func (p *Params) ParamSetPairs() params.ParamSetPairs {
 		params.NewParamSetPair(ParamKeyPublicTreasuryPoolCapacity, &p.PublicTreasuryPoolCapacity, validatePublicTreasuryPoolCapacity),
 		params.NewParamSetPair(ParamKeyBaseProposerReward, &p.BaseProposerReward, validateBaseProposerReward),
 		params.NewParamSetPair(ParamKeyBonusProposerReward, &p.BonusProposerReward, validateBonusProposerReward),
+		params.NewParamSetPair(ParamKeyLockedRatio, &p.LockedRatio, validateLockedRatio),
+		params.NewParamSetPair(ParamKeyLockedDuration, &p.LockedDuration, validateLockedDuration),
 		params.NewParamSetPair(ParamKeyWithdrawAddrEnabled, &p.WithdrawAddrEnabled, validateWithdrawAddrEnabled),
 		params.NewParamSetPair(ParamKeyFoundationNominees, &p.FoundationNominees, validateFoundationNominees),
 	}
@@ -118,6 +131,12 @@ func (p Params) ValidateBasic() error {
 		return err
 	}
 	if err := validateBonusProposerReward(p.BonusProposerReward); err != nil {
+		return err
+	}
+	if err := validateLockedRatio(p.LockedRatio); err != nil {
+		return err
+	}
+	if err := validateLockedDuration(p.LockedDuration); err != nil {
 		return err
 	}
 	if err := validateWithdrawAddrEnabled(p.WithdrawAddrEnabled); err != nil {
@@ -179,6 +198,36 @@ func validateBaseProposerReward(i interface{}) error {
 
 func validateBonusProposerReward(i interface{}) error {
 	return CheckRatioVariable("bonus proposer reward", i)
+}
+
+func validateLockedRatio(i interface{}) error {
+	const paramName = "locked ratio"
+
+	v, ok := i.(sdk.Dec)
+	if !ok {
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	if v.IsNegative() {
+		return fmt.Errorf("%s: cannot be nagative: %s", paramName, v)
+	}
+
+	return nil
+}
+
+func validateLockedDuration(i interface{}) error {
+	const paramName = "locked duration"
+
+	v, ok := i.(time.Duration)
+	if !ok {
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	if v <= 0 {
+		return fmt.Errorf("%s: cannot be LTE 0: %s", paramName, v)
+	}
+
+	return nil
 }
 
 func validateWithdrawAddrEnabled(i interface{}) error {

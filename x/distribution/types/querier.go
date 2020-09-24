@@ -13,6 +13,7 @@ const (
 	QueryDelegatorValidators         = "delegator_validators"
 	QueryWithdrawAddr                = "withdraw_addr"
 	QueryPool                        = "pool"
+	QueryLockedRewardsState          = "locked_rewards_state"
 )
 
 // params for query 'custom/distr/validator_outstanding_rewards'
@@ -89,4 +90,14 @@ type QueryDelegatorWithdrawAddrParams struct {
 // NewQueryDelegatorWithdrawAddrParams creates a new instance of QueryDelegatorWithdrawAddrParams.
 func NewQueryDelegatorWithdrawAddrParams(delegatorAddr sdk.AccAddress) QueryDelegatorWithdrawAddrParams {
 	return QueryDelegatorWithdrawAddrParams{DelegatorAddress: delegatorAddr}
+}
+
+// params for query 'custom/distr/locked_rewards_state'
+type QueryLockedRewardsStateParams struct {
+	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address"`
+}
+
+// NewQueryLockedRewardsStateParams creates a new instance of QueryLockedRewardsStateParams.
+func NewQueryLockedRewardsStateParams(validatorAddress sdk.ValAddress) QueryLockedRewardsStateParams {
+	return QueryLockedRewardsStateParams{ValidatorAddress: validatorAddress}
 }

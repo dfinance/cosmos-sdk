@@ -2,24 +2,121 @@ package keeper
 
 import (
 	"fmt"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 	"github.com/cosmos/cosmos-sdk/x/staking/exported"
 )
 
 // GetDistributionPower calculates distribution power based on validator stakingPower and lockedRewards ratio.
 func (k Keeper) GetDistributionPower(ctx sdk.Context, valAddr sdk.ValAddress, stakingPower int64) int64 {
-	lockedRewards := k.GetValidatorLockedRewards(ctx, valAddr)
-	if lockedRewards.LockedRatio.IsZero() {
-		return stakingPower
+	lockedState := k.MustGetValidatorLockedState(ctx, valAddr)
+
+	return lockedState.GetDistributionPower(stakingPower)
+}
+
+// LockValidatorRewards locks validator rewards.
+func (k Keeper) LockValidatorRewards(ctx sdk.Context, valAddr sdk.ValAddress) (time.Time, error) {
+	// get state
+	lockedState, found := k.GetValidatorLockedState(ctx, valAddr)
+	if !found {
+		return time.Time{}, types.ErrNoValidatorExists
 	}
 
-	lockedPower := sdk.NewDec(stakingPower).Mul(lockedRewards.LockedRatio)
-	distrPower := stakingPower + lockedPower.TruncateInt64()
+	// input checks
+	if lockedState.IsLocked() {
+		return time.Time{}, sdkerrors.Wrapf(types.ErrInvalidLockOperation, "already locked")
+	}
 
-	return distrPower
+	params := k.GetParams(ctx)
+	if params.LockedRatio.IsZero() {
+		return time.Time{}, sdkerrors.Wrapf(types.ErrInvalidLockOperation, "locked ratio is zero")
+	}
+
+	// update state
+	lockedState = lockedState.Lock(params.LockedRatio, params.LockedDuration, ctx.BlockTime(), ctx.BlockHeight())
+	k.SetValidatorLockedState(ctx, valAddr, lockedState)
+
+	// add to rewards unlock queue
+	k.InsertRewardsUnlockQueueValidator(ctx, valAddr, lockedState)
+
+	return lockedState.UnlocksAt, nil
+}
+
+// UnlockValidatorRewards unlocks validator rewards unless auto-renewal is on.
+func (k Keeper) UnlockValidatorRewards(ctx sdk.Context, valAddr sdk.ValAddress) (eventLockStatus string) {
+	lockedState := k.MustGetValidatorLockedState(ctx, valAddr)
+
+	// sanity check
+	if !lockedState.IsLocked() {
+		panic(fmt.Errorf("processing rewards unlock for validator %s: not locked", valAddr))
+	}
+
+	// update state
+	if lockedState.AutoRenewal {
+		params := k.GetParams(ctx)
+		lockedState = lockedState.RenewLock(params.LockedRatio, params.LockedDuration, ctx.BlockTime())
+		k.InsertRewardsUnlockQueueValidator(ctx, valAddr, lockedState)
+		eventLockStatus = types.LockedRewardsStateRenewed
+	} else {
+		lockedState = lockedState.Unlock()
+		eventLockStatus = types.LockedRewardsStateUnlocked
+	}
+	k.SetValidatorLockedState(ctx, valAddr, lockedState)
+
+	return
+}
+
+// DisableLockedRewardsAutoRenewal disables auto-renewal for locked validator rewards.
+func (k Keeper) DisableLockedRewardsAutoRenewal(ctx sdk.Context, valAddr sdk.ValAddress) error {
+	// get state
+	lockedState, found := k.GetValidatorLockedState(ctx, valAddr)
+	if !found {
+		return types.ErrNoValidatorExists
+	}
+
+	// check
+	if !lockedState.IsLocked() {
+		return sdkerrors.Wrapf(types.ErrInvalidLockOperation, "rewards are not locked")
+	}
+	if !lockedState.AutoRenewal {
+		return sdkerrors.Wrapf(types.ErrInvalidLockOperation, "auto-renew has already been disabled")
+	}
+
+	// update state
+	lockedState = lockedState.DisableAutoRenewal()
+	k.SetValidatorLockedState(ctx, valAddr, lockedState)
+
+	return nil
+}
+
+// ProcessAllMatureRewardsUnlockQueueItems iterates over mature rewards unlock queue items and removes rewards lock.
+func (k Keeper) ProcessAllMatureRewardsUnlockQueueItems(ctx sdk.Context) {
+	store := ctx.KVStore(k.storeKey)
+	iterator := k.GetRewardsUnlockQueueIterator(ctx, ctx.BlockHeader().Time)
+	defer iterator.Close()
+
+	for ; iterator.Valid(); iterator.Next() {
+		valsAddrs := []sdk.ValAddress{}
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &valsAddrs)
+
+		for _, valAddr := range valsAddrs {
+			eventLockStatus := k.UnlockValidatorRewards(ctx, valAddr)
+
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					sdk.EventTypeMessage,
+					sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
+					sdk.NewAttribute(sdk.AttributeKeySender, valAddr.String()),
+					sdk.NewAttribute(types.AttributeKeyLockedRewardsState, eventLockStatus),
+				),
+			)
+		}
+
+		store.Delete(iterator.Key())
+	}
 }
 
 // initializeValidator initializes rewards for a new validator.
@@ -37,7 +134,7 @@ func (k Keeper) initializeValidator(ctx sdk.Context, val exported.ValidatorI) {
 	k.SetValidatorOutstandingRewards(ctx, val.GetOperator(), sdk.DecCoins{})
 
 	// set empty locked rewards info
-	k.SetValidatorLockedRewards(ctx, val.GetOperator(), types.NewValidatorLockedRewards(sdk.ZeroDec()))
+	k.SetValidatorLockedState(ctx, val.GetOperator(), types.NewValidatorLockedRewards())
 }
 
 // incrementValidatorPeriod increments validator period, returning the period just ended.
@@ -176,5 +273,5 @@ func (k Keeper) removeValidator(ctx sdk.Context, valAddr sdk.ValAddress) {
 	k.DeleteValidatorCurrentRewards(ctx, valAddr)
 
 	// clear locked rewards info
-	k.DeleteValidatorLockedRewards(ctx, valAddr)
+	k.DeleteValidatorLockedState(ctx, valAddr)
 }

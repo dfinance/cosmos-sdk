@@ -2,6 +2,8 @@ package types
 
 import (
 	"encoding/binary"
+	"fmt"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -54,8 +56,9 @@ var (
 	ValidatorCurrentRewardsPrefix        = []byte{0x06} // key for current validator rewards
 	ValidatorAccumulatedCommissionPrefix = []byte{0x07} // key for accumulated validator commission
 	ValidatorSlashEventPrefix            = []byte{0x08} // key for validator slash fraction
-	ValidatorLockedRewardsPrefix         = []byte{0x09} // key for validator locked rewards info
+	ValidatorLockedRewardsStatePrefix    = []byte{0x09} // key for validator locked rewards state
 	DelegatorRewardsBankCoinsPrefix      = []byte{0x0A} // key for delegator RewardsBankPool coins
+	RewardsUnlockQueueKey                = []byte{0x0B} // prefix for the rewards unlock queue
 )
 
 // gets an address from a validator's outstanding rewards key
@@ -197,13 +200,13 @@ func GetValidatorSlashEventKey(v sdk.ValAddress, height, period uint64) []byte {
 	return append(prefix, periodBz...)
 }
 
-// gets the key for a validator's locked rewards info
-func GetValidatorLockedRewardsKey(v sdk.ValAddress) []byte {
-	return append(ValidatorLockedRewardsPrefix, v.Bytes()...)
+// gets the key for a validator's locked rewards state
+func GetValidatorLockedRewardsStateKey(v sdk.ValAddress) []byte {
+	return append(ValidatorLockedRewardsStatePrefix, v.Bytes()...)
 }
 
-// parses validator address from the ValidatorLockedRewardsKey
-func ParseValidatorLockedRewardsKey(key []byte) (valAddr sdk.ValAddress) {
+// parses validator address from the ValidatorLockedRewardsStateKey
+func ParseValidatorLockedRewardsStateKey(key []byte) (valAddr sdk.ValAddress) {
 	return key[1:]
 }
 
@@ -220,4 +223,21 @@ func GetDelegatorRewardsBankCoinsAddress(key []byte) (delAddr sdk.AccAddress) {
 	}
 
 	return sdk.AccAddress(addr)
+}
+
+// gets the prefix for all scheduled reward unlocks
+func GetRewardsUnlockQueueTimeKey(timestamp time.Time) []byte {
+	bz := sdk.FormatTimeBytes(timestamp)
+	return append(RewardsUnlockQueueKey, bz...)
+}
+
+// ParseRewardsUnlockQueueTimeKey parses timestamp from RewardsUnlockQueueTimeKey
+func ParseRewardsUnlockQueueTimeKey(key []byte) (timestamp time.Time) {
+	bz := key[1:]
+	ts, err := sdk.ParseTimeBytes(bz)
+	if err != nil {
+		panic(fmt.Errorf("parsing RewardsUnlockQueueTimeKey %v: %w", key, err))
+	}
+
+	return ts
 }

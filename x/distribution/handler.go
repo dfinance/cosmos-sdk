@@ -34,6 +34,12 @@ func NewHandler(k keeper.Keeper, mk mint.Keeper) sdk.Handler {
 		case types.MsgSetFoundationAllocationRatio:
 			return handleMsgSetFoundationAllocationRatio(ctx, msg, k, mk)
 
+		case types.MsgLockValidatorRewards:
+			return handleMsgLockValidatorRewards(ctx, msg, k)
+
+		case types.MsgDisableLockedRewardsAutoRenewal:
+			return handleMsgDisableLockedRewardsAutoRenewal(ctx, msg, k)
+
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distribution message type: %T", msg)
 		}
@@ -139,18 +145,24 @@ func handleMsgWithdrawFoundationPool(ctx sdk.Context, msg types.MsgWithdrawFound
 	return nil, nil
 }
 
-func NewProposalHandler(k Keeper) govtypes.Handler {
-	return func(ctx sdk.Context, content govtypes.Content) error {
-		switch c := content.(type) {
-		case types.PublicTreasuryPoolSpendProposal:
-			return keeper.HandlePublicTreasuryPoolSpendProposal(ctx, k, c)
-		case types.TaxParamsUpdateProposal:
-			return keeper.HandleTaxParamsUpdateProposal(ctx, k, c)
-
-		default:
-			return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distr proposal content type: %T", c)
-		}
+func handleMsgLockValidatorRewards(ctx sdk.Context, msg types.MsgLockValidatorRewards, k keeper.Keeper) (*sdk.Result, error) {
+	unlocksAt, err := k.LockValidatorRewards(ctx, msg.ValidatorAddress)
+	if err != nil {
+		return nil, err
 	}
+
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			sdk.EventTypeMessage,
+			sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
+			sdk.NewAttribute(sdk.AttributeKeySender, msg.ValidatorAddress.String()),
+			sdk.NewAttribute(types.AttributeKeyLockedRewardsState, types.LockedRewardsStateLocked),
+		),
+	)
+
+	k.Logger(ctx).Info(fmt.Sprintf("Validator %s rewards were locked: unlocksAt: %v", msg.ValidatorAddress, unlocksAt))
+
+	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
 }
 
 func handleMsgSetFoundationAllocationRatio(
@@ -187,4 +199,37 @@ func handleMsgSetFoundationAllocationRatio(
 	mk.SetParams(ctx, params)
 
 	return &sdk.Result{}, nil
+}
+
+func handleMsgDisableLockedRewardsAutoRenewal(ctx sdk.Context, msg types.MsgDisableLockedRewardsAutoRenewal, k keeper.Keeper) (*sdk.Result, error) {
+	if err := k.DisableLockedRewardsAutoRenewal(ctx, msg.ValidatorAddress); err != nil {
+		return nil, err
+	}
+
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			sdk.EventTypeMessage,
+			sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
+			sdk.NewAttribute(sdk.AttributeKeySender, msg.ValidatorAddress.String()),
+			sdk.NewAttribute(types.AttributeKeyLockedRewardsState, types.LockedRewardsStateAutoRenewDisabled),
+		),
+	)
+
+	k.Logger(ctx).Info(fmt.Sprintf("Validator %s rewards lock auto-renewal disabled", msg.ValidatorAddress))
+
+	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
+}
+
+func NewProposalHandler(k Keeper) govtypes.Handler {
+	return func(ctx sdk.Context, content govtypes.Content) error {
+		switch c := content.(type) {
+		case types.PublicTreasuryPoolSpendProposal:
+			return keeper.HandlePublicTreasuryPoolSpendProposal(ctx, k, c)
+		case types.TaxParamsUpdateProposal:
+			return keeper.HandleTaxParamsUpdateProposal(ctx, k, c)
+
+		default:
+			return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distr proposal content type: %T", c)
+		}
+	}
 }

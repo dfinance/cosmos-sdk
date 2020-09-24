@@ -47,6 +47,8 @@ func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
 		GetCmdWithdrawRewards(cdc),
 		GetCmdSetWithdrawAddr(cdc),
 		GetCmdWithdrawAllRewards(cdc, storeKey),
+		GetCmdLockValidatorRewards(cdc),
+		GetCmdDisableValidatorLockedRewardsAutoRenewal(cdc),
 		GetCmdFundPublicTreasuryPool(cdc),
 		GetCmdFoundationPoolWithdraw(cdc),
 		GetChangeFoundationAllocationRatioTxCmd(cdc),
@@ -278,6 +280,73 @@ $ %s tx distribution foundation-pool-withdraw 100uatom [LiquidityProvidersPool|P
 			}
 
 			msg := types.NewMsgWithdrawFoundationPool(nomineeAddr, recipientAddr, recipientPoolName, amount)
+			if err := msg.ValidateBasic(); err != nil {
+				return err
+			}
+
+			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+		},
+	}
+
+	return cmd
+}
+
+// GetCmdLockValidatorRewards implements the command to lock validators rewards.
+func GetCmdLockValidatorRewards(cdc *codec.Codec) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "lock-rewards",
+		Short: "Lock delegators rewards withdraw",
+		Long: strings.TrimSpace(
+			fmt.Sprintf(`Lock delegators rewards withdraw for params defined period of time.
+Lock increases validator's' rewards distribution power.
+Tx target validator is defined by the '--from' argument (only the operator can emit this operation).
+Lock is auto-renewed by default.
+
+Example:
+$ %s tx distribution lock-rewards --from=<key_or_address>
+`, version.ClientName,
+			),
+		),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := auth.NewTxBuilderFromCLI(inBuf).WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := context.NewCLIContextWithInput(inBuf).WithCodec(cdc)
+
+			from := cliCtx.GetFromAddress()
+
+			msg := types.NewMsgLockValidatorRewards(from, sdk.ValAddress(from))
+			if err := msg.ValidateBasic(); err != nil {
+				return err
+			}
+
+			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+		},
+	}
+
+	return cmd
+}
+
+// GetCmdDisableValidatorLockedRewardsAutoRenewal implements the command to disable validators locked rewards auto-renewal.
+func GetCmdDisableValidatorLockedRewardsAutoRenewal(cdc *codec.Codec) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "disable-auto-renewal",
+		Short: "Disable validator's locked rewards auto-renewal",
+		Long: strings.TrimSpace(
+			fmt.Sprintf(`Disable validator's locked rewards auto-renewal.
+
+Example:
+$ %s tx distribution disable-auto-renewal --from=<key_or_address>
+`, version.ClientName,
+			),
+		),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := auth.NewTxBuilderFromCLI(inBuf).WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := context.NewCLIContextWithInput(inBuf).WithCodec(cdc)
+
+			from := cliCtx.GetFromAddress()
+
+			msg := types.NewMsgDisableLockedRewardsAutoRenewal(from, sdk.ValAddress(from))
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}

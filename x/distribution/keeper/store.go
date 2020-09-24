@@ -1,6 +1,9 @@
 package keeper
 
 import (
+	"fmt"
+	"time"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 )
@@ -390,39 +393,55 @@ func (k Keeper) SetRewardPools(ctx sdk.Context, rewardPools types.RewardPools) {
 	store.Set(types.RewardPoolsKey, b)
 }
 
-// get validator locked rewards info
-func (k Keeper) GetValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress) (info types.ValidatorLockedRewards) {
+// get validator locked rewards state
+func (k Keeper) MustGetValidatorLockedState(ctx sdk.Context, val sdk.ValAddress) (state types.ValidatorLockedRewardsState) {
+	state, found := k.GetValidatorLockedState(ctx, val)
+	if !found {
+		panic(fmt.Errorf("locked rewards state for validator %s: not found", val))
+	}
+
+	return state
+}
+
+// get validator locked rewards state
+func (k Keeper) GetValidatorLockedState(ctx sdk.Context, val sdk.ValAddress) (state types.ValidatorLockedRewardsState, found bool) {
 	store := ctx.KVStore(k.storeKey)
-	b := store.Get(types.GetValidatorLockedRewardsKey(val))
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &info)
+	b := store.Get(types.GetValidatorLockedRewardsStateKey(val))
+	if b == nil {
+		found = false
+		return
+	}
+
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &state)
+	found = true
 
 	return
 }
 
-// set validator locked rewards info
-func (k Keeper) SetValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress, info types.ValidatorLockedRewards) {
+// set validator locked rewards state
+func (k Keeper) SetValidatorLockedState(ctx sdk.Context, val sdk.ValAddress, state types.ValidatorLockedRewardsState) {
 	store := ctx.KVStore(k.storeKey)
-	b := k.cdc.MustMarshalBinaryLengthPrefixed(info)
-	store.Set(types.GetValidatorLockedRewardsKey(val), b)
+	b := k.cdc.MustMarshalBinaryLengthPrefixed(state)
+	store.Set(types.GetValidatorLockedRewardsStateKey(val), b)
 }
 
-// delete validator locked rewards info
-func (k Keeper) DeleteValidatorLockedRewards(ctx sdk.Context, val sdk.ValAddress) {
+// delete validator locked rewards state
+func (k Keeper) DeleteValidatorLockedState(ctx sdk.Context, val sdk.ValAddress) {
 	store := ctx.KVStore(k.storeKey)
-	store.Delete(types.GetValidatorLockedRewardsKey(val))
+	store.Delete(types.GetValidatorLockedRewardsStateKey(val))
 }
 
 // iterate over all validators locked rewards info.
-func (k Keeper) IterateValidatorLockedRewards(ctx sdk.Context, handler func(valAddr sdk.ValAddress, info types.ValidatorLockedRewards) (stop bool)) {
+func (k Keeper) IterateValidatorLockedRewards(ctx sdk.Context, handler func(valAddr sdk.ValAddress, info types.ValidatorLockedRewardsState) (stop bool)) {
 	store := ctx.KVStore(k.storeKey)
 
-	iter := sdk.KVStorePrefixIterator(store, types.ValidatorLockedRewardsPrefix)
+	iter := sdk.KVStorePrefixIterator(store, types.ValidatorLockedRewardsStatePrefix)
 	defer iter.Close()
 
 	for ; iter.Valid(); iter.Next() {
-		var info types.ValidatorLockedRewards
+		var info types.ValidatorLockedRewardsState
 		k.cdc.MustUnmarshalBinaryLengthPrefixed(iter.Value(), &info)
-		valAddr := types.ParseValidatorLockedRewardsKey(iter.Key())
+		valAddr := types.ParseValidatorLockedRewardsStateKey(iter.Key())
 
 		if handler(valAddr, info) {
 			break
@@ -478,4 +497,72 @@ func (k Keeper) IterateDelegatorRewardsBankCoins(ctx sdk.Context, handler func(d
 			break
 		}
 	}
+}
+
+// GetRewardsUnlockQueueValidators gets validator addresses for specific timestamp of rewards unlock queue.
+func (k Keeper) GetRewardsUnlockQueueValidators(ctx sdk.Context, timestamp time.Time) (valAddrs []sdk.ValAddress) {
+	store := ctx.KVStore(k.storeKey)
+	bz := store.Get(types.GetRewardsUnlockQueueTimeKey(timestamp))
+	if bz == nil {
+		return []sdk.ValAddress{}
+	}
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(bz, &valAddrs)
+
+	return valAddrs
+}
+
+// SetRewardsUnlockQueueValidators sets validator addresses for specific timestamp of rewards unlock queue.
+func (k Keeper) SetRewardsUnlockQueueValidators(ctx sdk.Context, timestamp time.Time, valAddrs []sdk.ValAddress) {
+	store := ctx.KVStore(k.storeKey)
+	bz := k.cdc.MustMarshalBinaryLengthPrefixed(valAddrs)
+	store.Set(types.GetRewardsUnlockQueueTimeKey(timestamp), bz)
+}
+
+// InsertRewardsUnlockQueueValidator inserts a validator address for an appropriate timestamp of rewards unlock queue.
+func (k Keeper) InsertRewardsUnlockQueueValidator(ctx sdk.Context, valAddr sdk.ValAddress, lockedState types.ValidatorLockedRewardsState) {
+	timestamp := lockedState.UnlocksAt
+
+	valAddrs := k.GetRewardsUnlockQueueValidators(ctx, timestamp)
+	valAddrs = append(valAddrs, valAddr)
+
+	k.SetRewardsUnlockQueueValidators(ctx, timestamp, valAddrs)
+}
+
+// IterateRewardsUnlockQueue iterates over all rewards unlock queue items.
+func (k Keeper) IterateRewardsUnlockQueue(ctx sdk.Context, handler func(timestamp time.Time, valAddrs []sdk.ValAddress) (stop bool)) {
+	store := ctx.KVStore(k.storeKey)
+	iterator := sdk.KVStorePrefixIterator(store, types.RewardsUnlockQueueKey)
+	defer iterator.Close()
+
+	for ; iterator.Valid(); iterator.Next() {
+		timestamp := types.ParseRewardsUnlockQueueTimeKey(iterator.Key())
+		var valAddrs []sdk.ValAddress
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &valAddrs)
+
+		if handler(timestamp, valAddrs) {
+			break
+		}
+	}
+}
+
+// GetRewardsUnlockQueueIterator returns iterator for all rewards unlock queue items from time 0 until endTime.
+func (k Keeper) GetRewardsUnlockQueueIterator(ctx sdk.Context, endTime time.Time) sdk.Iterator {
+	store := ctx.KVStore(k.storeKey)
+	endKey := types.GetRewardsUnlockQueueTimeKey(endTime)
+
+	return store.Iterator(types.RewardsUnlockQueueKey, sdk.InclusiveEndBytes(endKey))
+}
+
+// GetAllRewardsUnlockQueueMatureValidators returns all rewards unlock queue validator addresses from time 0 until endTime.
+func (k Keeper) GetAllRewardsUnlockQueueMatureValidators(ctx sdk.Context, endTime time.Time) (valsAddrs []sdk.ValAddress) {
+	iterator := k.GetRewardsUnlockQueueIterator(ctx, endTime)
+	defer iterator.Close()
+
+	for ; iterator.Valid(); iterator.Next() {
+		curAddrs := []sdk.ValAddress{}
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &curAddrs)
+		valsAddrs = append(valsAddrs, curAddrs...)
+	}
+
+	return
 }

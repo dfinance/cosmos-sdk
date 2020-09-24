@@ -42,6 +42,9 @@ func NewQuerier(k Keeper) sdk.Querier {
 		case types.QueryPool:
 			return queryPool(ctx, path[1:], req, k)
 
+		case types.QueryLockedRewardsState:
+			return queryLockedRewardsState(ctx, path[1:], req, k)
+
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unknown query path: %s", path[0])
 		}
@@ -262,6 +265,27 @@ func queryPool(ctx sdk.Context, path []string, req abci.RequestQuery, k Keeper) 
 	}
 
 	bz, err := k.cdc.MarshalJSON(poolSupply)
+	if err != nil {
+		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
+	}
+
+	return bz, nil
+}
+
+func queryLockedRewardsState(ctx sdk.Context, path []string, req abci.RequestQuery, k Keeper) ([]byte, error) {
+	var params types.QueryLockedRewardsStateParams
+	err := k.cdc.UnmarshalJSON(req.Data, &params)
+	if err != nil {
+		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONUnmarshal, err.Error())
+	}
+
+	lockedState, found := k.GetValidatorLockedState(ctx, params.ValidatorAddress)
+	if !found {
+		return nil, types.ErrNoValidatorExists
+	}
+
+	resp := types.NewQueryLockedRewardsStateResponse(lockedState)
+	bz, err := codec.MarshalJSONIndent(k.cdc, resp)
 	if err != nil {
 		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
 	}

@@ -24,6 +24,7 @@ const (
 	QueryDelegatorValidators            = types.QueryDelegatorValidators
 	QueryWithdrawAddr                   = types.QueryWithdrawAddr
 	QueryPool                           = types.QueryPool
+	QueryLockedRewardsState             = types.QueryLockedRewardsState
 	DefaultParamspace                   = types.DefaultParamspace
 	TypeMsgFundPublicTreasuryPool       = types.TypeMsgFundPublicTreasuryPool
 	ChangeFoundationAllocationRatioTTL  = types.ChangeFoundationAllocationRatioTTL
@@ -78,6 +79,8 @@ var (
 	ErrEmptyProposalRecipient                  = types.ErrEmptyProposalRecipient
 	ErrWrongFoundationAllocationRatio          = types.ErrWrongFoundationAllocationRatio
 	ErrExceededTimeLimit                       = types.ErrExceededTimeLimit
+	ErrWithdrawLocked                          = types.ErrWithdrawLocked
+	ErrInvalidLockOperation                    = types.ErrInvalidLockOperation
 	InitialRewardPools                         = types.InitialRewardPools
 	NewGenesisState                            = types.NewGenesisState
 	DefaultGenesisState                        = types.DefaultGenesisState

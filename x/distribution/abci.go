@@ -14,6 +14,9 @@ import (
 func BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock, k keeper.Keeper, mk mint.Keeper) {
 	consVotes := req.LastCommitInfo.GetVotes()
 
+	// process the rewards unlock queue here as distributionPower might change
+	k.ProcessAllMatureRewardsUnlockQueueItems(ctx)
+
 	// determine the total distribution power signing the block
 	// override voter's power with distribution power
 	var previousTotalPower, previousProposerPower int64
