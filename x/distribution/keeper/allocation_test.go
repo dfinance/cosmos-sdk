@@ -55,7 +55,7 @@ func TestAllocateTokensToManyValidators(t *testing.T) {
 	distrParams.BaseProposerReward = sdk.NewDecWithPrec(1, 2)
 	distrParams.BonusProposerReward = sdk.NewDecWithPrec(4, 2)
 
-	ctx, ak, _, k, sk, _, supplyKeeper := CreateTestInputAdvanced(t, false, 1000, distrParams)
+	ctx, ak, _, k, sk, _, supplyKeeper, _ := CreateTestInputAdvanced(t, false, 1000, distrParams)
 	sh := staking.NewHandler(sk)
 
 	// create validator with 50% commission
@@ -146,7 +146,7 @@ func TestAllocateTokensTruncation(t *testing.T) {
 	distrParams.BaseProposerReward = sdk.NewDecWithPrec(1, 2)
 	distrParams.BonusProposerReward = sdk.NewDecWithPrec(4, 2)
 
-	ctx, ak, _, k, sk, _, supplyKeeper := CreateTestInputAdvanced(t, false, 1000000, distrParams)
+	ctx, ak, _, k, sk, _, supplyKeeper, _ := CreateTestInputAdvanced(t, false, 1000000, distrParams)
 	sh := staking.NewHandler(sk)
 
 	// create validator with 10% commission
@@ -238,7 +238,7 @@ func TestAllocateTokensTruncation(t *testing.T) {
 // Allocate tokens and check it is distributed without a loss (between pools and validators).
 func TestAllocateTokensPools(t *testing.T) {
 	distrParams := types.DefaultParams()
-	ctx, ak, _, k, sk, _, supplyKeeper := CreateTestInputAdvanced(t, false, 1000000, distrParams)
+	ctx, ak, _, k, sk, _, supplyKeeper, _ := CreateTestInputAdvanced(t, false, 1000000, distrParams)
 	sh := staking.NewHandler(sk)
 
 	// create validator 1 with 10% commission
@@ -435,7 +435,7 @@ func TestAllocatePublicTreasuryOverflow(t *testing.T) {
 	distrParams.PublicTreasuryPoolTax = sdk.NewDecWithPrec(1, 0)
 	distrParams.HARPTax = sdk.ZeroDec()
 
-	ctx, ak, _, k, sk, _, supplyKeeper := CreateTestInputAdvanced(t, false, 1000000, distrParams)
+	ctx, ak, _, k, sk, _, supplyKeeper, _ := CreateTestInputAdvanced(t, false, 1000000, distrParams)
 	sh := staking.NewHandler(sk)
 
 	// create validator with 0% commission

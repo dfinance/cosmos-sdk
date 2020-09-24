@@ -117,7 +117,7 @@ func (AppModule) Route() string {
 
 // NewHandler returns an sdk.Handler for the distribution module.
 func (am AppModule) NewHandler() sdk.Handler {
-	return NewHandler(am.keeper)
+	return NewHandler(am.keeper, am.mintKeeper)
 }
 
 // QuerierRoute returns the distribution module's querier route name.

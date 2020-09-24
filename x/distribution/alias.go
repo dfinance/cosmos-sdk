@@ -26,6 +26,7 @@ const (
 	QueryPool                           = types.QueryPool
 	DefaultParamspace                   = types.DefaultParamspace
 	TypeMsgFundPublicTreasuryPool       = types.TypeMsgFundPublicTreasuryPool
+	ChangeFoundationAllocationRatioTTL  = types.ChangeFoundationAllocationRatioTTL
 )
 
 var (
@@ -75,6 +76,8 @@ var (
 	ErrBadDistribution                         = types.ErrBadDistribution
 	ErrInvalidProposalAmount                   = types.ErrInvalidProposalAmount
 	ErrEmptyProposalRecipient                  = types.ErrEmptyProposalRecipient
+	ErrWrongFoundationAllocationRatio          = types.ErrWrongFoundationAllocationRatio
+	ErrExceededTimeLimit                       = types.ErrExceededTimeLimit
 	InitialRewardPools                         = types.InitialRewardPools
 	NewGenesisState                            = types.NewGenesisState
 	DefaultGenesisState                        = types.DefaultGenesisState
