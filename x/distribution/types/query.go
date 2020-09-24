@@ -49,10 +49,10 @@ func NewDelegationDelegatorReward(valAddr sdk.ValAddress,
 // QueryLockedRewardsStateResponse defines the locked_rewards_state query response.
 type QueryLockedRewardsStateResponse struct {
 	Enabled      bool      `json:"enabled" yaml:"enabled"`
+	AutoRenew    bool      `json:"auto_renew" yaml:"auto_renew"`
 	LockedHeight int64     `json:"locked_height" yaml:"locked_height"`
 	LockedAt     time.Time `json:"locked_at" yaml:"locked_at"`
 	UnlocksAt    time.Time `json:"unlocks_at" yaml:"unlocks_at"`
-	AutoRenew    bool      `json:"auto_renew" yaml:"auto_renew"`
 }
 
 // NewQueryLockedRewardsStateResponse constructs a QueryLockedRewardsStateResponse.
