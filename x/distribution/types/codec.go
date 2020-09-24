@@ -12,6 +12,7 @@ func RegisterCodec(cdc *codec.Codec) {
 	cdc.RegisterConcrete(PublicTreasuryPoolSpendProposal{}, "cosmos-sdk/PublicTreasuryPoolSpendProposal", nil)
 	cdc.RegisterConcrete(MsgFundPublicTreasuryPool{}, "cosmos-sdk/MsgFundPublicTreasuryPool", nil)
 	cdc.RegisterConcrete(MsgWithdrawFoundationPool{}, "cosmos-sdk/MsgWithdrawFoundationPool", nil)
+	cdc.RegisterConcrete(MsgSetFoundationAllocationRatio{}, "cosmos-sdk/MsgSetFoundationAllocationRatio", nil)
 	cdc.RegisterConcrete(MsgLockValidatorRewards{}, "cosmos-sdk/MsgLockValidatorRewards", nil)
 	cdc.RegisterConcrete(MsgDisableLockedRewardsAutoRenewal{}, "cosmos-sdk/MsgDisableLockedRewardsAutoRenewal", nil)
 }

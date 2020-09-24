@@ -51,6 +51,7 @@ func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
 		GetCmdDisableValidatorLockedRewardsAutoRenewal(cdc),
 		GetCmdFundPublicTreasuryPool(cdc),
 		GetCmdFoundationPoolWithdraw(cdc),
+		GetChangeFoundationAllocationRatioTxCmd(cdc),
 	)...)
 
 	return distTxCmd
@@ -473,6 +474,32 @@ Where proposal.json contains:
 				return err
 			}
 
+			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+		},
+	}
+
+	return cmd
+}
+
+// GetChangeFoundationAllocationRatioTxCmd will create a send tx and sign it with the given key.
+func GetChangeFoundationAllocationRatioTxCmd(cdc *codec.Codec) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "set-foundation-allocation-ratio [ratio]",
+		Short: "Change FoundationAllocationRatio param",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := auth.NewTxBuilderFromCLI(inBuf).WithTxEncoder(auth.DefaultTxEncoder(cdc))
+			cliCtx := context.NewCLIContextWithInput(inBuf).WithCodec(cdc)
+
+			// parse ratio
+			ratio, err := sdk.NewDecFromStr(args[0])
+			if err != nil {
+				return err
+			}
+
+			// build and sign the transaction, then broadcast to Tendermint
+			msg := types.NewMsgSetFoundationAllocationRatio(cliCtx.GetFromAddress(), ratio)
 			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}

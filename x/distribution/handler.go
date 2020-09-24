@@ -8,9 +8,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	"github.com/cosmos/cosmos-sdk/x/mint"
 )
 
-func NewHandler(k keeper.Keeper) sdk.Handler {
+func NewHandler(k keeper.Keeper, mk mint.Keeper) sdk.Handler {
 	return func(ctx sdk.Context, msg sdk.Msg) (*sdk.Result, error) {
 		ctx = ctx.WithEventManager(sdk.NewEventManager())
 
@@ -29,6 +30,9 @@ func NewHandler(k keeper.Keeper) sdk.Handler {
 
 		case types.MsgWithdrawFoundationPool:
 			return handleMsgWithdrawFoundationPool(ctx, msg, k)
+
+		case types.MsgSetFoundationAllocationRatio:
+			return handleMsgSetFoundationAllocationRatio(ctx, msg, k, mk)
 
 		case types.MsgLockValidatorRewards:
 			return handleMsgLockValidatorRewards(ctx, msg, k)
@@ -159,6 +163,42 @@ func handleMsgLockValidatorRewards(ctx sdk.Context, msg types.MsgLockValidatorRe
 	k.Logger(ctx).Info(fmt.Sprintf("Validator %s rewards were locked: unlocksAt: %v", msg.ValidatorAddress, unlocksAt))
 
 	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
+}
+
+func handleMsgSetFoundationAllocationRatio(
+	ctx sdk.Context,
+	msg types.MsgSetFoundationAllocationRatio,
+	k keeper.Keeper,
+	mk mint.Keeper,
+) (*sdk.Result, error) {
+	hasPermission := false
+	for _, nominee := range k.GetParams(ctx).FoundationNominees {
+		if nominee.Equals(msg.FromAddress) {
+			hasPermission = true
+			break
+		}
+	}
+
+	if !hasPermission {
+		return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "operation is allowed only for foundation nominee")
+	}
+
+	abpy, err := mk.GetAvgBlocksPerYear(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	chainAge := sdk.NewInt(ctx.BlockHeight()).QuoRaw(int64(abpy))
+
+	if chainAge.GTE(sdk.NewInt(ChangeFoundationAllocationRatioTTL)) {
+		return nil, sdkerrors.Wrapf(ErrExceededTimeLimit, "is not allowed to change after %d year", ChangeFoundationAllocationRatioTTL)
+	}
+
+	params := mk.GetParams(ctx)
+	params.FoundationAllocationRatio = msg.Ratio
+	mk.SetParams(ctx, params)
+
+	return &sdk.Result{}, nil
 }
 
 func handleMsgDisableLockedRewardsAutoRenewal(ctx sdk.Context, msg types.MsgDisableLockedRewardsAutoRenewal, k keeper.Keeper) (*sdk.Result, error) {

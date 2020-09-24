@@ -3,8 +3,8 @@ package keeper
 import (
 	"testing"
 
+	"github.com/cosmos/cosmos-sdk/x/mint"
 	"github.com/stretchr/testify/require"
-
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/libs/log"
@@ -78,14 +78,14 @@ func MakeTestCodec() *codec.Codec {
 func CreateTestInputDefault(t *testing.T, isCheckTx bool, initPower int64) (
 	sdk.Context, auth.AccountKeeper, Keeper, staking.Keeper, types.SupplyKeeper) {
 
-	ctx, ak, _, dk, sk, _, supplyKeeper := CreateTestInputAdvanced(t, isCheckTx, initPower, types.DefaultParams())
+	ctx, ak, _, dk, sk, _, supplyKeeper, _ := CreateTestInputAdvanced(t, isCheckTx, initPower, types.DefaultParams())
 
 	return ctx, ak, dk, sk, supplyKeeper
 }
 
 // hogpodge of all sorts of input required for testing
 func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, distrParams types.Params) (
-	sdk.Context, auth.AccountKeeper, bank.Keeper, Keeper, staking.Keeper, params.Keeper, types.SupplyKeeper) {
+	sdk.Context, auth.AccountKeeper, bank.Keeper, Keeper, staking.Keeper, params.Keeper, types.SupplyKeeper, mint.Keeper) {
 
 	initTokens := sdk.TokensFromConsensusPower(initPower)
 
@@ -94,6 +94,7 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 	keyAcc := sdk.NewKVStoreKey(auth.StoreKey)
 	keySupply := sdk.NewKVStoreKey(supply.StoreKey)
 	keyParams := sdk.NewKVStoreKey(params.StoreKey)
+	keyMint := sdk.NewKVStoreKey(mint.StoreKey)
 	tkeyParams := sdk.NewTransientStoreKey(params.TStoreKey)
 
 	db := dbm.NewMemDB()
@@ -104,6 +105,7 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 	ms.MountStoreWithDB(keySupply, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyAcc, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyParams, sdk.StoreTypeIAVL, db)
+	ms.MountStoreWithDB(keyMint, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(tkeyParams, sdk.StoreTypeTransient, db)
 
 	err := ms.LoadLatestVersion()
@@ -129,6 +131,7 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 	maccPerms := map[string][]string{
 		auth.FeeCollectorName:     nil,
 		types.ModuleName:          nil,
+		mint.ModuleName:           nil,
 		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
 		staking.BondedPoolName:    {supply.Burner, supply.Staking},
 		types.RewardsBankPoolName: nil,
@@ -139,6 +142,9 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 	skParams := staking.DefaultParams()
 	skParams.MinSelfDelegationLvl = sdk.OneInt()
 	sk.SetParams(ctx, skParams)
+
+	mintKeeper := mint.NewKeeper(cdc, keyMint, pk.Subspace(mint.DefaultParamspace), sk, supplyKeeper, auth.FeeCollectorName)
+	mintKeeper.SetParams(ctx, mint.DefaultParams())
 
 	keeper := NewKeeper(cdc, keyDistr, pk.Subspace(types.DefaultParamspace), sk, supplyKeeper, auth.FeeCollectorName, blacklistedAddrs)
 
@@ -167,5 +173,5 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 
 	keeper.SetParams(ctx, distrParams)
 
-	return ctx, accountKeeper, bankKeeper, keeper, sk, pk, supplyKeeper
+	return ctx, accountKeeper, bankKeeper, keeper, sk, pk, supplyKeeper, mintKeeper
 }

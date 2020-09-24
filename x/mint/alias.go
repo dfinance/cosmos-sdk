@@ -34,15 +34,16 @@ var (
 	DefaultParams        = types.DefaultParams
 
 	// variable aliases
-	ModuleCdc                    = types.ModuleCdc
-	MinterKey                    = types.MinterKey
-	KeyMintDenom                 = types.KeyMintDenom
-	KeyInflationMax              = types.KeyInflationMax
-	KeyInflationMin              = types.KeyInflationMin
-	KeyFeeBurningRatio           = types.KeyFeeBurningRatio
-	KeyInfPwrBondedLockedRatio   = types.KeyInfPwrBondedLockedRatio
-	KeyFoundationAllocationRatio = types.KeyFoundationAllocationRatio
-	KeyAvgBlockTimeWindow        = types.KeyAvgBlockTimeWindow
+	ModuleCdc                         = types.ModuleCdc
+	MinterKey                         = types.MinterKey
+	KeyMintDenom                      = types.KeyMintDenom
+	KeyInflationMax                   = types.KeyInflationMax
+	KeyInflationMin                   = types.KeyInflationMin
+	KeyFeeBurningRatio                = types.KeyFeeBurningRatio
+	KeyInfPwrBondedLockedRatio        = types.KeyInfPwrBondedLockedRatio
+	KeyFoundationAllocationRatio      = types.KeyFoundationAllocationRatio
+	KeyAvgBlockTimeWindow             = types.KeyAvgBlockTimeWindow
+	FoundationAllocationRatioMaxValue = types.FoundationAllocationRatioMaxValue
 )
 
 type (

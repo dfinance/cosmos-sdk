@@ -27,6 +27,7 @@ const (
 	QueryLockedRewardsState             = types.QueryLockedRewardsState
 	DefaultParamspace                   = types.DefaultParamspace
 	TypeMsgFundPublicTreasuryPool       = types.TypeMsgFundPublicTreasuryPool
+	ChangeFoundationAllocationRatioTTL  = types.ChangeFoundationAllocationRatioTTL
 )
 
 var (
@@ -76,6 +77,8 @@ var (
 	ErrBadDistribution                         = types.ErrBadDistribution
 	ErrInvalidProposalAmount                   = types.ErrInvalidProposalAmount
 	ErrEmptyProposalRecipient                  = types.ErrEmptyProposalRecipient
+	ErrWrongFoundationAllocationRatio          = types.ErrWrongFoundationAllocationRatio
+	ErrExceededTimeLimit                       = types.ErrExceededTimeLimit
 	ErrWithdrawLocked                          = types.ErrWithdrawLocked
 	ErrInvalidLockOperation                    = types.ErrInvalidLockOperation
 	InitialRewardPools                         = types.InitialRewardPools

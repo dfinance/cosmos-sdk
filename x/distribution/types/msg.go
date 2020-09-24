@@ -229,6 +229,43 @@ func (msg MsgWithdrawFoundationPool) ValidateBasic() error {
 	return nil
 }
 
+const TypeMsgSetFoundationAllocationRatio = "set_foundation_allocation_ratio"
+
+// MsgSetFoundationAllocationRatio - high level transaction of the coin module
+type MsgSetFoundationAllocationRatio struct {
+	FromAddress sdk.AccAddress `json:"from_address" yaml:"from_address"`
+	Ratio       sdk.Dec        `json:"ratio" yaml:"ratio"`
+}
+
+// NewMsgSetFoundationAllocationRatio - construct msg for change FoundationAllocationRatio.
+func NewMsgSetFoundationAllocationRatio(fromAddr sdk.AccAddress, ratio sdk.Dec) MsgSetFoundationAllocationRatio {
+	return MsgSetFoundationAllocationRatio{FromAddress: fromAddr, Ratio: ratio}
+}
+
+// Route Implements Msg.
+func (msg MsgSetFoundationAllocationRatio) Route() string { return RouterKey }
+
+// Type Implements Msg.
+func (msg MsgSetFoundationAllocationRatio) Type() string { return TypeMsgSetFoundationAllocationRatio }
+
+// ValidateBasic Implements Msg.
+func (msg MsgSetFoundationAllocationRatio) ValidateBasic() error {
+	if msg.FromAddress.Empty() {
+		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "missing sender address")
+	}
+	return nil
+}
+
+// GetSignBytes Implements Msg.
+func (msg MsgSetFoundationAllocationRatio) GetSignBytes() []byte {
+	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(msg))
+}
+
+// GetSigners Implements Msg.
+func (msg MsgSetFoundationAllocationRatio) GetSigners() []sdk.AccAddress {
+	return []sdk.AccAddress{msg.FromAddress}
+}
+
 const TypeMsgLockValidatorRewards = "lock_validator_rewards"
 
 // MsgLockValidatorRewards defines a Msg type that allows to lock delegator rewards withdraw for defined validator.
@@ -297,7 +334,9 @@ func NewMsgDisableLockedRewardsAutoRenewal(sender sdk.AccAddress, valAddr sdk.Va
 func (msg MsgDisableLockedRewardsAutoRenewal) Route() string { return ModuleName }
 
 // Type returns the MsgDisableLockedRewardsAutoRenewal message type.
-func (msg MsgDisableLockedRewardsAutoRenewal) Type() string { return TypeMsgDisableLockedRewardsAutoRenewal }
+func (msg MsgDisableLockedRewardsAutoRenewal) Type() string {
+	return TypeMsgDisableLockedRewardsAutoRenewal
+}
 
 // GetSigners returns the signer addresses that are expected to sign the result of GetSignBytes.
 func (msg MsgDisableLockedRewardsAutoRenewal) GetSigners() []sdk.AccAddress {
