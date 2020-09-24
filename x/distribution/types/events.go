@@ -8,10 +8,13 @@ const (
 	EventTypeWithdrawRewards    = "withdraw_rewards"
 	EventTypeWithdrawCommission = "withdraw_commission"
 	EventTypeProposerReward     = "proposer_reward"
-	EventType
 
-	AttributeKeyWithdrawAddress = "withdraw_address"
-	AttributeKeyValidator       = "validator"
+	AttributeKeyWithdrawAddress    = "withdraw_address"
+	AttributeKeyValidator          = "validator"
+	AttributeKeyLockedRewardsState = "locked_rewards_state"
 
 	AttributeValueCategory = ModuleName
+
+	LockedRewardsStateLocked   = "locked"
+	LockedRewardsStateUnlocked = "unlocked"
 )

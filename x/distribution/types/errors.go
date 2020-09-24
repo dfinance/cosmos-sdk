@@ -18,4 +18,6 @@ var (
 	ErrEmptyProposalRecipient  = sdkerrors.Register(ModuleName, 10, "invalid proposal recipient")
 	ErrNoValidatorExists       = sdkerrors.Register(ModuleName, 11, "validator does not exist")
 	ErrNoDelegationExists      = sdkerrors.Register(ModuleName, 12, "delegation does not exist")
+	ErrWithdrawLocked          = sdkerrors.Register(ModuleName, 13, "rewards withdraw is locked")
+	ErrInvalidLockOperation    = sdkerrors.Register(ModuleName, 14, "invalid rewards lock operation")
 )

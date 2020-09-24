@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -43,4 +44,26 @@ type DelegationDelegatorReward struct {
 func NewDelegationDelegatorReward(valAddr sdk.ValAddress,
 	reward sdk.DecCoins) DelegationDelegatorReward {
 	return DelegationDelegatorReward{ValidatorAddress: valAddr, Reward: reward}
+}
+
+// QueryLockedRewardsStateResponse defines the locked_rewards_state query response.
+type QueryLockedRewardsStateResponse struct {
+	Enabled      bool      `json:"enabled" yaml:"enabled"`
+	LockedHeight int64     `json:"locked_height" yaml:"locked_height"`
+	LockedAt     time.Time `json:"locked_at" yaml:"locked_at"`
+	UnlocksAt    time.Time `json:"unlocks_at" yaml:"unlocks_at"`
+}
+
+// NewQueryLockedRewardsStateResponse constructs a QueryLockedRewardsStateResponse.
+func NewQueryLockedRewardsStateResponse(state ValidatorLockedRewardsState) QueryLockedRewardsStateResponse {
+	r := QueryLockedRewardsStateResponse{
+		LockedHeight: state.LockHeight,
+		LockedAt:     state.LockedAt,
+		UnlocksAt:    state.UnlocksAt,
+	}
+	if state.IsLocked() {
+		r.Enabled = true
+	}
+
+	return r
 }

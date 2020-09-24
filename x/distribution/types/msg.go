@@ -228,3 +228,51 @@ func (msg MsgWithdrawFoundationPool) ValidateBasic() error {
 
 	return nil
 }
+
+const TypeMsgLockValidatorRewards = "lock_validator_rewards"
+
+// MsgLockValidatorRewards defines a Msg type that allows to lock delegator rewards withdraw for defined validator.
+type MsgLockValidatorRewards struct {
+	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address"`
+	SenderAddress    sdk.AccAddress `json:"sender_address" yaml:"sender_address"`
+}
+
+// NewMsgFundPublicTreasuryPool returns a new MsgLockValidatorRewards with a sender and validator address.
+func NewMsgLockValidatorRewards(sender sdk.AccAddress, valAddr sdk.ValAddress) MsgLockValidatorRewards {
+	return MsgLockValidatorRewards{
+		SenderAddress:    sender,
+		ValidatorAddress: valAddr,
+	}
+}
+
+// Route returns the MsgLockValidatorRewards message route.
+func (msg MsgLockValidatorRewards) Route() string { return ModuleName }
+
+// Type returns the MsgLockValidatorRewards message type.
+func (msg MsgLockValidatorRewards) Type() string { return TypeMsgLockValidatorRewards }
+
+// GetSigners returns the signer addresses that are expected to sign the result of GetSignBytes.
+func (msg MsgLockValidatorRewards) GetSigners() []sdk.AccAddress {
+	return []sdk.AccAddress{msg.SenderAddress}
+}
+
+// GetSignBytes returns the raw bytes for a MsgLockValidatorRewards message that the expected signer needs to sign.
+func (msg MsgLockValidatorRewards) GetSignBytes() []byte {
+	bz := ModuleCdc.MustMarshalJSON(msg)
+	return sdk.MustSortJSON(bz)
+}
+
+// ValidateBasic performs basic MsgLockValidatorRewards message validation.
+func (msg MsgLockValidatorRewards) ValidateBasic() error {
+	if msg.SenderAddress.Empty() {
+		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "sender address: empty")
+	}
+	if msg.ValidatorAddress.Empty() {
+		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "validator address: empty")
+	}
+	if operatorAddr := sdk.ValAddress(msg.SenderAddress); !operatorAddr.Equals(msg.ValidatorAddress) {
+		return sdkerrors.Wrap(sdkerrors.ErrUnauthorized, "operation can be performed only by the validator operator")
+	}
+
+	return nil
+}

@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -52,14 +54,20 @@ type ValidatorSlashEventRecord struct {
 }
 
 type ValidatorLockedRewardsRecord struct {
-	ValidatorAddress sdk.ValAddress         `json:"validator_address" yaml:"validator_address"`
-	LockedInfo       ValidatorLockedRewards `json:"locked_info" yaml:"locked_info"`
+	ValidatorAddress sdk.ValAddress              `json:"validator_address" yaml:"validator_address"`
+	LockedInfo       ValidatorLockedRewardsState `json:"locked_info" yaml:"locked_info"`
 }
 
 // used for import / export via genesis json
 type RewardsBankPoolRecord struct {
 	AccAddress sdk.AccAddress `json:"acc_address" yaml:"acc_address"`
 	Coins      sdk.Coins      `json:"coins" yaml:"coins"`
+}
+
+// used for import / export via genesis json
+type RewardsUnlockQueueRecord struct {
+	Timestamp          time.Time        `json:" timestamp" yaml:"timestamp"`
+	ValidatorAddresses []sdk.ValAddress `json:"validator_addresses" yaml:"validator_addresses"`
 }
 
 // GenesisState - all distribution state that must be provided at genesis
@@ -76,6 +84,7 @@ type GenesisState struct {
 	ValidatorSlashEvents            []ValidatorSlashEventRecord            `json:"validator_slash_events" yaml:"validator_slash_events"`
 	ValidatorLockedRewards          []ValidatorLockedRewardsRecord         `json:"validator_locked_rewards" yaml:"validator_locked_rewards"`
 	RewardBankPool                  []RewardsBankPoolRecord                `json:"reward_bank_pool" yaml:"reward_bank_pool"`
+	RewardsUnlockQueue              []RewardsUnlockQueueRecord             `json:"rewards_unlock_queue" yaml:"rewards_unlock_queue"`
 }
 
 func NewGenesisState(
@@ -83,6 +92,7 @@ func NewGenesisState(
 	acc []ValidatorAccumulatedCommissionRecord, historical []ValidatorHistoricalRewardsRecord,
 	cur []ValidatorCurrentRewardsRecord, dels []DelegatorStartingInfoRecord, slashes []ValidatorSlashEventRecord,
 	validatorLockedRewards []ValidatorLockedRewardsRecord, rewardBankPool []RewardsBankPoolRecord,
+	rewardsUnlockQueue []RewardsUnlockQueueRecord,
 ) GenesisState {
 
 	return GenesisState{
@@ -98,6 +108,7 @@ func NewGenesisState(
 		ValidatorSlashEvents:            slashes,
 		ValidatorLockedRewards:          validatorLockedRewards,
 		RewardBankPool:                  rewardBankPool,
+		RewardsUnlockQueue:              rewardsUnlockQueue,
 	}
 }
 
@@ -116,6 +127,7 @@ func DefaultGenesisState() GenesisState {
 		ValidatorSlashEvents:            []ValidatorSlashEventRecord{},
 		ValidatorLockedRewards:          []ValidatorLockedRewardsRecord{},
 		RewardBankPool:                  []RewardsBankPoolRecord{},
+		RewardsUnlockQueue:              []RewardsUnlockQueueRecord{},
 	}
 }
 

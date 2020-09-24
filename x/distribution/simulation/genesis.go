@@ -100,6 +100,8 @@ func RandomizedGenState(simState *module.SimulationState) {
 			BaseProposerReward:         baseProposerReward,
 			BonusProposerReward:        bonusProposerReward,
 			WithdrawAddrEnabled:        withdrawEnabled,
+			LockedRatio:                sdk.NewDecWithPrec(5, 1),
+			LockedDuration:             types.AvgYearDur,
 		},
 	}
 

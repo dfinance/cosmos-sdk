@@ -30,6 +30,9 @@ func NewHandler(k keeper.Keeper) sdk.Handler {
 		case types.MsgWithdrawFoundationPool:
 			return handleMsgWithdrawFoundationPool(ctx, msg, k)
 
+		case types.MsgLockValidatorRewards:
+			return handleMsgLockValidatorRewards(ctx, msg, k)
+
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distribution message type: %T", msg)
 		}
@@ -133,6 +136,26 @@ func handleMsgWithdrawFoundationPool(ctx sdk.Context, msg types.MsgWithdrawFound
 	k.Logger(ctx).Info(fmt.Sprintf("transferred %s from the foundation pool to recipient %s (authorized by %s)", msg.Amount, msg.RecipientPool, msg.NomineeAddr))
 
 	return nil, nil
+}
+
+func handleMsgLockValidatorRewards(ctx sdk.Context, msg types.MsgLockValidatorRewards, k keeper.Keeper) (*sdk.Result, error) {
+	unlocksAt, err := k.LockValidatorRewards(ctx, msg.ValidatorAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			sdk.EventTypeMessage,
+			sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
+			sdk.NewAttribute(sdk.AttributeKeySender, msg.ValidatorAddress.String()),
+			sdk.NewAttribute(types.AttributeKeyLockedRewardsState, types.LockedRewardsStateLocked),
+		),
+	)
+
+	k.Logger(ctx).Info(fmt.Sprintf("Validator %s rewards were locked: unlocksAt: %v", msg.ValidatorAddress, unlocksAt))
+
+	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
 }
 
 func NewProposalHandler(k Keeper) govtypes.Handler {

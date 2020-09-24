@@ -2,6 +2,7 @@ package distribution
 
 import (
 	"fmt"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
@@ -38,10 +39,13 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, supplyKeeper types.SupplyKeeper
 		keeper.SetValidatorSlashEvent(ctx, evt.ValidatorAddress, evt.Height, evt.Period, evt.Event)
 	}
 	for _, entry := range data.ValidatorLockedRewards {
-		keeper.SetValidatorLockedRewards(ctx, entry.ValidatorAddress, entry.LockedInfo)
+		keeper.SetValidatorLockedState(ctx, entry.ValidatorAddress, entry.LockedInfo)
 	}
 	for _, entry := range data.RewardBankPool {
 		keeper.SetDelegatorRewardsBankCoins(ctx, entry.AccAddress, entry.Coins)
+	}
+	for _, entry := range data.RewardsUnlockQueue {
+		keeper.SetRewardsUnlockQueueValidators(ctx, entry.Timestamp, entry.ValidatorAddresses)
 	}
 
 	moduleHoldings = moduleHoldings.Add(data.RewardPools.TotalCoins()...)
@@ -147,7 +151,7 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 
 	lockedRewards := make([]types.ValidatorLockedRewardsRecord, 0)
 	keeper.IterateValidatorLockedRewards(ctx,
-		func(valAddr sdk.ValAddress, info types.ValidatorLockedRewards) (stop bool) {
+		func(valAddr sdk.ValAddress, info types.ValidatorLockedRewardsState) (stop bool) {
 			lockedRewards = append(lockedRewards, types.ValidatorLockedRewardsRecord{
 				ValidatorAddress: valAddr,
 				LockedInfo:       info,
@@ -167,5 +171,30 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 		},
 	)
 
-	return types.NewGenesisState(params, rewardPools, dwi, pp, outstanding, acc, his, cur, dels, slashes, lockedRewards, rewardsPool)
+	rewardsUnlockQueue := make([]types.RewardsUnlockQueueRecord, 0)
+	keeper.IterateRewardsUnlockQueue(ctx,
+		func(timestamp time.Time, valAddr []sdk.ValAddress) (stop bool) {
+			rewardsUnlockQueue = append(rewardsUnlockQueue, types.RewardsUnlockQueueRecord{
+				Timestamp:          timestamp,
+				ValidatorAddresses: valAddr,
+			})
+			return false
+		},
+	)
+
+	return types.NewGenesisState(
+		params,
+		rewardPools,
+		dwi,
+		pp,
+		outstanding,
+		acc,
+		his,
+		cur,
+		dels,
+		slashes,
+		lockedRewards,
+		rewardsPool,
+		rewardsUnlockQueue,
+	)
 }

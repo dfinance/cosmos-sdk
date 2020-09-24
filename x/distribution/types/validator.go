@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -95,15 +96,56 @@ func (vs ValidatorSlashEvents) String() string {
 // It is inexpensive to track, allows simple sanity checks.
 type ValidatorOutstandingRewards = sdk.DecCoins
 
-// ValidatorLockedRewards contains locked rewards data.
-type ValidatorLockedRewards struct {
+// ValidatorLockedRewardsState contains locked rewards data.
+type ValidatorLockedRewardsState struct {
+	// Rewards lock block height
+	LockHeight int64 `json:"lock_height" yaml:"lock_height"`
+	// Rewards lock timestamp
+	LockedAt time.Time `json:"locked_at" yaml:"locked_at"`
+	// Rewards are locked until
+	UnlocksAt time.Time `json:"unlocks_at" yaml:"unlocks_at"`
 	// Locked shares to all shares relation (zero if there is no locking)
 	LockedRatio sdk.Dec `json:"locked_ratio" yaml:"locked_ratio"`
 }
 
-// NewValidatorLockedRewards creates a new ValidatorLockedRewards.
-func NewValidatorLockedRewards(lockedRatio sdk.Dec) ValidatorLockedRewards {
-	return ValidatorLockedRewards{
+// GetDistributionPower calculates validator distribution power depending on the lock state.
+func (l ValidatorLockedRewardsState) GetDistributionPower(stakingPower int64) int64 {
+	if !l.IsLocked() {
+		return stakingPower
+	}
+	lockedPower := sdk.NewDec(stakingPower).Mul(l.LockedRatio)
+
+	return stakingPower + lockedPower.TruncateInt64()
+}
+
+// Lock locks current state.
+func (l ValidatorLockedRewardsState) Lock(lockRatio sdk.Dec, lockDuration time.Duration, currTime time.Time, currHeight int64) ValidatorLockedRewardsState {
+	l.LockedRatio = lockRatio
+	l.LockedAt = currTime
+	l.LockHeight = currHeight
+	l.UnlocksAt = currTime.Add(lockDuration)
+
+	return l
+}
+
+// Unlock unlocks current state.
+func (l ValidatorLockedRewardsState) Unlock() ValidatorLockedRewardsState {
+	l.LockedRatio = sdk.ZeroDec()
+	l.LockedAt = time.Time{}
+	l.LockHeight = 0
+	l.UnlocksAt = time.Time{}
+
+	return l
+}
+
+// IsLocked checks if locking is active.
+func (l ValidatorLockedRewardsState) IsLocked() bool {
+	return !l.LockedRatio.IsZero()
+}
+
+// NewValidatorLockedRewards creates a new ValidatorLockedRewardsState.
+func NewValidatorLockedRewards(lockedRatio sdk.Dec) ValidatorLockedRewardsState {
+	return ValidatorLockedRewardsState{
 		LockedRatio: lockedRatio,
 	}
 }

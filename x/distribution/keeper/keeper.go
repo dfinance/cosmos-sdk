@@ -87,11 +87,20 @@ func (k Keeper) SetWithdrawAddr(ctx sdk.Context, delegatorAddr sdk.AccAddress, w
 
 // withdraw rewards from a delegation
 func (k Keeper) WithdrawDelegationRewards(ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (sdk.Coins, error) {
+	// check lock
+	lockedState, found := k.GetValidatorLockedState(ctx, valAddr)
+	if !found {
+		return nil, types.ErrNoValidatorDistInfo
+	}
+	if lockedState.IsLocked() {
+		return nil, sdkerrors.Wrapf(types.ErrWithdrawLocked, "unlocked at %v", lockedState.UnlocksAt)
+	}
+
+	// get validator and delegator
 	val := k.stakingKeeper.Validator(ctx, valAddr)
 	if val == nil {
 		return nil, types.ErrNoValidatorDistInfo
 	}
-
 	del := k.stakingKeeper.Delegation(ctx, delAddr, valAddr)
 	if del == nil {
 		return nil, types.ErrEmptyDelegationDistInfo
