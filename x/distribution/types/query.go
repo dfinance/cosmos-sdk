@@ -52,6 +52,7 @@ type QueryLockedRewardsStateResponse struct {
 	LockedHeight int64     `json:"locked_height" yaml:"locked_height"`
 	LockedAt     time.Time `json:"locked_at" yaml:"locked_at"`
 	UnlocksAt    time.Time `json:"unlocks_at" yaml:"unlocks_at"`
+	AutoRenew    bool      `json:"auto_renew" yaml:"auto_renew"`
 }
 
 // NewQueryLockedRewardsStateResponse constructs a QueryLockedRewardsStateResponse.
@@ -60,6 +61,7 @@ func NewQueryLockedRewardsStateResponse(state ValidatorLockedRewardsState) Query
 		LockedHeight: state.LockHeight,
 		LockedAt:     state.LockedAt,
 		UnlocksAt:    state.UnlocksAt,
+		AutoRenew:    state.AutoRenewal,
 	}
 	if state.IsLocked() {
 		r.Enabled = true

@@ -276,3 +276,51 @@ func (msg MsgLockValidatorRewards) ValidateBasic() error {
 
 	return nil
 }
+
+const TypeMsgDisableLockedRewardsAutoRenewal = "disable_locked_rewards_autorenewal"
+
+// MsgDisableLockedRewardsAutoRenewal defines a Msg type that allows to disable locked delegator rewards auto-renewal for validator address.
+type MsgDisableLockedRewardsAutoRenewal struct {
+	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address"`
+	SenderAddress    sdk.AccAddress `json:"sender_address" yaml:"sender_address"`
+}
+
+// NewMsgFundPublicTreasuryPool returns a new MsgLockValidatorRewards with a sender and validator address.
+func NewMsgDisableLockedRewardsAutoRenewal(sender sdk.AccAddress, valAddr sdk.ValAddress) MsgDisableLockedRewardsAutoRenewal {
+	return MsgDisableLockedRewardsAutoRenewal{
+		SenderAddress:    sender,
+		ValidatorAddress: valAddr,
+	}
+}
+
+// Route returns the MsgDisableLockedRewardsAutoRenewal message route.
+func (msg MsgDisableLockedRewardsAutoRenewal) Route() string { return ModuleName }
+
+// Type returns the MsgDisableLockedRewardsAutoRenewal message type.
+func (msg MsgDisableLockedRewardsAutoRenewal) Type() string { return TypeMsgDisableLockedRewardsAutoRenewal }
+
+// GetSigners returns the signer addresses that are expected to sign the result of GetSignBytes.
+func (msg MsgDisableLockedRewardsAutoRenewal) GetSigners() []sdk.AccAddress {
+	return []sdk.AccAddress{msg.SenderAddress}
+}
+
+// GetSignBytes returns the raw bytes for a MsgDisableLockedRewardsAutoRenewal message that the expected signer needs to sign.
+func (msg MsgDisableLockedRewardsAutoRenewal) GetSignBytes() []byte {
+	bz := ModuleCdc.MustMarshalJSON(msg)
+	return sdk.MustSortJSON(bz)
+}
+
+// ValidateBasic performs basic MsgDisableLockedRewardsAutoRenewal message validation.
+func (msg MsgDisableLockedRewardsAutoRenewal) ValidateBasic() error {
+	if msg.SenderAddress.Empty() {
+		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "sender address: empty")
+	}
+	if msg.ValidatorAddress.Empty() {
+		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "validator address: empty")
+	}
+	if operatorAddr := sdk.ValAddress(msg.SenderAddress); !operatorAddr.Equals(msg.ValidatorAddress) {
+		return sdkerrors.Wrap(sdkerrors.ErrUnauthorized, "operation can be performed only by the validator operator")
+	}
+
+	return nil
+}

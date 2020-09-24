@@ -33,6 +33,9 @@ func NewHandler(k keeper.Keeper) sdk.Handler {
 		case types.MsgLockValidatorRewards:
 			return handleMsgLockValidatorRewards(ctx, msg, k)
 
+		case types.MsgDisableLockedRewardsAutoRenewal:
+			return handleMsgDisableLockedRewardsAutoRenewal(ctx, msg, k)
+
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distribution message type: %T", msg)
 		}
@@ -154,6 +157,25 @@ func handleMsgLockValidatorRewards(ctx sdk.Context, msg types.MsgLockValidatorRe
 	)
 
 	k.Logger(ctx).Info(fmt.Sprintf("Validator %s rewards were locked: unlocksAt: %v", msg.ValidatorAddress, unlocksAt))
+
+	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
+}
+
+func handleMsgDisableLockedRewardsAutoRenewal(ctx sdk.Context, msg types.MsgDisableLockedRewardsAutoRenewal, k keeper.Keeper) (*sdk.Result, error) {
+	if err := k.DisableLockedRewardsAutoRenewal(ctx, msg.ValidatorAddress); err != nil {
+		return nil, err
+	}
+
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			sdk.EventTypeMessage,
+			sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
+			sdk.NewAttribute(sdk.AttributeKeySender, msg.ValidatorAddress.String()),
+			sdk.NewAttribute(types.AttributeKeyLockedRewardsState, types.LockedRewardsStateAutoRenewDisabled),
+		),
+	)
+
+	k.Logger(ctx).Info(fmt.Sprintf("Validator %s rewards lock auto-renewal disabled", msg.ValidatorAddress))
 
 	return &sdk.Result{Events: ctx.EventManager().Events()}, nil
 }

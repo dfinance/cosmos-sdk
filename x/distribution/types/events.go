@@ -15,6 +15,8 @@ const (
 
 	AttributeValueCategory = ModuleName
 
-	LockedRewardsStateLocked   = "locked"
-	LockedRewardsStateUnlocked = "unlocked"
+	LockedRewardsStateLocked            = "locked"
+	LockedRewardsStateRenewed           = "renewed"
+	LockedRewardsStateUnlocked          = "unlocked"
+	LockedRewardsStateAutoRenewDisabled = "auto_renew_disabled"
 )

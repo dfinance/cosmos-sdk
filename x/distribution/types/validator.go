@@ -106,6 +106,8 @@ type ValidatorLockedRewardsState struct {
 	UnlocksAt time.Time `json:"unlocks_at" yaml:"unlocks_at"`
 	// Locked shares to all shares relation (zero if there is no locking)
 	LockedRatio sdk.Dec `json:"locked_ratio" yaml:"locked_ratio"`
+	// Lock auto-renewal flag
+	AutoRenewal bool `json:"auto_renewal" yaml:"auto_renewal"`
 }
 
 // GetDistributionPower calculates validator distribution power depending on the lock state.
@@ -124,6 +126,16 @@ func (l ValidatorLockedRewardsState) Lock(lockRatio sdk.Dec, lockDuration time.D
 	l.LockedAt = currTime
 	l.LockHeight = currHeight
 	l.UnlocksAt = currTime.Add(lockDuration)
+	l.AutoRenewal = true
+
+	return l
+}
+
+// RenewLock renews current locked state.
+func (l ValidatorLockedRewardsState) RenewLock(lockRatio sdk.Dec, lockDuration time.Duration, currTime time.Time) ValidatorLockedRewardsState {
+	l.LockedRatio = lockRatio
+	l.UnlocksAt = currTime.Add(lockDuration)
+	l.AutoRenewal = true
 
 	return l
 }
@@ -134,6 +146,14 @@ func (l ValidatorLockedRewardsState) Unlock() ValidatorLockedRewardsState {
 	l.LockedAt = time.Time{}
 	l.LockHeight = 0
 	l.UnlocksAt = time.Time{}
+	l.AutoRenewal = false
+
+	return l
+}
+
+// DisableAutoRenewal drop the auto-renewal flag.
+func (l ValidatorLockedRewardsState) DisableAutoRenewal() ValidatorLockedRewardsState {
+	l.AutoRenewal = false
 
 	return l
 }
@@ -144,8 +164,9 @@ func (l ValidatorLockedRewardsState) IsLocked() bool {
 }
 
 // NewValidatorLockedRewards creates a new ValidatorLockedRewardsState.
-func NewValidatorLockedRewards(lockedRatio sdk.Dec) ValidatorLockedRewardsState {
-	return ValidatorLockedRewardsState{
-		LockedRatio: lockedRatio,
-	}
+func NewValidatorLockedRewards() ValidatorLockedRewardsState {
+	l := ValidatorLockedRewardsState{}
+	l = l.Unlock()
+
+	return l
 }
