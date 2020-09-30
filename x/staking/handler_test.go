@@ -2711,3 +2711,361 @@ func TestBannedAccounts(t *testing.T) {
 		require.NoError(t, err)
 	}
 }
+
+// Test delegation ops with LP shares only.
+func TestLPDelegationBasic(t *testing.T) {
+	initPower := int64(100000)
+	ctx, ak, keeper, sk := keep.CreateTestInput(t, false, initPower)
+
+	// fix non-bonded pool supply
+	nbPoolAcc := sk.GetModuleAccount(ctx, types.NotBondedPoolName)
+	nbPoolAcc.SetCoins(sdk.Coins{})
+	sk.SetModuleAccount(ctx, nbPoolAcc)
+
+	val1OpAddr, val2OpAddr := keep.Addrs[0], keep.Addrs[1]
+	val1Addr, val1PubKey := sdk.ValAddress(val1OpAddr), keep.PKs[0]
+	val2Addr, val2PubKey := sdk.ValAddress(val2OpAddr), keep.PKs[1]
+	delAddr := keep.Addrs[2]
+
+	checkInvariants := func() {
+		msg, broken := AllInvariants(keeper)(ctx)
+		require.False(t, broken, msg)
+	}
+
+	// create validators
+	{
+		selfStakeAmt := sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val1Addr, val1PubKey, selfStakeAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msgCreateValidator = NewTestMsgCreateValidator(val2Addr, val2PubKey, selfStakeAmt)
+		res, err = handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	// next block to bond validators
+	ctx = ctx.WithBlockTime(ctx.BlockTime().Add(5 * time.Second))
+	EndBlocker(ctx, keeper)
+	checkInvariants()
+
+	// delegate LPs
+	delCoin := sdk.NewCoin(sdk.DefaultLiquidityDenom, sdk.NewInt(100))
+	var delShares sdk.Dec
+	{
+		msg := NewMsgDelegate(delAddr, val1Addr, delCoin)
+		_, err := handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check delegation
+		del, found := keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsZero())
+		require.True(t, del.LPShares.IsPositive())
+		delShares = del.GetLPShares()
+
+		// check validator
+		val, found := keeper.GetValidator(ctx, val1Addr)
+		require.True(t, found)
+		require.True(t, val.GetBondingTokens().IsPositive())
+		require.True(t, val.GetLPTokens().IsPositive())
+		require.True(t, val.GetBondingDelegatorShares().IsPositive())
+		require.True(t, val.GetLPDelegatorShares().IsPositive())
+	}
+	checkInvariants()
+
+	// redelegate all LPs
+	{
+		msg := NewMsgBeginRedelegate(delAddr, val1Addr, val2Addr, delCoin)
+		_, err := handleMsgBeginRedelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check redelegation
+		rd, found := keeper.GetRedelegation(ctx, delAddr, val1Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, rd.Entries, 1)
+		require.Equal(t, rd.Entries[0].OpType, types.LiquidityDelOpType)
+		require.Equal(t, rd.Entries[0].InitialBalance, delCoin.Amount)
+		require.True(t, rd.Entries[0].SharesDst.Equal(delShares))
+
+		// check old delegation removed
+		_, found = keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.False(t, found)
+
+		// check new delegation created
+		_, found = keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+	}
+	checkInvariants()
+
+	// check RD queue
+	{
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(keeper.UnbondingTime(ctx)))
+		EndBlocker(ctx, keeper)
+
+		// check RD removed
+		_, found := keeper.GetRedelegation(ctx, delAddr, val1Addr, val2Addr)
+		require.False(t, found)
+	}
+	checkInvariants()
+
+	// undelegate all LPs
+	{
+		msg := NewMsgUndelegate(delAddr, val2Addr, delCoin)
+		res, err := handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// check delegation removed
+		_, found := keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.False(t, found)
+
+		// check unbonding delegation exists
+		ub, found := keeper.GetUnbondingDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+		require.Len(t, ub.Entries, 1)
+		require.Equal(t, ub.Entries[0].OpType, types.LiquidityDelOpType)
+		require.Equal(t, ub.Entries[0].InitialBalance, delCoin.Amount)
+		require.Equal(t, ub.Entries[0].Balance, delCoin.Amount)
+	}
+	checkInvariants()
+
+	// check UB queue
+	{
+		prevLPBalance := ak.GetAccount(ctx, delAddr).GetCoins().AmountOf(sdk.DefaultLiquidityDenom)
+
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(keeper.UnbondingTime(ctx)))
+		EndBlocker(ctx, keeper)
+
+		// check UB removed
+		_, found := keeper.GetUnbondingDelegation(ctx, delAddr, val2Addr)
+		require.False(t, found)
+
+		curLPBalance := ak.GetAccount(ctx, delAddr).GetCoins().AmountOf(sdk.DefaultLiquidityDenom)
+		require.True(t, curLPBalance.GT(prevLPBalance))
+	}
+	checkInvariants()
+}
+
+// Test delegation ops with mixed bonding / LP shares.
+func TestLPDelegationMixed(t *testing.T) {
+	initPower := int64(100000)
+	ctx, ak, keeper, sk := keep.CreateTestInput(t, false, initPower)
+
+	// fix non-bonded pool supply
+	nbPoolAcc := sk.GetModuleAccount(ctx, types.NotBondedPoolName)
+	nbPoolAcc.SetCoins(sdk.Coins{})
+	sk.SetModuleAccount(ctx, nbPoolAcc)
+
+	val1OpAddr, val2OpAddr := keep.Addrs[0], keep.Addrs[1]
+	val1Addr, val1PubKey := sdk.ValAddress(val1OpAddr), keep.PKs[0]
+	val2Addr, val2PubKey := sdk.ValAddress(val2OpAddr), keep.PKs[1]
+	delAddr := keep.Addrs[2]
+
+	checkInvariants := func() {
+		msg, broken := AllInvariants(keeper)(ctx)
+		require.False(t, broken, msg)
+	}
+
+	getVal := func(id int) types.Validator {
+		var valAddr sdk.ValAddress
+		switch id {
+		case 1:
+			valAddr = val1Addr
+		case 2:
+			valAddr = val2Addr
+		}
+
+		val, found := keeper.GetValidator(ctx, valAddr)
+		require.True(t, found)
+		return val
+	}
+
+	// create validators
+	{
+		selfStakeAmt := sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val1Addr, val1PubKey, selfStakeAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msgCreateValidator = NewTestMsgCreateValidator(val2Addr, val2PubKey, selfStakeAmt)
+		res, err = handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	// next block to bond validators
+	{
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(5 * time.Second))
+		EndBlocker(ctx, keeper)
+	}
+	checkInvariants()
+
+	// get initial delegator balance
+	delInitBalance := ak.GetAccount(ctx, delAddr).GetCoins()
+
+	// delegate bonds and LPs
+	delBCoin := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100))
+	delLPCoin := sdk.NewCoin(sdk.DefaultLiquidityDenom, sdk.NewInt(100))
+	{
+		msg := NewMsgDelegate(delAddr, val1Addr, delBCoin)
+		_, err := handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		msg = NewMsgDelegate(delAddr, val1Addr, delLPCoin)
+		_, err = handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check delegation
+		del, found := keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsPositive())
+		require.True(t, del.LPShares.IsPositive())
+	}
+	checkInvariants()
+
+	// redelegate half bonds and LPs to validator 2
+	rdBCoin := sdk.NewCoin(delBCoin.Denom, delBCoin.Amount.QuoRaw(2))
+	rdLPCoin := sdk.NewCoin(delLPCoin.Denom, delLPCoin.Amount.QuoRaw(2))
+	{
+		msg := NewMsgBeginRedelegate(delAddr, val1Addr, val2Addr, rdBCoin)
+		_, err := handleMsgBeginRedelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		msg = NewMsgBeginRedelegate(delAddr, val1Addr, val2Addr, rdLPCoin)
+		_, err = handleMsgBeginRedelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check redelegation
+		rd, found := keeper.GetRedelegation(ctx, delAddr, val1Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, rd.Entries, 2)
+		//
+		require.Equal(t, rd.Entries[0].OpType, types.BondingDelOpType)
+		require.Equal(t, rd.Entries[0].InitialBalance, rdBCoin.Amount)
+		require.True(t, rd.Entries[0].SharesDst.IsPositive())
+		//
+		require.Equal(t, rd.Entries[1].OpType, types.LiquidityDelOpType)
+		require.Equal(t, rd.Entries[1].InitialBalance, rdLPCoin.Amount)
+		require.True(t, rd.Entries[1].SharesDst.IsPositive())
+
+		// check old delegation exists
+		delOld, found := keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.True(t, found)
+		require.True(t, delOld.BondingShares.IsPositive())
+		require.True(t, delOld.LPShares.IsPositive())
+
+		// check new delegation created
+		delNew, found := keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+		require.True(t, delNew.BondingShares.IsPositive())
+		require.True(t, delNew.LPShares.IsPositive())
+
+		// check validator1 still has both tokens
+		val := getVal(1)
+		require.True(t, val.GetBondingTokens().IsPositive())
+		require.True(t, val.GetBondingDelegatorShares().IsPositive())
+		require.True(t, val.GetLPTokens().IsPositive())
+		require.True(t, val.GetLPDelegatorShares().IsPositive())
+	}
+	checkInvariants()
+
+	// undelegate half bonds and LPs from validator 2
+	udBCoin := sdk.NewCoin(rdBCoin.Denom, rdBCoin.Amount.QuoRaw(2))
+	udLPCoin := sdk.NewCoin(rdLPCoin.Denom, rdLPCoin.Amount.QuoRaw(2))
+	{
+		msg := NewMsgUndelegate(delAddr, val2Addr, udBCoin)
+		res, err := handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = NewMsgUndelegate(delAddr, val2Addr, udLPCoin)
+		res, err = handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// check delegation exists
+		_, found := keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+
+		// check unbonding delegation exists
+		ub, found := keeper.GetUnbondingDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+		require.Len(t, ub.Entries, 2)
+		//
+		require.Equal(t, ub.Entries[0].OpType, types.BondingDelOpType)
+		require.Equal(t, ub.Entries[0].InitialBalance, udBCoin.Amount)
+		require.Equal(t, ub.Entries[0].Balance, udBCoin.Amount)
+		//
+		require.Equal(t, ub.Entries[1].OpType, types.LiquidityDelOpType)
+		require.Equal(t, ub.Entries[1].InitialBalance, udLPCoin.Amount)
+		require.Equal(t, ub.Entries[1].Balance, udLPCoin.Amount)
+	}
+	checkInvariants()
+
+	// wait for the 1st undelegation to finish
+	{
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(keeper.UnbondingTime(ctx)))
+		EndBlocker(ctx, keeper)
+	}
+	checkInvariants()
+
+	// undelegate the rest from validator 1 and 2
+	{
+		// 1st
+		msg := NewMsgUndelegate(delAddr, val1Addr, sdk.NewCoin(delBCoin.Denom, delBCoin.Amount.QuoRaw(2)))
+		res, err := handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		//
+		msg = NewMsgUndelegate(delAddr, val1Addr, sdk.NewCoin(delLPCoin.Denom, delLPCoin.Amount.QuoRaw(2)))
+		res, err = handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// 2nd
+		msg = NewMsgUndelegate(delAddr, val2Addr, udBCoin)
+		res, err = handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		//
+		msg = NewMsgUndelegate(delAddr, val2Addr, udLPCoin)
+		res, err = handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// wait for UDs to finish
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(keeper.UnbondingTime(ctx)))
+		EndBlocker(ctx, keeper)
+	}
+	checkInvariants()
+
+	// check not delegations, redelegation exists and validators 1 and 2 has no LPs
+	{
+		_, found := keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.False(t, found)
+		_, found = keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.False(t, found)
+
+		_, found = keeper.GetRedelegation(ctx, delAddr, val1Addr, val2Addr)
+		require.False(t, found)
+
+		val1 := getVal(1)
+		val2 := getVal(2)
+		require.True(t, val1.GetLPTokens().IsZero())
+		require.True(t, val1.GetLPDelegatorShares().IsZero())
+		require.True(t, val2.GetLPTokens().IsZero())
+		require.True(t, val2.GetLPDelegatorShares().IsZero())
+	}
+
+	// check delegator balance
+	{
+		delCurBalance := ak.GetAccount(ctx, delAddr).GetCoins()
+		require.True(t, delCurBalance.IsEqual(delInitBalance))
+	}
+}

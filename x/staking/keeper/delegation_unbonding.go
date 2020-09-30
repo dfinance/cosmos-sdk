@@ -305,7 +305,7 @@ func (k Keeper) Undelegate(
 	}
 
 	// transfer the validator tokens to the not bonded pool
-	if validator.IsBonded() {
+	if delOpType.IsBonding() && validator.IsBonded() {
 		k.bondedTokensToNotBonded(ctx, returnAmount)
 	}
 
