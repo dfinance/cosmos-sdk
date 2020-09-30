@@ -23,7 +23,7 @@ var (
 		auth.FeeCollectorName:     {supply.Burner},
 		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
 		staking.BondedPoolName:    {supply.Burner, supply.Staking},
-		staking.LiquidityPoolName: nil,
+		staking.LiquidityPoolName: {supply.Staking},
 		types.ModuleName:          {supply.Minter},
 	}
 

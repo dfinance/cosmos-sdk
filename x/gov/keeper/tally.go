@@ -25,7 +25,7 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 		currValidators[validator.GetOperator().String()] = types.NewValidatorGovInfo(
 			validator.GetOperator(),
 			validator.GetBondedTokens(),
-			validator.GetDelegatorShares(),
+			validator.GetBondingDelegatorShares(),
 			sdk.ZeroDec(),
 			types.OptionEmpty,
 		)
@@ -48,10 +48,10 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 			if val, ok := currValidators[valAddrStr]; ok {
 				// There is no need to handle the special case that validator address equal to voter address.
 				// Because voter's voting power will tally again even if there will deduct voter's voting power from validator.
-				val.DelegatorDeductions = val.DelegatorDeductions.Add(delegation.GetShares())
+				val.DelegatorDeductions = val.DelegatorDeductions.Add(delegation.GetBondingShares())
 				currValidators[valAddrStr] = val
 
-				delegatorShare := delegation.GetShares().Quo(val.DelegatorShares)
+				delegatorShare := delegation.GetBondingShares().Quo(val.DelegatorShares)
 				votingPower := delegatorShare.MulInt(val.BondedTokens)
 
 				results[vote.Option] = results[vote.Option].Add(votingPower)

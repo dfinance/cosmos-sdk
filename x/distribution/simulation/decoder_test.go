@@ -35,11 +35,11 @@ func TestDecodeDistributionStore(t *testing.T) {
 	decCoins := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.OneDec())}
 	feePool := types.InitialRewardPools()
 	feePool.FoundationPool = decCoins
-	info := types.NewDelegatorStartingInfo(2, sdk.OneDec(), 200)
+	info := types.NewDelegatorStartingInfo(2, sdk.OneDec(), sdk.ZeroDec(), 200)
 	outstanding := types.ValidatorOutstandingRewards{decCoins[0]}
 	commission := types.ValidatorAccumulatedCommission{decCoins[0]}
-	historicalRewards := types.NewValidatorHistoricalRewards(decCoins, 100)
-	currentRewards := types.NewValidatorCurrentRewards(decCoins, 5)
+	historicalRewards := types.NewValidatorHistoricalRewards(decCoins, sdk.DecCoins{}, 100)
+	currentRewards := types.NewValidatorCurrentRewards(decCoins, sdk.DecCoins{}, 5)
 	slashEvent := types.NewValidatorSlashEvent(10, sdk.OneDec())
 
 	kvPairs := tmkv.Pairs{

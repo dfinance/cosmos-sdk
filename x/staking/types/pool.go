@@ -10,7 +10,7 @@ import (
 const (
 	NotBondedPoolName = "not_bonded_tokens_pool"
 	BondedPoolName    = "bonded_tokens_pool"
-	LiquidityPoolName = "liquidity_tokesn_pool"
+	LiquidityPoolName = "liquidity_tokens_pool"
 )
 
 // Pool - tracking bonded and not-bonded token supply of the bond denomination

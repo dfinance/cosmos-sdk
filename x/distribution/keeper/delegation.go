@@ -10,6 +10,7 @@ import (
 )
 
 // initializeDelegation initializes starting info for a new delegation.
+// DelegatorStartingInfo includes bonding and lp stakes.
 func (k Keeper) initializeDelegation(ctx sdk.Context, val sdk.ValAddress, del sdk.AccAddress) {
 	// period has already been incremented - we want to store the period ended by this delegation action
 	previousPeriod := k.GetValidatorCurrentRewards(ctx, val).Period - 1
@@ -23,33 +24,52 @@ func (k Keeper) initializeDelegation(ctx sdk.Context, val sdk.ValAddress, del sd
 	// calculate delegation stake in tokens
 	// we don't store directly, so multiply delegation shares * (tokens per share)
 	// note: necessary to truncate so we don't allow withdrawing more rewards than owed
-	stake := validator.TokensFromSharesTruncated(delegation.GetShares())
-	k.SetDelegatorStartingInfo(ctx, val, del, types.NewDelegatorStartingInfo(previousPeriod, stake, uint64(ctx.BlockHeight())))
+	bondingStake := validator.BondingTokensFromSharesTruncated(delegation.GetBondingShares())
+	lpStake := validator.LPTokensFromSharesTruncated(delegation.GetLPShares())
+	k.SetDelegatorStartingInfo(ctx,
+		val, del,
+		types.NewDelegatorStartingInfo(previousPeriod, bondingStake, lpStake, uint64(ctx.BlockHeight())),
+	)
 }
 
 // calculateDelegationRewardsBetween calculates the rewards accrued by a delegation between two periods.
 // Cumulative reward rate difference is used to get rewards from a stake.
 // RewardsBankPool balance is not included in the calculation.
-func (k Keeper) calculateDelegationRewardsBetween(ctx sdk.Context, val exported.ValidatorI, startingPeriod, endingPeriod uint64, stake sdk.Dec) (rewards sdk.DecCoins) {
+func (k Keeper) calculateDelegationRewardsBetween(ctx sdk.Context, val exported.ValidatorI,
+	startingPeriod, endingPeriod uint64,
+	bondingStake, lpStake sdk.Dec,
+) (bondingRewards, lpRewards sdk.DecCoins) {
+
 	// sanity check
 	if startingPeriod > endingPeriod {
 		panic("startingPeriod cannot be greater than endingPeriod")
 	}
 
 	// sanity check
-	if stake.IsNegative() {
-		panic("stake should not be negative")
+	if bondingStake.IsNegative() {
+		panic("bonding stake should not be negative")
+	}
+	if lpStake.IsNegative() {
+		panic("LP stake should not be negative")
 	}
 
 	// return staking * (ending - starting)
 	starting := k.GetValidatorHistoricalRewards(ctx, val.GetOperator(), startingPeriod)
 	ending := k.GetValidatorHistoricalRewards(ctx, val.GetOperator(), endingPeriod)
-	difference := ending.CumulativeRewardRatio.Sub(starting.CumulativeRewardRatio)
-	if difference.IsAnyNegative() {
-		panic("negative rewards should not be possible")
+
+	bondingDifference := ending.CumulativeBondingRewardRatio.Sub(starting.CumulativeBondingRewardRatio)
+	if bondingDifference.IsAnyNegative() {
+		panic("negative bonding rewards should not be possible")
 	}
+
+	lpDifference := ending.CumulativeLPRewardRatio.Sub(starting.CumulativeLPRewardRatio)
+	if lpDifference.IsAnyNegative() {
+		panic("negative LP rewards should not be possible")
+	}
+
 	// note: necessary to truncate so we don't allow withdrawing more rewards than owed
-	rewards = difference.MulDecTruncate(stake)
+	bondingRewards = bondingDifference.MulDecTruncate(bondingStake)
+	lpRewards = lpDifference.MulDecTruncate(lpStake)
 
 	return
 }
@@ -58,7 +78,10 @@ func (k Keeper) calculateDelegationRewardsBetween(ctx sdk.Context, val exported.
 // Start period is taken from delegationStaringInfo.
 // Delegator stake is reduced iterating over slash events.
 // RewardsBankPool balance is not included in the calculation.
-func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI, endingPeriod uint64) (rewards sdk.DecCoins) {
+func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI,
+	endingPeriod uint64,
+) (bondingRewards, lpRewards sdk.DecCoins) {
+
 	// fetch starting info for delegation
 	startingInfo := k.GetDelegatorStartingInfo(ctx, del.GetValidatorAddr(), del.GetDelegatorAddr())
 
@@ -68,7 +91,8 @@ func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.Validat
 	}
 
 	startingPeriod := startingInfo.PreviousPeriod
-	stake := startingInfo.Stake
+	bondingStake := startingInfo.BondingStake
+	lpStake := startingInfo.LPStake
 
 	// Iterate through slashes and withdraw with calculated staking for
 	// distribution periods. These period offsets are dependent on *when* slashes
@@ -80,17 +104,21 @@ func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.Validat
 	startingHeight := startingInfo.Height
 	// Slashes this block happened after reward allocation, but we have to account
 	// for them for the stake sanity check below.
+	// Slashing only affects bonding rewards.
 	endingHeight := uint64(ctx.BlockHeight())
 	if endingHeight > startingHeight {
 		k.IterateValidatorSlashEventsBetween(ctx, del.GetValidatorAddr(), startingHeight, endingHeight,
 			func(height uint64, event types.ValidatorSlashEvent) (stop bool) {
 				endingPeriod := event.ValidatorPeriod
 				if endingPeriod > startingPeriod {
-					rewards = rewards.Add(k.calculateDelegationRewardsBetween(ctx, val, startingPeriod, endingPeriod, stake)...)
+					curBondingRewards, curLPRewards := k.calculateDelegationRewardsBetween(ctx, val, startingPeriod, endingPeriod, bondingStake, lpStake)
+
+					bondingRewards = bondingRewards.Add(curBondingRewards...)
+					lpRewards = lpRewards.Add(curLPRewards...)
 
 					// Note: It is necessary to truncate so we don't allow withdrawing
 					// more rewards than owed.
-					stake = stake.MulTruncate(sdk.OneDec().Sub(event.Fraction))
+					bondingStake = bondingStake.MulTruncate(sdk.OneDec().Sub(event.Fraction))
 					startingPeriod = endingPeriod
 				}
 				return false
@@ -102,9 +130,8 @@ func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.Validat
 	// equal to current stake here. We cannot use Equals because stake is truncated
 	// when multiplied by slash fractions (see above). We could only use equals if
 	// we had arbitrary-precision rationals.
-	currentStake := val.TokensFromShares(del.GetShares())
-
-	if stake.GT(currentStake) {
+	currentBondingStake := val.BondingTokensFromShares(del.GetBondingShares())
+	if bondingStake.GT(currentBondingStake) {
 		// Account for rounding inconsistencies between:
 		//
 		//     currentStake: calculated as in staking with a single computation
@@ -126,30 +153,32 @@ func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.Validat
 		// however any greater amount should be considered a breach in expected
 		// behaviour.
 		marginOfErr := sdk.SmallestDec().MulInt64(3)
-		if stake.LTE(currentStake.Add(marginOfErr)) {
-			stake = currentStake
+		if bondingStake.LTE(currentBondingStake.Add(marginOfErr)) {
+			bondingStake = currentBondingStake
 		} else {
-			panic(fmt.Sprintf("calculated final stake for delegator %s greater than current stake"+
+			panic(fmt.Sprintf("calculated final bonding stake for delegator %s greater than current stake"+
 				"\n\tfinal stake:\t%s"+
 				"\n\tcurrent stake:\t%s",
-				del.GetDelegatorAddr(), stake, currentStake))
+				del.GetDelegatorAddr(), bondingStake, currentBondingStake))
 		}
 	}
 
 	// calculate rewards for final period
-	rewards = rewards.Add(k.calculateDelegationRewardsBetween(ctx, val, startingPeriod, endingPeriod, stake)...)
+	curBondingRewards, curLPRewrds := k.calculateDelegationRewardsBetween(ctx, val, startingPeriod, endingPeriod, bondingStake, lpStake)
+	bondingRewards = bondingRewards.Add(curBondingRewards...)
+	lpRewards = lpRewards.Add(curLPRewrds...)
 
-	return rewards
+	return
 }
 
 // calculateDelegationTotalRewards sums current validator delegator rewards and stored RewardsBank coins.
 func (k Keeper) calculateDelegationTotalRewards(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI, endingPeriod uint64) (rewards sdk.DecCoins) {
 	// calculate rewards from the main pool
-	curDecCoins := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	curBondingDecCoins, curLPDecCoins := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
 	// get accumulated coins from the RewardsBankPool
 	bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
 
-	totalDecCoins := curDecCoins.Add(sdk.NewDecCoinsFromCoins(bankCoins...)...)
+	totalDecCoins := curBondingDecCoins.Add(curLPDecCoins...).Add(sdk.NewDecCoinsFromCoins(bankCoins...)...)
 
 	return totalDecCoins
 }
@@ -165,7 +194,8 @@ func (k Keeper) withdrawDelegationRewards(ctx sdk.Context, val exported.Validato
 
 	// end current period and calculate rewards
 	endingPeriod := k.incrementValidatorPeriod(ctx, val)
-	rewardsRaw := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	bondingRewardsRaw, lpRewardsRaw := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	rewardsRaw := bondingRewardsRaw.Add(lpRewardsRaw...)
 	outstanding := k.GetValidatorOutstandingRewards(ctx, del.GetValidatorAddr())
 
 	// defensive edge case may happen on the very final digits

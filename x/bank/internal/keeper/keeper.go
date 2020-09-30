@@ -208,7 +208,7 @@ func (keeper BaseSendKeeper) InputOutputCoins(ctx sdk.Context, inputs []types.In
 			sdk.NewEvent(
 				types.EventTypeTransfer,
 				sdk.NewAttribute(types.AttributeKeyRecipient, out.Address.String()),
-				sdk.NewAttribute(sdk.AttributeKeyCoin, out.Coins.String()),
+				sdk.NewAttribute(sdk.AttributeKeyAmount, out.Coins.String()),
 			),
 		)
 
@@ -233,7 +233,7 @@ func (keeper BaseSendKeeper) SendCoins(ctx sdk.Context, fromAddr sdk.AccAddress,
 			types.EventTypeTransfer,
 			sdk.NewAttribute(types.AttributeKeyRecipient, toAddr.String()),
 			sdk.NewAttribute(types.AttributeKeySender, fromAddr.String()),
-			sdk.NewAttribute(sdk.AttributeKeyCoin, amt.String()),
+			sdk.NewAttribute(sdk.AttributeKeyAmount, amt.String()),
 		),
 		sdk.NewEvent(
 			sdk.EventTypeMessage,

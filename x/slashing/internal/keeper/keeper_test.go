@@ -111,7 +111,6 @@ func TestHandleAlreadyJailed(t *testing.T) {
 // Ensure that missed blocks are tracked correctly and that
 // the start height of the signing info is reset correctly
 func TestValidatorDippingInAndOut(t *testing.T) {
-
 	// initial setup
 	// TestParams set the SignedBlocksWindow to 1000 and MaxMissedBlocksPerWindow to 500
 	ctx, _, sk, _, keeper := CreateTestInput(t, TestParams())
@@ -219,5 +218,4 @@ func TestValidatorDippingInAndOut(t *testing.T) {
 	staking.EndBlocker(ctx, sk)
 	validator, _ = sk.GetValidator(ctx, addr)
 	require.Equal(t, sdk.Unbonding, validator.Status)
-
 }

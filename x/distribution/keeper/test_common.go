@@ -135,7 +135,7 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 		mint.ModuleName:           nil,
 		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
 		staking.BondedPoolName:    {supply.Burner, supply.Staking},
-		staking.LiquidityPoolName: nil,
+		staking.LiquidityPoolName: {supply.Staking},
 		types.RewardsBankPoolName: nil,
 	}
 	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bankKeeper, maccPerms)

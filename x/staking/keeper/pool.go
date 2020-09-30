@@ -17,7 +17,7 @@ func (k Keeper) GetNotBondedPool(ctx sdk.Context) (notBondedPool exported.Module
 }
 
 // GetLiquidityPool returns the liquidity tokens pool's module account
-func (k Keeper) GetLiquidityPool(ctx sdk.Context) (notBondedPool exported.ModuleAccountI) {
+func (k Keeper) GetLiquidityPool(ctx sdk.Context) (liquidityPool exported.ModuleAccountI) {
 	return k.supplyKeeper.GetModuleAccount(ctx, types.LiquidityPoolName)
 }
 

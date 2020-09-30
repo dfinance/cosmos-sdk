@@ -32,7 +32,7 @@ func TestAllocateTokensToValidatorWithCommission(t *testing.T) {
 	tokens := sdk.DecCoins{
 		{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(10)},
 	}
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// check commission
 	expected := sdk.DecCoins{
@@ -41,7 +41,7 @@ func TestAllocateTokensToValidatorWithCommission(t *testing.T) {
 	require.Equal(t, expected, k.GetValidatorAccumulatedCommission(ctx, val.GetOperator()))
 
 	// check current rewards
-	require.Equal(t, expected, k.GetValidatorCurrentRewards(ctx, val.GetOperator()).Rewards)
+	require.Equal(t, expected, k.GetValidatorCurrentRewards(ctx, val.GetOperator()).BondingRewards, sdk.DecCoins{})
 }
 
 // Allocate tokens between two validators (commission: 1st - 50%, 2nd - 0%) and no pools distribution.
@@ -98,8 +98,8 @@ func TestAllocateTokensToManyValidators(t *testing.T) {
 	require.True(t, k.GetRewardPools(ctx).HARP.IsZero())
 	require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr1).IsZero())
 	require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr2).IsZero())
-	require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).Rewards.IsZero())
-	require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr2).Rewards.IsZero())
+	require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).BondingRewards.IsZero())
+	require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr2).BondingRewards.IsZero())
 
 	// allocate tokens as if both had voted and second was proposer + pre allocated Foundation tokens
 	fees := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)))
@@ -111,7 +111,7 @@ func TestAllocateTokensToManyValidators(t *testing.T) {
 	ak.SetAccount(ctx, feeCollector)
 
 	// allocate
-	k.AllocateTokens(ctx, 200, 200, valConsAddr2, votes, sdk.ZeroDec())
+	k.AllocateTokens(ctx, 200, 0, 200, 0, valConsAddr2, votes, sdk.ZeroDec())
 
 	// val1, val2: outstanding rewards (100% as no pools distribution involved)
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDecWithPrec(475, 1)}}, k.GetValidatorOutstandingRewards(ctx, valOpAddr1))
@@ -126,9 +126,9 @@ func TestAllocateTokensToManyValidators(t *testing.T) {
 	// val2 commissions: zero
 	require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr2).IsZero())
 	// val1 rewards: outstanding / 2
-	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDecWithPrec(2375, 2)}}, k.GetValidatorCurrentRewards(ctx, valOpAddr1).Rewards)
+	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDecWithPrec(2375, 2)}}, k.GetValidatorCurrentRewards(ctx, valOpAddr1).BondingRewards)
 	// val2 rewards: outstanding (as it has no commission)
-	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDecWithPrec(525, 1)}}, k.GetValidatorCurrentRewards(ctx, valOpAddr2).Rewards)
+	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDecWithPrec(525, 1)}}, k.GetValidatorCurrentRewards(ctx, valOpAddr2).BondingRewards)
 
 	// check module funds invariant
 	invMsg, invBroken := ModuleAccountInvariant(k)(ctx)
@@ -198,8 +198,8 @@ func TestAllocateTokensTruncation(t *testing.T) {
 	require.True(t, k.GetRewardPools(ctx).PublicTreasuryPool.IsZero())
 	require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr1).IsZero())
 	require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr2).IsZero())
-	require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).Rewards.IsZero())
-	require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr2).Rewards.IsZero())
+	require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).BondingRewards.IsZero())
+	require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr2).BondingRewards.IsZero())
 
 	// allocate tokens as if both had voted and second was proposer
 	fees := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(634195840)))
@@ -212,7 +212,7 @@ func TestAllocateTokensTruncation(t *testing.T) {
 	ak.SetAccount(ctx, feeCollector)
 
 	// allocate
-	k.AllocateTokens(ctx, 31, 31, valConsAddr2, votes, sdk.ZeroDec())
+	k.AllocateTokens(ctx, 31, 0, 31, 0, valConsAddr2, votes, sdk.ZeroDec())
 
 	// check validators has outstanding rewards
 	require.True(t, k.GetValidatorOutstandingRewards(ctx, valOpAddr1).IsValid())
@@ -280,11 +280,11 @@ func TestAllocateTokensPools(t *testing.T) {
 	{
 		require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr1).IsZero())
 		require.True(t, k.GetValidatorOutstandingRewards(ctx, valOpAddr1).IsZero())
-		require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).Rewards.IsZero())
+		require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).BondingRewards.IsZero())
 		//
 		require.True(t, k.GetValidatorOutstandingRewards(ctx, valOpAddr2).IsZero())
 		require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr2).IsZero())
-		require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr2).Rewards.IsZero())
+		require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr2).BondingRewards.IsZero())
 		//
 		require.True(t, k.GetRewardPools(ctx).TotalCoins().IsZero())
 		//
@@ -303,7 +303,7 @@ func TestAllocateTokensPools(t *testing.T) {
 
 	// allocate tokens with foundation part of 1%
 	foundationTax := sdk.NewDecWithPrec(1, 2)
-	k.AllocateTokens(ctx, votes[0].DistributionPower, votes.TotalDistributionPower(), valConsAddr1, votes, foundationTax)
+	k.AllocateTokens(ctx, votes[0].DistributionPower, 0, votes.TotalDistributionPower(), 0, valConsAddr1, votes, foundationTax)
 
 	// check reward pools distribution and only one coin exists in a pool
 	rewardPools := k.GetRewardPools(ctx)
@@ -348,20 +348,20 @@ func TestAllocateTokensPools(t *testing.T) {
 	// get validators rewards
 	val1OutstangingRewardsAmt := k.GetValidatorOutstandingRewards(ctx, valOpAddr1).AmountOf(sdk.DefaultBondDenom)
 	val1CommissionRewardsAmt := k.GetValidatorAccumulatedCommission(ctx, valOpAddr1).AmountOf(sdk.DefaultBondDenom)
-	val1DelegatorsRewardsAmt := k.GetValidatorCurrentRewards(ctx, valOpAddr1).Rewards.AmountOf(sdk.DefaultBondDenom)
+	val1DelegatorsRewardsAmt := k.GetValidatorCurrentRewards(ctx, valOpAddr1).BondingRewards.AmountOf(sdk.DefaultBondDenom)
 	{
 		require.Len(t, k.GetValidatorOutstandingRewards(ctx, valOpAddr1), 1)
 		require.Len(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr1), 1)
-		require.Len(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).Rewards, 1)
+		require.Len(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).BondingRewards, 1)
 	}
 	//
 	val2OutstangingRewardsAmt := k.GetValidatorOutstandingRewards(ctx, valOpAddr2).AmountOf(sdk.DefaultBondDenom)
 	val2CommissionRewardsAmt := k.GetValidatorAccumulatedCommission(ctx, valOpAddr2).AmountOf(sdk.DefaultBondDenom)
-	val2DelegatorsRewardsAmt := k.GetValidatorCurrentRewards(ctx, valOpAddr2).Rewards.AmountOf(sdk.DefaultBondDenom)
+	val2DelegatorsRewardsAmt := k.GetValidatorCurrentRewards(ctx, valOpAddr2).BondingRewards.AmountOf(sdk.DefaultBondDenom)
 	{
 		require.Len(t, k.GetValidatorOutstandingRewards(ctx, valOpAddr2), 1)
 		require.Len(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr2), 1)
-		require.Len(t, k.GetValidatorCurrentRewards(ctx, valOpAddr2).Rewards, 1)
+		require.Len(t, k.GetValidatorCurrentRewards(ctx, valOpAddr2).BondingRewards, 1)
 	}
 
 	// check ValidatorsPool distribution
@@ -472,7 +472,7 @@ func TestAllocatePublicTreasuryOverflow(t *testing.T) {
 	{
 		require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr1).IsZero())
 		require.True(t, k.GetValidatorOutstandingRewards(ctx, valOpAddr1).IsZero())
-		require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).Rewards.IsZero())
+		require.True(t, k.GetValidatorCurrentRewards(ctx, valOpAddr1).BondingRewards.IsZero())
 		//
 		require.True(t, k.GetRewardPools(ctx).TotalCoins().IsZero())
 		//
@@ -480,7 +480,7 @@ func TestAllocatePublicTreasuryOverflow(t *testing.T) {
 	}
 
 	// allocate tokens without foundation part
-	k.AllocateTokens(ctx, votes[0].DistributionPower, votes.TotalDistributionPower(), valConsAddr1, votes, sdk.ZeroDec())
+	k.AllocateTokens(ctx, votes[0].DistributionPower, 0, votes.TotalDistributionPower(), 0, valConsAddr1, votes, sdk.ZeroDec())
 
 	// check pools distribution
 	rewardPools := k.GetRewardPools(ctx)

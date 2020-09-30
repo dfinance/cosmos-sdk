@@ -13,7 +13,8 @@ import (
 // {dynamicFoundationPoolTax} is defined by mint module as a ratio between foundationAllocated token to all minted tokens.
 func (k Keeper) AllocateTokens(
 	ctx sdk.Context,
-	proposerPower, totalPower int64,
+	proposerDistrPower, proposerLPPower,
+	totalDistrPower, totalLPPower int64,
 	proposer sdk.ConsAddress, votes types.ABCIVotes,
 	dynamicFoundationPoolTax sdk.Dec,
 ) {
@@ -41,7 +42,7 @@ func (k Keeper) AllocateTokens(
 
 	// temporary workaround to keep CanWithdrawInvariant happy
 	// general discussions here: https://github.com/cosmos/cosmos-sdk/issues/2906#issuecomment-441867634
-	if totalPower == 0 {
+	if totalDistrPower == 0 {
 		k.AppendToFoundationPool(ctx, feesCollected)
 		return
 	}
@@ -83,14 +84,32 @@ func (k Keeper) AllocateTokens(
 			pools.PublicTreasuryPool[i] = treasuryCoin
 		}
 	}
+
+	// check if LiquidityProvidersPool can be distributed
+	lpPool, lpRemainder := sdk.DecCoins{}, sdk.DecCoins{}
+	if totalLPPower > 0 {
+		lpPool = pools.LiquidityProvidersPool
+		lpRemainder = lpPool
+		pools.LiquidityProvidersPool = sdk.DecCoins{}
+	}
+
+	// update pools
 	k.SetRewardPools(ctx, pools)
 
-	// distribute validatorsPool
+	// distribute validatorsPool and lpPool
 
-	// calculate previous proposer reward relative to its power
-	proposerPowerRatio := sdk.NewDec(proposerPower).Quo(sdk.NewDec(totalPower))
-	proposerMultiplier := params.BaseProposerReward.Add(params.BonusProposerReward.Mul(proposerPowerRatio))
-	proposerReward := validatorsPool.MulDecTruncate(proposerMultiplier)
+	// calculate previous proposer bonding reward relative to its distr power
+	proposerPowerBondingRatio := sdk.NewDec(proposerDistrPower).Quo(sdk.NewDec(totalDistrPower))
+	proposerBondingMultiplier := params.BaseProposerReward.Add(params.BonusProposerReward.Mul(proposerPowerBondingRatio))
+	proposerBondingReward := validatorsPool.MulDecTruncate(proposerBondingMultiplier)
+
+	// calculate previous proposer LP reward relative to its LP power
+	proposerLPMultiplier := sdk.ZeroDec()
+	proposerLPReward := sdk.DecCoins{}
+	if proposerLPPower > 0 {
+		proposerLPMultiplier = sdk.NewDec(proposerLPPower).QuoTruncate(sdk.NewDec(totalLPPower))
+		proposerLPReward = lpPool.MulDecTruncate(proposerLPMultiplier)
+	}
 
 	// pay previous proposer
 	proposerValidator := k.stakingKeeper.ValidatorByConsAddr(ctx, proposer)
@@ -98,13 +117,15 @@ func (k Keeper) AllocateTokens(
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				types.EventTypeProposerReward,
-				sdk.NewAttribute(sdk.AttributeKeyAmount, proposerReward.String()),
+				sdk.NewAttribute(sdk.AttributeKeyBondingAmount, proposerBondingReward.String()),
+				sdk.NewAttribute(sdk.AttributeKeyLPAmount, proposerLPReward.String()),
 				sdk.NewAttribute(types.AttributeKeyValidator, proposerValidator.GetOperator().String()),
 			),
 		)
 
-		k.AllocateTokensToValidator(ctx, proposerValidator, proposerReward)
-		feesRemainder = feesRemainder.Sub(proposerReward)
+		k.AllocateTokensToValidator(ctx, proposerValidator, proposerBondingReward, proposerLPReward)
+		feesRemainder = feesRemainder.Sub(proposerBondingReward)
+		lpRemainder = lpRemainder.Sub(proposerLPReward)
 	} else {
 		// previous proposer can be unknown if say, the unbonding period is 1 block, so
 		// e.g. a validator undelegates at block X, it's removed entirely by
@@ -118,52 +139,66 @@ func (k Keeper) AllocateTokens(
 			proposer.String()))
 	}
 
-	// calculate previous voters rewards relative to their power
-	voterMultiplier := sdk.OneDec().Sub(proposerMultiplier)
+	// calculate previous voters rewards relative to their power (distribution / LP)
+	voterBondingMultiplier := sdk.OneDec().Sub(proposerBondingMultiplier)
+	voterLPMultiplier := sdk.OneDec().Sub(proposerLPMultiplier)
 	for _, vote := range votes {
-		validatorPowerRatio := sdk.NewDec(vote.DistributionPower).QuoTruncate(sdk.NewDec(totalPower))
-		validatorReward := validatorsPool.MulDecTruncate(voterMultiplier).MulDecTruncate(validatorPowerRatio)
-		k.AllocateTokensToValidator(ctx, vote.Validator, validatorReward)
+		// estimate bonding reward
+		validatorBondingPowerRatio := sdk.NewDec(vote.DistributionPower).QuoTruncate(sdk.NewDec(totalDistrPower))
+		validatorBondingReward := validatorsPool.MulDecTruncate(voterBondingMultiplier).MulDecTruncate(validatorBondingPowerRatio)
 
-		feesRemainder = feesRemainder.Sub(validatorReward)
+		// estimate LP reward
+		validatorLPReward := sdk.DecCoins{}
+		if vote.LPPower > 0 {
+			validatorLPPowerRatio := sdk.NewDec(vote.LPPower).QuoTruncate(sdk.NewDec(totalLPPower))
+			validatorLPReward = lpPool.MulDecTruncate(voterLPMultiplier).MulDecTruncate(validatorLPPowerRatio)
+		}
+
+		k.AllocateTokensToValidator(ctx, vote.Validator, validatorBondingReward, validatorLPReward)
+
+		feesRemainder = feesRemainder.Sub(validatorBondingReward)
+		lpRemainder = lpRemainder.Sub(validatorLPReward)
 	}
 
-	// transfer ValidatorsPool remainder to FoundationPool
+	// transfer ValidatorsPool and LPPool remainders to FoundationPool
 	k.AppendToFoundationPool(ctx, feesRemainder)
+	k.AppendToFoundationPool(ctx, lpRemainder)
 }
 
 // AllocateTokensToValidator allocates tokens to a particular validator, splitting according to commission.
-func (k Keeper) AllocateTokensToValidator(ctx sdk.Context, val exported.ValidatorI, tokens sdk.DecCoins) {
+func (k Keeper) AllocateTokensToValidator(ctx sdk.Context, val exported.ValidatorI, bondingTokens, lpTokens sdk.DecCoins) {
 	// split tokens between validator and delegators according to commission
-	commission := tokens.MulDec(val.GetCommission())
-	shared := tokens.Sub(commission)
+	bondingCommission := bondingTokens.MulDec(val.GetCommission())
+	bondingShared := bondingTokens.Sub(bondingCommission)
 
 	// update current commission
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types.EventTypeCommission,
-			sdk.NewAttribute(sdk.AttributeKeyAmount, commission.String()),
+			sdk.NewAttribute(sdk.AttributeKeyBondingAmount, bondingCommission.String()),
 			sdk.NewAttribute(types.AttributeKeyValidator, val.GetOperator().String()),
 		),
 	)
 	currentCommission := k.GetValidatorAccumulatedCommission(ctx, val.GetOperator())
-	currentCommission = currentCommission.Add(commission...)
+	currentCommission = currentCommission.Add(bondingCommission...)
 	k.SetValidatorAccumulatedCommission(ctx, val.GetOperator(), currentCommission)
 
 	// update current rewards
 	currentRewards := k.GetValidatorCurrentRewards(ctx, val.GetOperator())
-	currentRewards.Rewards = currentRewards.Rewards.Add(shared...)
+	currentRewards.BondingRewards = currentRewards.BondingRewards.Add(bondingShared...)
+	currentRewards.LPRewards = currentRewards.LPRewards.Add(lpTokens...)
 	k.SetValidatorCurrentRewards(ctx, val.GetOperator(), currentRewards)
 
 	// update outstanding rewards
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types.EventTypeRewards,
-			sdk.NewAttribute(sdk.AttributeKeyAmount, tokens.String()),
+			sdk.NewAttribute(sdk.AttributeKeyBondingAmount, bondingTokens.String()),
+			sdk.NewAttribute(sdk.AttributeKeyLPAmount, lpTokens.String()),
 			sdk.NewAttribute(types.AttributeKeyValidator, val.GetOperator().String()),
 		),
 	)
 	outstanding := k.GetValidatorOutstandingRewards(ctx, val.GetOperator())
-	outstanding = outstanding.Add(tokens...)
+	outstanding = outstanding.Add(bondingTokens...).Add(lpTokens...)
 	k.SetValidatorOutstandingRewards(ctx, val.GetOperator(), outstanding)
 }

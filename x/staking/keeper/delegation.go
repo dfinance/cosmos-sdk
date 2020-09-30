@@ -369,7 +369,7 @@ func (k Keeper) forceStopAllRedelegations(ctx sdk.Context, delAddr sdk.AccAddres
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				types.EventTypeCompleteRedelegation,
-				sdk.NewAttribute(sdk.AttributeKeyCoin, balances.String()),
+				sdk.NewAttribute(sdk.AttributeKeyAmount, balances.String()),
 				sdk.NewAttribute(types.AttributeKeyDelegator, triplet.DelegatorAddress.String()),
 				sdk.NewAttribute(types.AttributeKeySrcValidator, triplet.ValidatorSrcAddress.String()),
 				sdk.NewAttribute(types.AttributeKeyDstValidator, triplet.ValidatorDstAddress.String()),
@@ -438,7 +438,7 @@ func (k Keeper) forceStopAllUnbondingDelegations(ctx sdk.Context, delAddr sdk.Ac
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				types.EventTypeCompleteUnbonding,
-				sdk.NewAttribute(sdk.AttributeKeyCoin, balances.String()),
+				sdk.NewAttribute(sdk.AttributeKeyAmount, balances.String()),
 				sdk.NewAttribute(types.AttributeKeyValidator, pair.ValidatorAddress.String()),
 				sdk.NewAttribute(types.AttributeKeyDelegator, pair.DelegatorAddress.String()),
 			),

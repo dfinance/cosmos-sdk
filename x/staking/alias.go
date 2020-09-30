@@ -42,6 +42,8 @@ const (
 	MaxWebsiteLength                   = types.MaxWebsiteLength
 	MaxDetailsLength                   = types.MaxDetailsLength
 	DoNotModifyDesc                    = types.DoNotModifyDesc
+	BondingDelOpType                   = types.BondingDelOpType
+	LiquidityDelOpType                 = types.LiquidityDelOpType
 )
 
 var (
@@ -206,6 +208,7 @@ type (
 	Keeper                    = keeper.Keeper
 	Commission                = types.Commission
 	CommissionRates           = types.CommissionRates
+	DelegationOpType          = types.DelegationOpType
 	DVPair                    = types.DVPair
 	DVVTriplet                = types.DVVTriplet
 	Delegation                = types.Delegation

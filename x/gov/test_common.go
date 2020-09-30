@@ -62,11 +62,13 @@ func getMockApp(
 	govAcc := supply.NewEmptyModuleAccount(types.ModuleName, supply.Burner)
 	notBondedPool := supply.NewEmptyModuleAccount(staking.NotBondedPoolName, supply.Burner, supply.Staking)
 	bondPool := supply.NewEmptyModuleAccount(staking.BondedPoolName, supply.Burner, supply.Staking)
+	liquidityPool := supply.NewEmptyModuleAccount(staking.LiquidityPoolName, supply.Staking)
 
 	blacklistedAddrs := make(map[string]bool)
 	blacklistedAddrs[govAcc.GetAddress().String()] = true
 	blacklistedAddrs[notBondedPool.GetAddress().String()] = true
 	blacklistedAddrs[bondPool.GetAddress().String()] = true
+	blacklistedAddrs[liquidityPool.GetAddress().String()] = true
 
 	pk := mApp.ParamsKeeper
 
@@ -79,7 +81,7 @@ func getMockApp(
 		types.ModuleName:          {supply.Burner},
 		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
 		staking.BondedPoolName:    {supply.Burner, supply.Staking},
-		staking.LiquidityPoolName: nil,
+		staking.LiquidityPoolName: {supply.Staking},
 	}
 	supplyKeeper := supply.NewKeeper(mApp.Cdc, keySupply, mApp.AccountKeeper, bk, maccPerms)
 	sk := staking.NewKeeper(
@@ -95,7 +97,7 @@ func getMockApp(
 
 	mApp.SetEndBlocker(getEndBlocker(keeper))
 	mApp.SetInitChainer(getInitChainer(mApp, keeper, sk, supplyKeeper, genAccs, genState,
-		[]supplyexported.ModuleAccountI{govAcc, notBondedPool, bondPool}))
+		[]supplyexported.ModuleAccountI{govAcc, notBondedPool, bondPool, liquidityPool}))
 
 	require.NoError(t, mApp.CompleteSetup(keyStaking, keyGov, keySupply))
 

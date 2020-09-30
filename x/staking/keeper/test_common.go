@@ -109,11 +109,13 @@ func CreateTestInput(t *testing.T, isCheckTx bool, initPower int64) (sdk.Context
 	feeCollectorAcc := supply.NewEmptyModuleAccount(auth.FeeCollectorName)
 	notBondedPool := supply.NewEmptyModuleAccount(types.NotBondedPoolName, supply.Burner, supply.Staking)
 	bondPool := supply.NewEmptyModuleAccount(types.BondedPoolName, supply.Burner, supply.Staking)
+	liquidityPool := supply.NewEmptyModuleAccount(types.LiquidityPoolName, supply.Staking)
 
 	blacklistedAddrs := make(map[string]bool)
 	blacklistedAddrs[feeCollectorAcc.GetAddress().String()] = true
 	blacklistedAddrs[notBondedPool.GetAddress().String()] = true
 	blacklistedAddrs[bondPool.GetAddress().String()] = true
+	blacklistedAddrs[liquidityPool.GetAddress().String()] = true
 
 	pk := params.NewKeeper(cdc, keyParams, tkeyParams)
 
@@ -134,7 +136,7 @@ func CreateTestInput(t *testing.T, isCheckTx bool, initPower int64) (sdk.Context
 		auth.FeeCollectorName:   nil,
 		types.NotBondedPoolName: {supply.Burner, supply.Staking},
 		types.BondedPoolName:    {supply.Burner, supply.Staking},
-		types.LiquidityPoolName: nil,
+		types.LiquidityPoolName: {supply.Staking},
 	}
 	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bk, maccPerms)
 
@@ -154,6 +156,7 @@ func CreateTestInput(t *testing.T, isCheckTx bool, initPower int64) (sdk.Context
 	supplyKeeper.SetModuleAccount(ctx, feeCollectorAcc)
 	supplyKeeper.SetModuleAccount(ctx, bondPool)
 	supplyKeeper.SetModuleAccount(ctx, notBondedPool)
+	supplyKeeper.SetModuleAccount(ctx, liquidityPool)
 
 	// fill all the addresses with some coins, set the loose pool tokens simultaneously
 	for _, addr := range Addrs {

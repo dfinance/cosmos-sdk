@@ -16,33 +16,42 @@ import (
 //  + one per validator for the zeroeth period, set on initialization
 type ValidatorHistoricalRewards struct {
 	// Sum from the zeroeth period until this period of rewards / tokens, per the spec
-	CumulativeRewardRatio sdk.DecCoins `json:"cumulative_reward_ratio" yaml:"cumulative_reward_ratio"`
+	CumulativeBondingRewardRatio sdk.DecCoins `json:"cumulative_bonding_reward_ratio" yaml:"cumulative_bonding_reward_ratio"`
+	CumulativeLPRewardRatio      sdk.DecCoins `json:"cumulative_lp_reward_ratio" yaml:"cumulative_lp_reward_ratio"`
 	// Indicates the number of objects which might need to reference this historical entry at any point
 	ReferenceCount uint16 `json:"reference_count" yaml:"reference_count"`
 }
 
 // NewValidatorHistoricalRewards creates a new ValidatorHistoricalRewards.
-func NewValidatorHistoricalRewards(cumulativeRewardRatio sdk.DecCoins, referenceCount uint16) ValidatorHistoricalRewards {
+func NewValidatorHistoricalRewards(
+	cumulativeBondingRewardRatio, cumulativeLPRewardRatio sdk.DecCoins,
+	referenceCount uint16,
+) ValidatorHistoricalRewards {
+
 	return ValidatorHistoricalRewards{
-		CumulativeRewardRatio: cumulativeRewardRatio,
-		ReferenceCount:        referenceCount,
+		CumulativeBondingRewardRatio: cumulativeBondingRewardRatio,
+		CumulativeLPRewardRatio:      cumulativeLPRewardRatio,
+		ReferenceCount:               referenceCount,
 	}
 }
 
 // ValidatorCurrentRewards keeps current rewards and current period for a validator.
 // Kept as a running counter and incremented each block as long as the validator's tokens remain constant.
 type ValidatorCurrentRewards struct {
-	// Current rewards
-	Rewards sdk.DecCoins `json:"rewards" yaml:"rewards"`
+	// Current bonding tokens rewards
+	BondingRewards sdk.DecCoins `json:"bonding_rewards" yaml:"bonding_rewards"`
+	// Current liquidity tokens rewards
+	LPRewards sdk.DecCoins `json:"lp_rewards" yaml:"lp_rewards"`
 	// Current period
 	Period uint64 `json:"period" yaml:"period"`
 }
 
 // NewValidatorCurrentRewards creates a new ValidatorCurrentRewards.
-func NewValidatorCurrentRewards(rewards sdk.DecCoins, period uint64) ValidatorCurrentRewards {
+func NewValidatorCurrentRewards(bondingRewards, lpRewards sdk.DecCoins, period uint64) ValidatorCurrentRewards {
 	return ValidatorCurrentRewards{
-		Rewards: rewards,
-		Period:  period,
+		BondingRewards: bondingRewards,
+		LPRewards:      lpRewards,
+		Period:         period,
 	}
 }
 

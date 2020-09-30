@@ -43,7 +43,7 @@ func (k Keeper) BlockValidatorUpdates(ctx sdk.Context) []abci.ValidatorUpdate {
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				types.EventTypeCompleteUnbonding,
-				sdk.NewAttribute(sdk.AttributeKeyCoin, balances.String()),
+				sdk.NewAttribute(sdk.AttributeKeyAmount, balances.String()),
 				sdk.NewAttribute(types.AttributeKeyValidator, dvPair.ValidatorAddress.String()),
 				sdk.NewAttribute(types.AttributeKeyDelegator, dvPair.DelegatorAddress.String()),
 			),
@@ -61,7 +61,7 @@ func (k Keeper) BlockValidatorUpdates(ctx sdk.Context) []abci.ValidatorUpdate {
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				types.EventTypeCompleteRedelegation,
-				sdk.NewAttribute(sdk.AttributeKeyCoin, balances.String()),
+				sdk.NewAttribute(sdk.AttributeKeyAmount, balances.String()),
 				sdk.NewAttribute(types.AttributeKeyDelegator, dvvTriplet.DelegatorAddress.String()),
 				sdk.NewAttribute(types.AttributeKeySrcValidator, dvvTriplet.ValidatorSrcAddress.String()),
 				sdk.NewAttribute(types.AttributeKeyDstValidator, dvvTriplet.ValidatorDstAddress.String()),
@@ -118,10 +118,10 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx sdk.Context) (updates []ab
 		switch {
 		case validator.IsUnbonded():
 			validator = k.unbondedToBonded(ctx, validator)
-			amtFromNotBondedToBonded = amtFromNotBondedToBonded.Add(validator.GetBondedTokens())
+			amtFromNotBondedToBonded = amtFromNotBondedToBonded.Add(validator.GetBondingTokens())
 		case validator.IsUnbonding():
 			validator = k.unbondingToBonded(ctx, validator)
-			amtFromNotBondedToBonded = amtFromNotBondedToBonded.Add(validator.GetBondedTokens())
+			amtFromNotBondedToBonded = amtFromNotBondedToBonded.Add(validator.GetBondingTokens())
 		case validator.IsBonded():
 			// no state change
 		default:
@@ -150,10 +150,9 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx sdk.Context) (updates []ab
 
 	noLongerBonded := sortNoLongerBonded(last)
 	for _, valAddrBytes := range noLongerBonded {
-
 		validator := k.mustGetValidator(ctx, sdk.ValAddress(valAddrBytes))
 		validator = k.bondedToUnbonding(ctx, validator)
-		amtFromBondedToNotBonded = amtFromBondedToNotBonded.Add(validator.GetBondedTokens())
+		amtFromBondedToNotBonded = amtFromBondedToNotBonded.Add(validator.GetBondingTokens())
 		k.DeleteLastValidatorPower(ctx, validator.GetOperator())
 		updates = append(updates, validator.ABCIValidatorUpdateZero())
 	}
