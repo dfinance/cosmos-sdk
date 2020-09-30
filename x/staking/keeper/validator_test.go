@@ -25,10 +25,10 @@ func TestSetValidator(t *testing.T) {
 
 	// test how the validator is set from a purely unbonbed pool
 	validator := types.NewValidator(valAddr, valPubKey, types.Description{})
-	validator, _ = validator.AddTokensFromDel(valTokens)
+	validator, _ = validator.AddTokensFromDel(types.BondingDelOpType, valTokens)
 	require.Equal(t, sdk.Unbonded, validator.Status)
-	assert.Equal(t, valTokens, validator.Tokens)
-	assert.Equal(t, valTokens, validator.DelegatorShares.RoundInt())
+	assert.Equal(t, valTokens, validator.GetBondingTokens())
+	assert.Equal(t, valTokens, validator.Bonding.DelegatorShares.RoundInt())
 	keeper.SetValidator(ctx, validator)
 	keeper.SetValidatorByPowerIndex(ctx, validator)
 
@@ -41,8 +41,8 @@ func TestSetValidator(t *testing.T) {
 
 	// after the save the validator should be bonded
 	require.Equal(t, sdk.Bonded, validator.Status)
-	assert.Equal(t, valTokens, validator.Tokens)
-	assert.Equal(t, valTokens, validator.DelegatorShares.RoundInt())
+	assert.Equal(t, valTokens, validator.GetBondingTokens())
+	assert.Equal(t, valTokens, validator.Bonding.DelegatorShares.RoundInt())
 
 	// Check each store for being saved
 	resVal, found := keeper.GetValidator(ctx, valAddr)
@@ -81,20 +81,20 @@ func TestUpdateValidatorByPowerIndex(t *testing.T) {
 
 	// add a validator
 	validator := types.NewValidator(addrVals[0], PKs[0], types.Description{})
-	validator, delSharesCreated := validator.AddTokensFromDel(sdk.TokensFromConsensusPower(100))
+	validator, delSharesCreated := validator.AddTokensFromDel(types.BondingDelOpType, sdk.TokensFromConsensusPower(100))
 	require.Equal(t, sdk.Unbonded, validator.Status)
-	require.Equal(t, sdk.TokensFromConsensusPower(100), validator.Tokens)
+	require.Equal(t, sdk.TokensFromConsensusPower(100), validator.GetBondingTokens())
 	TestingUpdateValidator(keeper, ctx, validator, true)
 	validator, found := keeper.GetValidator(ctx, addrVals[0])
 	require.True(t, found)
-	require.Equal(t, sdk.TokensFromConsensusPower(100), validator.Tokens)
+	require.Equal(t, sdk.TokensFromConsensusPower(100), validator.GetBondingTokens())
 
 	power := types.GetValidatorsByPowerIndexKey(validator)
 	require.True(t, validatorByPowerIndexExists(keeper, ctx, power))
 
 	// burn half the delegator shares
 	keeper.DeleteValidatorByPowerIndex(ctx, validator)
-	validator, burned := validator.RemoveDelShares(delSharesCreated.Quo(sdk.NewDec(2)))
+	validator, burned := validator.RemoveDelShares(types.BondingDelOpType, delSharesCreated.Quo(sdk.NewDec(2)))
 	require.Equal(t, sdk.TokensFromConsensusPower(50), burned)
 	TestingUpdateValidator(keeper, ctx, validator, true) // update the validator, possibly kicking it out
 	require.False(t, validatorByPowerIndexExists(keeper, ctx, power))
@@ -131,7 +131,7 @@ func TestUpdateBondedValidatorsDecreaseCliff(t *testing.T) {
 		moniker := fmt.Sprintf("val#%d", int64(i))
 		val := types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{Moniker: moniker})
 		delTokens := sdk.TokensFromConsensusPower(int64((i + 1) * 10))
-		val, _ = val.AddTokensFromDel(delTokens)
+		val, _ = val.AddTokensFromDel(types.BondingDelOpType, delTokens)
 
 		val = TestingUpdateValidator(keeper, ctx, val, true)
 		validators[i] = val
@@ -143,7 +143,7 @@ func TestUpdateBondedValidatorsDecreaseCliff(t *testing.T) {
 	// validator and next in line cliff validator
 	keeper.DeleteValidatorByPowerIndex(ctx, nextCliffVal)
 	shares := sdk.TokensFromConsensusPower(21)
-	nextCliffVal, _ = nextCliffVal.RemoveDelShares(shares.ToDec())
+	nextCliffVal, _ = nextCliffVal.RemoveDelShares(types.BondingDelOpType, shares.ToDec())
 	nextCliffVal = TestingUpdateValidator(keeper, ctx, nextCliffVal, true)
 
 	expectedValStatus := map[int]sdk.BondStatus{
@@ -176,12 +176,12 @@ func TestSlashToZeroPowerRemoved(t *testing.T) {
 	require.NoError(t, err)
 	keeper.supplyKeeper.SetModuleAccount(ctx, bondedPool)
 
-	validator, _ = validator.AddTokensFromDel(valTokens)
+	validator, _ = validator.AddTokensFromDel(types.BondingDelOpType, valTokens)
 	require.Equal(t, sdk.Unbonded, validator.Status)
-	require.Equal(t, valTokens, validator.Tokens)
+	require.Equal(t, valTokens, validator.GetBondingTokens())
 	keeper.SetValidatorByConsAddr(ctx, validator)
 	validator = TestingUpdateValidator(keeper, ctx, validator, true)
-	require.Equal(t, valTokens, validator.Tokens, "\nvalidator %v\npool %v", validator, valTokens)
+	require.Equal(t, valTokens, validator.GetBondingTokens(), "\nvalidator %v\npool %v", validator, valTokens)
 
 	// slash the validator by 100%
 	consAddr0 := sdk.ConsAddress(PKs[0].Address())
@@ -203,14 +203,14 @@ func TestValidatorBasics(t *testing.T) {
 	for i, power := range powers {
 		validators[i] = types.NewValidator(addrVals[i], PKs[i], types.Description{})
 		validators[i].Status = sdk.Unbonded
-		validators[i].Tokens = sdk.ZeroInt()
+		validators[i].Bonding.Tokens = sdk.ZeroInt()
 		tokens := sdk.TokensFromConsensusPower(power)
 
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 	}
-	assert.Equal(t, sdk.TokensFromConsensusPower(9), validators[0].Tokens)
-	assert.Equal(t, sdk.TokensFromConsensusPower(8), validators[1].Tokens)
-	assert.Equal(t, sdk.TokensFromConsensusPower(7), validators[2].Tokens)
+	assert.Equal(t, sdk.TokensFromConsensusPower(9), validators[0].GetBondingTokens())
+	assert.Equal(t, sdk.TokensFromConsensusPower(8), validators[1].GetBondingTokens())
+	assert.Equal(t, sdk.TokensFromConsensusPower(7), validators[2].GetBondingTokens())
 
 	// check the empty keeper first
 	_, found := keeper.GetValidator(ctx, addrVals[0])
@@ -244,8 +244,8 @@ func TestValidatorBasics(t *testing.T) {
 
 	// modify a records, save, and retrieve
 	validators[0].Status = sdk.Bonded
-	validators[0].Tokens = sdk.TokensFromConsensusPower(10)
-	validators[0].DelegatorShares = validators[0].Tokens.ToDec()
+	validators[0].Bonding.Tokens = sdk.TokensFromConsensusPower(10)
+	validators[0].Bonding.DelegatorShares = validators[0].Bonding.Tokens.ToDec()
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], true)
 	resVal, found = keeper.GetValidator(ctx, addrVals[0])
 	require.True(t, found)
@@ -285,7 +285,7 @@ func TestValidatorBasics(t *testing.T) {
 		"attempting to remove a validator which still contains tokens",
 		func() { keeper.RemoveValidator(ctx, validators[1].OperatorAddress) })
 
-	validators[1].Tokens = sdk.ZeroInt()                       // ...remove all tokens
+	validators[1].Bonding.Tokens = sdk.ZeroInt()               // ...remove all tokens
 	keeper.SetValidator(ctx, validators[1])                    // ...set the validator
 	keeper.RemoveValidator(ctx, validators[1].OperatorAddress) // Now it can be removed.
 	_, found = keeper.GetValidator(ctx, addrVals[1])
@@ -308,8 +308,8 @@ func TestGetValidatorSortingUnmixed(t *testing.T) {
 	for i, amt := range amts {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
 		validators[i].Status = sdk.Bonded
-		validators[i].Tokens = sdk.NewInt(amt)
-		validators[i].DelegatorShares = sdk.NewDec(amt)
+		validators[i].Bonding.Tokens = sdk.NewInt(amt)
+		validators[i].Bonding.DelegatorShares = sdk.NewDec(amt)
 		TestingUpdateValidator(keeper, ctx, validators[i], true)
 	}
 
@@ -328,14 +328,14 @@ func TestGetValidatorSortingUnmixed(t *testing.T) {
 	assert.Equal(t, validators[0].OperatorAddress, resValidators[4].OperatorAddress, "%v", resValidators)
 
 	// test a basic increase in voting power
-	validators[3].Tokens = sdk.NewInt(500).Mul(sdk.PowerReduction)
+	validators[3].Bonding.Tokens = sdk.NewInt(500).Mul(sdk.PowerReduction)
 	TestingUpdateValidator(keeper, ctx, validators[3], true)
 	resValidators = keeper.GetBondedValidatorsByPower(ctx)
 	require.Equal(t, len(resValidators), n)
 	assert.True(ValEq(t, validators[3], resValidators[0]))
 
 	// test a decrease in voting power
-	validators[3].Tokens = sdk.NewInt(300).Mul(sdk.PowerReduction)
+	validators[3].Bonding.Tokens = sdk.NewInt(300).Mul(sdk.PowerReduction)
 	TestingUpdateValidator(keeper, ctx, validators[3], true)
 	resValidators = keeper.GetBondedValidatorsByPower(ctx)
 	require.Equal(t, len(resValidators), n)
@@ -343,7 +343,7 @@ func TestGetValidatorSortingUnmixed(t *testing.T) {
 	assert.True(ValEq(t, validators[4], resValidators[1]))
 
 	// test equal voting power, different age
-	validators[3].Tokens = sdk.NewInt(200).Mul(sdk.PowerReduction)
+	validators[3].Bonding.Tokens = sdk.NewInt(200).Mul(sdk.PowerReduction)
 	ctx = ctx.WithBlockHeight(10)
 	TestingUpdateValidator(keeper, ctx, validators[3], true)
 	resValidators = keeper.GetBondedValidatorsByPower(ctx)
@@ -360,8 +360,8 @@ func TestGetValidatorSortingUnmixed(t *testing.T) {
 	assert.True(ValEq(t, validators[4], resValidators[1]))
 
 	// change in voting power of both validators, both still in v-set, no age change
-	validators[3].Tokens = sdk.NewInt(300).Mul(sdk.PowerReduction)
-	validators[4].Tokens = sdk.NewInt(300).Mul(sdk.PowerReduction)
+	validators[3].Bonding.Tokens = sdk.NewInt(300).Mul(sdk.PowerReduction)
+	validators[4].Bonding.Tokens = sdk.NewInt(300).Mul(sdk.PowerReduction)
 	TestingUpdateValidator(keeper, ctx, validators[3], true)
 	resValidators = keeper.GetBondedValidatorsByPower(ctx)
 	require.Equal(t, len(resValidators), n)
@@ -398,9 +398,9 @@ func TestGetValidatorSortingMixed(t *testing.T) {
 	var validators [5]types.Validator
 	for i, amt := range amts {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
-		validators[i].DelegatorShares = sdk.NewDec(amt)
+		validators[i].Bonding.DelegatorShares = sdk.NewDec(amt)
 		validators[i].Status = sdk.Bonded
-		validators[i].Tokens = sdk.NewInt(amt)
+		validators[i].Bonding.Tokens = sdk.NewInt(amt)
 		TestingUpdateValidator(keeper, ctx, validators[i], true)
 	}
 
@@ -447,7 +447,7 @@ func TestGetValidatorsEdgeCases(t *testing.T) {
 		moniker := fmt.Sprintf("val#%d", int64(i))
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{Moniker: moniker})
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 		notBondedPool := keeper.GetNotBondedPool(ctx)
 		require.NoError(t, notBondedPool.SetCoins(notBondedPool.GetCoins().Add(sdk.NewCoin(params.BondDenom, tokens))))
 		keeper.supplyKeeper.SetModuleAccount(ctx, notBondedPool)
@@ -463,7 +463,7 @@ func TestGetValidatorsEdgeCases(t *testing.T) {
 	// delegate 500 tokens to validator 0
 	keeper.DeleteValidatorByPowerIndex(ctx, validators[0])
 	delTokens := sdk.TokensFromConsensusPower(500)
-	validators[0], _ = validators[0].AddTokensFromDel(delTokens)
+	validators[0], _ = validators[0].AddTokensFromDel(types.BondingDelOpType, delTokens)
 	notBondedPool := keeper.GetNotBondedPool(ctx)
 	newTokens := sdk.NewCoins()
 	require.NoError(t, notBondedPool.SetCoins(notBondedPool.GetCoins().Add(newTokens...)))
@@ -492,7 +492,7 @@ func TestGetValidatorsEdgeCases(t *testing.T) {
 
 	validators[3] = keeper.mustGetValidator(ctx, validators[3].OperatorAddress)
 	keeper.DeleteValidatorByPowerIndex(ctx, validators[3])
-	validators[3], _ = validators[3].AddTokensFromDel(sdk.TokensFromConsensusPower(1))
+	validators[3], _ = validators[3].AddTokensFromDel(types.BondingDelOpType, sdk.TokensFromConsensusPower(1))
 
 	notBondedPool = keeper.GetNotBondedPool(ctx)
 	newTokens = sdk.NewCoins(sdk.NewCoin(params.BondDenom, sdk.TokensFromConsensusPower(1)))
@@ -507,8 +507,8 @@ func TestGetValidatorsEdgeCases(t *testing.T) {
 
 	// validator 3 kicked out temporarily
 	keeper.DeleteValidatorByPowerIndex(ctx, validators[3])
-	rmTokens := validators[3].TokensFromShares(sdk.NewDec(201)).TruncateInt()
-	validators[3], _ = validators[3].RemoveDelShares(sdk.NewDec(201))
+	rmTokens := validators[3].Bonding.TokensFromShares(sdk.NewDec(201)).TruncateInt()
+	validators[3], _ = validators[3].RemoveDelShares(types.BondingDelOpType, sdk.NewDec(201))
 
 	bondedPool := keeper.GetBondedPool(ctx)
 	require.NoError(t, bondedPool.SetCoins(bondedPool.GetCoins().Add(sdk.NewCoin(params.BondDenom, rmTokens))))
@@ -522,7 +522,7 @@ func TestGetValidatorsEdgeCases(t *testing.T) {
 
 	// validator 3 does not get spot back
 	keeper.DeleteValidatorByPowerIndex(ctx, validators[3])
-	validators[3], _ = validators[3].AddTokensFromDel(sdk.NewInt(200))
+	validators[3], _ = validators[3].AddTokensFromDel(types.BondingDelOpType, sdk.NewInt(200))
 
 	notBondedPool = keeper.GetNotBondedPool(ctx)
 	require.NoError(t, notBondedPool.SetCoins(notBondedPool.GetCoins().Add(sdk.NewCoin(params.BondDenom, sdk.NewInt(200)))))
@@ -554,9 +554,9 @@ func TestValidatorBondHeight(t *testing.T) {
 	tokens0 := sdk.TokensFromConsensusPower(200)
 	tokens1 := sdk.TokensFromConsensusPower(100)
 	tokens2 := sdk.TokensFromConsensusPower(100)
-	validators[0], _ = validators[0].AddTokensFromDel(tokens0)
-	validators[1], _ = validators[1].AddTokensFromDel(tokens1)
-	validators[2], _ = validators[2].AddTokensFromDel(tokens2)
+	validators[0], _ = validators[0].AddTokensFromDel(types.BondingDelOpType, tokens0)
+	validators[1], _ = validators[1].AddTokensFromDel(types.BondingDelOpType, tokens1)
+	validators[2], _ = validators[2].AddTokensFromDel(types.BondingDelOpType, tokens2)
 
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], true)
 
@@ -574,8 +574,8 @@ func TestValidatorBondHeight(t *testing.T) {
 	keeper.DeleteValidatorByPowerIndex(ctx, validators[1])
 	keeper.DeleteValidatorByPowerIndex(ctx, validators[2])
 	delTokens := sdk.TokensFromConsensusPower(50)
-	validators[1], _ = validators[1].AddTokensFromDel(delTokens)
-	validators[2], _ = validators[2].AddTokensFromDel(delTokens)
+	validators[1], _ = validators[1].AddTokensFromDel(types.BondingDelOpType, delTokens)
+	validators[2], _ = validators[2].AddTokensFromDel(types.BondingDelOpType, delTokens)
 	validators[2] = TestingUpdateValidator(keeper, ctx, validators[2], true)
 	resValidators = keeper.GetBondedValidatorsByPower(ctx)
 	require.Equal(t, params.MaxValidators, uint16(len(resValidators)))
@@ -597,7 +597,7 @@ func TestFullValidatorSetPowerChange(t *testing.T) {
 	for i, power := range powers {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 		TestingUpdateValidator(keeper, ctx, validators[i], true)
 	}
 	for i := range powers {
@@ -618,7 +618,7 @@ func TestFullValidatorSetPowerChange(t *testing.T) {
 	// test a swap in voting power
 
 	tokens := sdk.TokensFromConsensusPower(600)
-	validators[0], _ = validators[0].AddTokensFromDel(tokens)
+	validators[0], _ = validators[0].AddTokensFromDel(types.BondingDelOpType, tokens)
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], true)
 	resValidators = keeper.GetBondedValidatorsByPower(ctx)
 	assert.Equal(t, max, len(resValidators))
@@ -637,7 +637,7 @@ func TestApplyAndReturnValidatorSetUpdatesAllNone(t *testing.T) {
 
 		validators[i] = types.NewValidator(valAddr, valPubKey, types.Description{})
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 	}
 
 	// test from nothing to something
@@ -665,7 +665,7 @@ func TestApplyAndReturnValidatorSetUpdatesIdentical(t *testing.T) {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
 
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 
 	}
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], false)
@@ -689,7 +689,7 @@ func TestApplyAndReturnValidatorSetUpdatesSingleValueChange(t *testing.T) {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
 
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 
 	}
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], false)
@@ -699,7 +699,7 @@ func TestApplyAndReturnValidatorSetUpdatesSingleValueChange(t *testing.T) {
 	// test single value change
 	//  tendermintUpdate set: {} -> {c1'}
 	validators[0].Status = sdk.Bonded
-	validators[0].Tokens = sdk.TokensFromConsensusPower(600)
+	validators[0].Bonding.Tokens = sdk.TokensFromConsensusPower(600)
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], false)
 
 	updates := keeper.ApplyAndReturnValidatorSetUpdates(ctx)
@@ -718,7 +718,7 @@ func TestApplyAndReturnValidatorSetUpdatesMultipleValueChange(t *testing.T) {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
 
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 
 	}
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], false)
@@ -729,8 +729,8 @@ func TestApplyAndReturnValidatorSetUpdatesMultipleValueChange(t *testing.T) {
 	//  tendermintUpdate set: {c1, c3} -> {c1', c3'}
 	delTokens1 := sdk.TokensFromConsensusPower(190)
 	delTokens2 := sdk.TokensFromConsensusPower(80)
-	validators[0], _ = validators[0].AddTokensFromDel(delTokens1)
-	validators[1], _ = validators[1].AddTokensFromDel(delTokens2)
+	validators[0], _ = validators[0].AddTokensFromDel(types.BondingDelOpType, delTokens1)
+	validators[1], _ = validators[1].AddTokensFromDel(types.BondingDelOpType, delTokens2)
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], false)
 	validators[1] = TestingUpdateValidator(keeper, ctx, validators[1], false)
 
@@ -750,7 +750,7 @@ func TestApplyAndReturnValidatorSetUpdatesInserted(t *testing.T) {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
 
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 
 	}
 
@@ -799,7 +799,7 @@ func TestApplyAndReturnValidatorSetUpdatesWithCliffValidator(t *testing.T) {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
 
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 
 	}
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], false)
@@ -817,7 +817,7 @@ func TestApplyAndReturnValidatorSetUpdatesWithCliffValidator(t *testing.T) {
 	require.Equal(t, 0, len(keeper.ApplyAndReturnValidatorSetUpdates(ctx)))
 
 	tokens := sdk.TokensFromConsensusPower(10)
-	validators[2], _ = validators[2].AddTokensFromDel(tokens)
+	validators[2], _ = validators[2].AddTokensFromDel(types.BondingDelOpType, tokens)
 	keeper.SetValidator(ctx, validators[2])
 	keeper.SetValidatorByPowerIndex(ctx, validators[2])
 	updates = keeper.ApplyAndReturnValidatorSetUpdates(ctx)
@@ -837,7 +837,7 @@ func TestApplyAndReturnValidatorSetUpdatesPowerDecrease(t *testing.T) {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
 
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 
 	}
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], false)
@@ -852,8 +852,8 @@ func TestApplyAndReturnValidatorSetUpdatesPowerDecrease(t *testing.T) {
 	//  tendermintUpdate set: {c1, c3} -> {c1', c3'}
 	delTokens1 := sdk.TokensFromConsensusPower(20)
 	delTokens2 := sdk.TokensFromConsensusPower(30)
-	validators[0], _ = validators[0].RemoveDelShares(delTokens1.ToDec())
-	validators[1], _ = validators[1].RemoveDelShares(delTokens2.ToDec())
+	validators[0], _ = validators[0].RemoveDelShares(types.BondingDelOpType, delTokens1.ToDec())
+	validators[1], _ = validators[1].RemoveDelShares(types.BondingDelOpType, delTokens2.ToDec())
 	validators[0] = TestingUpdateValidator(keeper, ctx, validators[0], false)
 	validators[1] = TestingUpdateValidator(keeper, ctx, validators[1], false)
 
@@ -886,7 +886,7 @@ func TestApplyAndReturnValidatorSetUpdatesNewValidator(t *testing.T) {
 
 		validators[i] = types.NewValidator(valAddr, valPubKey, types.Description{})
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 
 		keeper.SetValidator(ctx, validators[i])
 		keeper.SetValidatorByPowerIndex(ctx, validators[i])
@@ -904,10 +904,9 @@ func TestApplyAndReturnValidatorSetUpdatesNewValidator(t *testing.T) {
 
 	// update initial validator set
 	for i, power := range powers {
-
 		keeper.DeleteValidatorByPowerIndex(ctx, validators[i])
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 
 		keeper.SetValidator(ctx, validators[i])
 		keeper.SetValidatorByPowerIndex(ctx, validators[i])
@@ -920,11 +919,11 @@ func TestApplyAndReturnValidatorSetUpdatesNewValidator(t *testing.T) {
 	amt := sdk.NewInt(100)
 
 	validator := types.NewValidator(valAddr, valPubKey, types.Description{})
-	validator, _ = validator.AddTokensFromDel(amt)
+	validator, _ = validator.AddTokensFromDel(types.BondingDelOpType, amt)
 
 	keeper.SetValidator(ctx, validator)
 
-	validator, _ = validator.RemoveDelShares(amt.ToDec())
+	validator, _ =validator.RemoveDelShares(types.BondingDelOpType, amt.ToDec())
 	keeper.SetValidator(ctx, validator)
 	keeper.SetValidatorByPowerIndex(ctx, validator)
 
@@ -934,7 +933,7 @@ func TestApplyAndReturnValidatorSetUpdatesNewValidator(t *testing.T) {
 
 	validator = types.NewValidator(valAddr, valPubKey, types.Description{})
 	tokens := sdk.TokensFromConsensusPower(500)
-	validator, _ = validator.AddTokensFromDel(tokens)
+	validator, _ = validator.AddTokensFromDel(types.BondingDelOpType, tokens)
 	keeper.SetValidator(ctx, validator)
 	keeper.SetValidatorByPowerIndex(ctx, validator)
 
@@ -967,7 +966,7 @@ func TestApplyAndReturnValidatorSetUpdatesBondTransition(t *testing.T) {
 
 		validators[i] = types.NewValidator(valAddr, valPubKey, types.Description{Moniker: moniker})
 		tokens := sdk.TokensFromConsensusPower(power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, tokens)
 		keeper.SetValidator(ctx, validators[i])
 		keeper.SetValidatorByPowerIndex(ctx, validators[i])
 	}
@@ -991,7 +990,7 @@ func TestApplyAndReturnValidatorSetUpdatesBondTransition(t *testing.T) {
 
 	keeper.DeleteValidatorByPowerIndex(ctx, validators[0])
 	tokens := sdk.TokensFromConsensusPower(1)
-	validators[0], _ = validators[0].AddTokensFromDel(tokens)
+	validators[0], _ = validators[0].AddTokensFromDel(types.BondingDelOpType, tokens)
 	keeper.SetValidator(ctx, validators[0])
 	keeper.SetValidatorByPowerIndex(ctx, validators[0])
 
@@ -1006,7 +1005,7 @@ func TestApplyAndReturnValidatorSetUpdatesBondTransition(t *testing.T) {
 	require.True(t, found)
 
 	keeper.DeleteValidatorByPowerIndex(ctx, validators[0])
-	validators[0], _ = validators[0].RemoveDelShares(validators[0].DelegatorShares)
+	validators[0], _ = validators[0].RemoveDelShares(types.BondingDelOpType, validators[0].Bonding.DelegatorShares)
 	keeper.SetValidator(ctx, validators[0])
 	keeper.SetValidatorByPowerIndex(ctx, validators[0])
 	updates = keeper.ApplyAndReturnValidatorSetUpdates(ctx)
@@ -1014,7 +1013,7 @@ func TestApplyAndReturnValidatorSetUpdatesBondTransition(t *testing.T) {
 
 	keeper.DeleteValidatorByPowerIndex(ctx, validators[1])
 	tokens = sdk.TokensFromConsensusPower(250)
-	validators[1], _ = validators[1].AddTokensFromDel(tokens)
+	validators[1], _ = validators[1].AddTokensFromDel(types.BondingDelOpType, tokens)
 	keeper.SetValidator(ctx, validators[1])
 	keeper.SetValidatorByPowerIndex(ctx, validators[1])
 

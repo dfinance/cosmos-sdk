@@ -10,11 +10,20 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking/exported"
 )
 
-// GetDistributionPower calculates distribution power based on validator stakingPower and lockedRewards ratio.
-func (k Keeper) GetDistributionPower(ctx sdk.Context, valAddr sdk.ValAddress, stakingPower int64) int64 {
+// GetDistributionPower calculates distribution power based on:
+//   * validator consensus power (bonded tokens);
+//   * validator liquidity providers power (staked LP tokens);
+//   * consPower / lpPower relation coef;
+//   * lockedRewards ratio;
+func (k Keeper) GetDistributionPower(ctx sdk.Context, valAddr sdk.ValAddress,
+	consPower, lpPower int64, lpRatio sdk.Dec,
+) int64 {
+
 	lockedState := k.MustGetValidatorLockedState(ctx, valAddr)
 
-	return lockedState.GetDistributionPower(stakingPower)
+	valPower := consPower + sdk.NewDec(lpPower).Mul(lpRatio).TruncateInt64()
+
+	return lockedState.GetDistributionPower(valPower)
 }
 
 // LockValidatorRewards locks validator rewards.
@@ -147,7 +156,7 @@ func (k Keeper) incrementValidatorPeriod(ctx sdk.Context, val exported.Validator
 
 	// calculate current ratio
 	var current sdk.DecCoins
-	if val.GetTokens().IsZero() {
+	if val.GetBondingTokens().IsZero() {
 		// can't calculate ratio for zero-token validators
 		// ergo we instead add to the FoundationPool
 		k.AppendToFoundationPool(ctx, rewards.Rewards)
@@ -159,7 +168,7 @@ func (k Keeper) incrementValidatorPeriod(ctx sdk.Context, val exported.Validator
 		current = sdk.DecCoins{}
 	} else {
 		// note: necessary to truncate so we don't allow withdrawing more rewards than owed
-		current = rewards.Rewards.QuoDecTruncate(val.GetTokens().ToDec())
+		current = rewards.Rewards.QuoDecTruncate(val.GetBondingTokens().ToDec())
 	}
 
 	// fetch historical rewards for last period

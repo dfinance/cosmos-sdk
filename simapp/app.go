@@ -74,6 +74,7 @@ var (
 		mint.ModuleName:           {supply.Minter},
 		staking.BondedPoolName:    {supply.Burner, supply.Staking},
 		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
+		staking.LiquidityPoolName: nil,
 		gov.ModuleName:            {supply.Burner},
 	}
 

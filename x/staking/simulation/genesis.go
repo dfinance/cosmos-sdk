@@ -54,7 +54,10 @@ func RandomizedGenState(simState *module.SimulationState) {
 		simState.UnbondTime,
 		maxValidators,
 		7,
-		3, sdk.DefaultBondDenom,
+		3,
+		sdk.DefaultBondDenom,
+		sdk.DefaultLiquidityDenom,
+		sdk.NewDecWithPrec(1, 0),
 		sdk.NewInt(types.DefaultMinSelfDelegationLvl),
 		sdk.NewDecWithPrec(1000, types.DefaultMaxDelegationsRatioPrecision),
 		types.DefaultScheduledUnbondTime,
@@ -79,11 +82,14 @@ func RandomizedGenState(simState *module.SimulationState) {
 		)
 
 		validator := types.NewValidator(valAddr, simState.Accounts[i].PubKey, types.Description{})
-		validator.Tokens = sdk.NewInt(simState.InitialStake)
-		validator.DelegatorShares = sdk.NewDec(simState.InitialStake)
+		validator.Bonding = types.ValidatorTokens{
+			Tokens:          sdk.NewInt(simState.InitialStake),
+			DelegatorShares: sdk.NewDec(simState.InitialStake),
+		}
+		validator.LP = types.NewValidatorTokens()
 		validator.Commission = commission
 
-		delegation := types.NewDelegation(simState.Accounts[i].Address, valAddr, sdk.NewDec(simState.InitialStake))
+		delegation := types.NewDelegation(simState.Accounts[i].Address, valAddr, sdk.NewDec(simState.InitialStake), sdk.ZeroDec())
 		validators = append(validators, validator)
 		delegations = append(delegations, delegation)
 	}

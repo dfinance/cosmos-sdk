@@ -21,6 +21,7 @@ const (
 	DefaultMinSelfDelegationLvl        = types.DefaultMinSelfDelegationLvl
 	NotBondedPoolName                  = types.NotBondedPoolName
 	BondedPoolName                     = types.BondedPoolName
+	LiquidityPoolName                  = types.LiquidityPoolName
 	QueryValidators                    = types.QueryValidators
 	QueryValidator                     = types.QueryValidator
 	QueryDelegatorDelegations          = types.QueryDelegatorDelegations

@@ -95,7 +95,7 @@ func TestHandleAlreadyJailed(t *testing.T) {
 
 	// validator should have been slashed
 	resultingTokens := amt.Sub(sdk.TokensFromConsensusPower(1))
-	require.Equal(t, resultingTokens, validator.GetTokens())
+	require.Equal(t, resultingTokens, validator.GetBondingTokens())
 
 	// another block missed
 	ctx = ctx.WithBlockHeight(height)
@@ -103,7 +103,7 @@ func TestHandleAlreadyJailed(t *testing.T) {
 
 	// validator should not have been slashed twice
 	validator, _ = sk.GetValidatorByConsAddr(ctx, sdk.GetConsAddress(val))
-	require.Equal(t, resultingTokens, validator.GetTokens())
+	require.Equal(t, resultingTokens, validator.GetBondingTokens())
 
 }
 

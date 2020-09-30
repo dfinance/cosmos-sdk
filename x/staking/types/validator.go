@@ -3,8 +3,6 @@ package types
 import (
 	"bytes"
 	"fmt"
-	"sort"
-	"strings"
 	"time"
 
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -14,18 +12,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/staking/exported"
-)
-
-// nolint
-const (
-	// TODO: Why can't we just have one string description which can be JSON by convention
-	MaxMonikerLength         = 70
-	MaxIdentityLength        = 3000
-	MaxWebsiteLength         = 140
-	MaxSecurityContactLength = 140
-	MaxDetailsLength         = 280
 )
 
 // Implements Validator interface
@@ -49,10 +36,10 @@ type Validator struct {
 	ScheduledToUnbond bool `json:"scheduled_to_unbond" yaml:"scheduled_to_unbond"`
 	// Validator status (bonded/unbonding/unbonded)
 	Status sdk.BondStatus `json:"status" yaml:"status"`
-	// Delegated tokens (incl. self-delegation)
-	Tokens sdk.Int `json:"tokens" yaml:"tokens"`
-	// Total shares issued to a validator's delegators
-	DelegatorShares sdk.Dec `json:"delegator_shares" yaml:"delegator_shares"`
+	// Delegated bonding tokens (incl. self-delegation)
+	Bonding ValidatorTokens `json:"bonding" yaml:"bonding"`
+	// Delegated liquidity tokens
+	LP ValidatorTokens `json:"lp" yaml:"lp"`
 	// Description terms for the validator
 	Description Description `json:"description" yaml:"description"`
 	// If unbonding, height at which this validator has begun unbonding
@@ -69,7 +56,237 @@ type Validator struct {
 	MinSelfDelegation sdk.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
 }
 
-// custom marshal yaml function due to consensus pubkey
+// TestEquivalent checks equality of vital fields of two validators.
+func (v Validator) TestEquivalent(v2 Validator) bool {
+	return v.ConsPubKey.Equals(v2.ConsPubKey) &&
+		bytes.Equal(v.OperatorAddress, v2.OperatorAddress) &&
+		v.Status.Equal(v2.Status) &&
+		v.Bonding.Equal(v2.Bonding) && v.LP.Equal(v2.LP) &&
+		v.Description == v2.Description &&
+		v.Commission.Equal(v2.Commission)
+}
+
+// ABCIValidatorUpdate returns an abci.ValidatorUpdate from a staking validator type with the full validator power.
+func (v Validator) ABCIValidatorUpdate() abci.ValidatorUpdate {
+	return abci.ValidatorUpdate{
+		PubKey: tmtypes.TM2PB.PubKey(v.ConsPubKey),
+		Power:  v.ConsensusPower(),
+	}
+}
+
+// ABCIValidatorUpdateZero returns an abci.ValidatorUpdate from a staking validator type with zero power used for validator updates.
+func (v Validator) ABCIValidatorUpdateZero() abci.ValidatorUpdate {
+	return abci.ValidatorUpdate{
+		PubKey: tmtypes.TM2PB.PubKey(v.ConsPubKey),
+		Power:  0,
+	}
+}
+
+// SetInitialCommission attempts to set a validator's initial commission.
+// An error is returned if the commission is invalid.
+func (v Validator) SetInitialCommission(commission Commission) (Validator, error) {
+	if err := commission.Validate(); err != nil {
+		return v, err
+	}
+	v.Commission = commission
+
+	return v, nil
+}
+
+// InvalidExRate checks if exchange rate is valid.
+// In some situations, the exchange rate becomes invalid, e.g. if
+// Validator loses all tokens due to slashing. In this case,
+// make all future delegations invalid.
+func (v Validator) InvalidExRate() bool {
+	return v.Bonding.Tokens.IsZero() && v.Bonding.DelegatorShares.IsPositive()
+}
+
+// BondedTokens gets the bonded tokens which the validator holds.
+func (v Validator) BondedTokens() sdk.Int {
+	if v.IsBonded() {
+		return v.Bonding.Tokens
+	}
+
+	return sdk.ZeroInt()
+}
+
+// ConsensusPower gets the consensus-engine power, a reduction of 10^6 from validator tokens is applied.
+func (v Validator) ConsensusPower() int64 {
+	if v.IsBonded() {
+		return v.PotentialConsensusPower()
+	}
+
+	return 0
+}
+
+// LPPower gets the LP distribution / gov voting power fraction, a reduction of 10^6 from validator tokens is applied.
+func (v Validator) LPPower() int64 {
+	if v.IsBonded() {
+		return v.PotentialConsensusPower()
+	}
+
+	return 0
+}
+
+// PotentialConsensusPower returns potential consensus-engine power.
+func (v Validator) PotentialConsensusPower() int64 {
+	return sdk.TokensToConsensusPower(v.Bonding.Tokens)
+}
+
+// PotentialLPPower returns potential LP distribution / gov voting power fraction.
+func (v Validator) PotentialLPPower() int64 {
+	return sdk.TokensToConsensusPower(v.LP.Tokens)
+}
+
+// UpdateStatus updates the location of the bonding shares within a validator to reflect the new status.
+func (v Validator) UpdateStatus(newStatus sdk.BondStatus) Validator {
+	v.Status = newStatus
+
+	return v
+}
+
+// ScheduleValidatorForceUnbond set ScheduledToUnbond state/
+func (v Validator) ScheduleValidatorForceUnbond(curBlockHeight int64, curBlockTime time.Time, unbondDelay time.Duration) Validator {
+	v.ScheduledToUnbond = true
+	v.ScheduledUnbondHeight = curBlockHeight
+	v.ScheduledUnbondStartTime = curBlockTime.Add(unbondDelay)
+
+	return v
+}
+
+// UnscheduleValidatorForceUnbond drops ScheduledToUnbond state/
+func (v Validator) UnscheduleValidatorForceUnbond() Validator {
+	v.ScheduledToUnbond = false
+	v.ScheduledUnbondHeight = int64(0)
+	v.ScheduledUnbondStartTime = time.Unix(0, 0).UTC()
+
+	return v
+}
+
+// IsScheduledToUnbond checks if validator is schedulted to force unbond.
+func (v Validator) IsScheduledToUnbond() bool {
+	return v.ScheduledToUnbond
+}
+
+// TotalTokens sums bonding and liquidity tokens.
+func (v Validator) TotalTokens() sdk.Int {
+	return v.Bonding.Tokens.Add(v.LP.Tokens)
+}
+
+// GetTokens returns ValidatorTokens based on delegation operation type.
+func (v Validator) GetTokens(delOpType DelegationOpType) ValidatorTokens {
+	switch delOpType {
+	case BondingDelOpType:
+		return v.Bonding
+	case LiquidityDelOpType:
+		return v.LP
+	default:
+		panic(delOpType.Validate())
+	}
+}
+
+// AddTokensFromDel adds tokens to a validator based on delegation operation type.
+func (v Validator) AddTokensFromDel(delOpType DelegationOpType, amount sdk.Int) (Validator, sdk.Dec) {
+	switch delOpType {
+	case BondingDelOpType:
+		updTokens, issuedShares := v.Bonding.AddTokensFromDel(amount)
+		v.Bonding = updTokens
+		return v, issuedShares
+	case LiquidityDelOpType:
+		updTokens, issuedShares := v.LP.AddTokensFromDel(amount)
+		v.LP = updTokens
+		return v, issuedShares
+	default:
+		panic(delOpType.Validate())
+	}
+}
+
+// RemoveTokens removes tokens from a validator based on delegation operation type.
+func (v Validator) RemoveTokens(delOpType DelegationOpType, tokens sdk.Int) Validator {
+	switch delOpType {
+	case BondingDelOpType:
+		updTokens := v.Bonding.RemoveTokens(tokens)
+		v.Bonding = updTokens
+		return v
+	case LiquidityDelOpType:
+		updTokens := v.LP.RemoveTokens(tokens)
+		v.LP = updTokens
+		return v
+	default:
+		panic(delOpType.Validate())
+	}
+}
+
+// RemoveDelShares removes delegator shares from a validator based on delegation operation type.
+// NOTE: because token fractions are left in the valiadator,
+//       the exchange rate of future shares of this validator can increase.
+func (v Validator) RemoveDelShares(delOpType DelegationOpType, delShares sdk.Dec) (Validator, sdk.Int) {
+	switch delOpType {
+	case BondingDelOpType:
+		updTokens, issuedTokens := v.Bonding.RemoveDelShares(delShares)
+		v.Bonding = updTokens
+		return v, issuedTokens
+	case LiquidityDelOpType:
+		updTokens, issuedTokens := v.LP.RemoveDelShares(delShares)
+		v.LP = updTokens
+		return v, issuedTokens
+	default:
+		panic(delOpType.Validate())
+	}
+}
+
+// nolint - for ValidatorI
+func (v Validator) IsJailed() bool                     { return v.Jailed }
+func (v Validator) GetMoniker() string                 { return v.Description.Moniker }
+func (v Validator) GetStatus() sdk.BondStatus          { return v.Status }
+func (v Validator) IsBonded() bool                     { return v.GetStatus().Equal(sdk.Bonded) }
+func (v Validator) IsUnbonded() bool                   { return v.GetStatus().Equal(sdk.Unbonded) }
+func (v Validator) IsUnbonding() bool                  { return v.GetStatus().Equal(sdk.Unbonding) }
+func (v Validator) GetOperator() sdk.ValAddress        { return v.OperatorAddress }
+func (v Validator) GetConsPubKey() crypto.PubKey       { return v.ConsPubKey }
+func (v Validator) GetConsAddr() sdk.ConsAddress       { return sdk.ConsAddress(v.ConsPubKey.Address()) }
+func (v Validator) GetBondedTokens() sdk.Int           { return v.BondedTokens() }
+func (v Validator) GetConsensusPower() int64           { return v.ConsensusPower() }
+func (v Validator) GetCommission() sdk.Dec             { return v.Commission.Rate }
+func (v Validator) GetMinSelfDelegation() sdk.Int      { return v.MinSelfDelegation }
+//
+func (v Validator) GetBondingDelegatorShares() sdk.Dec { return v.Bonding.DelegatorShares }
+func (v Validator) GetBondingTokens() sdk.Int          { return v.Bonding.Tokens }
+func (v Validator) BondingTokensFromShares(shares sdk.Dec) sdk.Dec {
+	return v.Bonding.TokensFromShares(shares)
+}
+func (v Validator) BondingTokensFromSharesTruncated(shares sdk.Dec) sdk.Dec {
+	return v.Bonding.TokensFromSharesTruncated(shares)
+}
+func (v Validator) BondingTokensFromSharesRoundUp(shares sdk.Dec) sdk.Dec {
+	return v.Bonding.TokensFromSharesRoundUp(shares)
+}
+func (v Validator) BondingSharesFromTokens(amount sdk.Int) (sdk.Dec, error) {
+	return v.Bonding.SharesFromTokens(amount)
+}
+func (v Validator) BondingSharesFromTokensTruncated(amount sdk.Int) (sdk.Dec, error) {
+	return v.Bonding.SharesFromTokensTruncated(amount)
+}
+//
+func (v Validator) GetLPDelegatorShares() sdk.Dec { return v.LP.DelegatorShares }
+func (v Validator) GetLPTokens() sdk.Int          { return v.LP.Tokens }
+func (v Validator) LPTokensFromShares(shares sdk.Dec) sdk.Dec {
+	return v.LP.TokensFromShares(shares)
+}
+func (v Validator) LPTokensFromSharesTruncated(shares sdk.Dec) sdk.Dec {
+	return v.LP.TokensFromSharesTruncated(shares)
+}
+func (v Validator) LPTokensFromSharesRoundUp(shares sdk.Dec) sdk.Dec {
+	return v.LP.TokensFromSharesRoundUp(shares)
+}
+func (v Validator) LPSharesFromTokens(amount sdk.Int) (sdk.Dec, error) {
+	return v.LP.SharesFromTokens(amount)
+}
+func (v Validator) LPSharesFromTokensTruncated(amount sdk.Int) (sdk.Dec, error) {
+	return v.LP.SharesFromTokensTruncated(amount)
+}
+
+// MarshalYAML implements custom marshal yaml function due to consensus pubkey.
 func (v Validator) MarshalYAML() (interface{}, error) {
 	bs, err := yaml.Marshal(struct {
 		OperatorAddress          sdk.ValAddress
@@ -77,8 +294,10 @@ func (v Validator) MarshalYAML() (interface{}, error) {
 		Jailed                   bool
 		ScheduledToUnbond        bool
 		Status                   sdk.BondStatus
-		Tokens                   sdk.Int
-		DelegatorShares          sdk.Dec
+		BondingDelegatorShares   sdk.Dec
+		BondingTokens            sdk.Int
+		LPDelegatorShares        sdk.Dec
+		LPTokens                 sdk.Int
 		Description              Description
 		UnbondingHeight          int64
 		UnbondingCompletionTime  time.Time
@@ -92,8 +311,10 @@ func (v Validator) MarshalYAML() (interface{}, error) {
 		Jailed:                   v.Jailed,
 		ScheduledToUnbond:        v.ScheduledToUnbond,
 		Status:                   v.Status,
-		Tokens:                   v.Tokens,
-		DelegatorShares:          v.DelegatorShares,
+		BondingDelegatorShares:   v.Bonding.DelegatorShares,
+		BondingTokens:            v.Bonding.Tokens,
+		LPDelegatorShares:        v.LP.DelegatorShares,
+		LPTokens:                 v.LP.Tokens,
 		Description:              v.Description,
 		UnbondingHeight:          v.UnbondingHeight,
 		UnbondingCompletionTime:  v.UnbondingCompletionTime,
@@ -109,84 +330,86 @@ func (v Validator) MarshalYAML() (interface{}, error) {
 	return string(bs), nil
 }
 
-// Validators is a collection of Validator
-type Validators []Validator
-
-func (v Validators) String() (out string) {
-	for _, val := range v {
-		out += val.String() + "\n"
-	}
-	return strings.TrimSpace(out)
+// bechValidator this is a helper struct used for JSON de- and encoding only.
+type bechValidator struct {
+	OperatorAddress          sdk.ValAddress `json:"operator_address" yaml:"operator_address"`                 // the bech32 address of the validator's operator
+	ConsPubKey               string         `json:"consensus_pubkey" yaml:"consensus_pubkey"`                 // the bech32 consensus public key of the validator
+	Jailed                   bool           `json:"jailed" yaml:"jailed"`                                     // has the validator been jailed from bonded status?
+	ScheduledToUnbond        bool           `json:"scheduled_to_unbond" yaml:"scheduled_to_unbond"`           // has the validator been scheduled to force unbond due to low SelfStake amount compared to TotalDelegationsAmount
+	Status                   sdk.BondStatus `json:"status" yaml:"status"`                                     // validator status (bonded/unbonding/unbonded)
+	BondingDelegatorShares   sdk.Dec        `json:"bonding_delegator_shares" yaml:"bonding_delegator_shares"` // bondable tokens: total shares issued to a validator's delegators
+	BondingTokens            sdk.Int        `json:"bonding_tokens" yaml:"bonding_tokens"`                     // bondable tokens: delegated tokens (incl. self-delegation)
+	LPDelegatorShares        sdk.Dec        `json:"lp_delegator_shares" yaml:"lp_delegator_shares"`           // liquidity tokens: total shares issued to a validator's delegators
+	LPTokens                 sdk.Int        `json:"lp_tokens" yaml:"lp_tokens"`                               // liquidity tokens: delegated tokens
+	Description              Description    `json:"description" yaml:"description"`                           // description terms for the validator
+	UnbondingHeight          int64          `json:"unbonding_height" yaml:"unbonding_height"`                 // if unbonding, height at which this validator has begun unbonding
+	UnbondingCompletionTime  time.Time      `json:"unbonding_time" yaml:"unbonding_time"`                     // if unbonding, min time for the validator to complete unbonding
+	ScheduledUnbondHeight    int64          `json:"scheduled_unbond_height" yaml:"scheduled_unbond_height"`   // if ScheduledToUnbond, height at which this schedule started
+	ScheduledUnbondStartTime time.Time      `json:"scheduled_unbond_time" yaml:"scheduled_unbond_time"`       // is ScheduledToUnbond, min time for the validator to begin force unbond
+	Commission               Commission     `json:"commission" yaml:"commission"`                             // commission parameters
+	MinSelfDelegation        sdk.Int        `json:"min_self_delegation" yaml:"min_self_delegation"`           // minimum self delegation
 }
 
-// ToSDKValidators -  convenience function convert []Validators to []sdk.Validators
-func (v Validators) ToSDKValidators() (validators []exported.ValidatorI) {
-	for _, val := range v {
-		validators = append(validators, val)
-	}
-	return validators
-}
-
-// Sort Validators sorts validator array in ascending operator address order
-func (v Validators) Sort() {
-	sort.Sort(v)
-}
-
-// Implements sort interface
-func (v Validators) Len() int {
-	return len(v)
-}
-
-// Implements sort interface
-func (v Validators) Less(i, j int) bool {
-	return bytes.Compare(v[i].OperatorAddress, v[j].OperatorAddress) == -1
-}
-
-// Implements sort interface
-func (v Validators) Swap(i, j int) {
-	it := v[i]
-	v[i] = v[j]
-	v[j] = it
-}
-
-// NewValidator - initialize a new validator
-func NewValidator(operator sdk.ValAddress, pubKey crypto.PubKey, description Description) Validator {
-	return Validator{
-		OperatorAddress:          operator,
-		ConsPubKey:               pubKey,
-		Jailed:                   false,
-		ScheduledToUnbond:        false,
-		Status:                   sdk.Unbonded,
-		Tokens:                   sdk.ZeroInt(),
-		DelegatorShares:          sdk.ZeroDec(),
-		Description:              description,
-		UnbondingHeight:          int64(0),
-		UnbondingCompletionTime:  time.Unix(0, 0).UTC(),
-		ScheduledUnbondHeight:    int64(0),
-		ScheduledUnbondStartTime: time.Unix(0, 0).UTC(),
-		Commission:               NewCommission(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec()),
-		MinSelfDelegation:        sdk.OneInt(),
-	}
-}
-
-// return the redelegation
-func MustMarshalValidator(cdc *codec.Codec, validator Validator) []byte {
-	return cdc.MustMarshalBinaryLengthPrefixed(validator)
-}
-
-// unmarshal a redelegation from a store value
-func MustUnmarshalValidator(cdc *codec.Codec, value []byte) Validator {
-	validator, err := UnmarshalValidator(cdc, value)
+// MarshalJSON marshals the validator to JSON using Bech32.
+func (v Validator) MarshalJSON() ([]byte, error) {
+	bechConsPubKey, err := sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return validator
+
+	return codec.Cdc.MarshalJSON(bechValidator{
+		OperatorAddress:          v.OperatorAddress,
+		ConsPubKey:               bechConsPubKey,
+		Jailed:                   v.Jailed,
+		ScheduledToUnbond:        v.ScheduledToUnbond,
+		Status:                   v.Status,
+		BondingDelegatorShares:   v.Bonding.DelegatorShares,
+		BondingTokens:            v.Bonding.Tokens,
+		LPDelegatorShares:        v.LP.DelegatorShares,
+		LPTokens:                 v.LP.Tokens,
+		Description:              v.Description,
+		UnbondingHeight:          v.UnbondingHeight,
+		UnbondingCompletionTime:  v.UnbondingCompletionTime,
+		ScheduledUnbondHeight:    v.ScheduledUnbondHeight,
+		ScheduledUnbondStartTime: v.ScheduledUnbondStartTime,
+		MinSelfDelegation:        v.MinSelfDelegation,
+		Commission:               v.Commission,
+	})
 }
 
-// unmarshal a redelegation from a store value
-func UnmarshalValidator(cdc *codec.Codec, value []byte) (validator Validator, err error) {
-	err = cdc.UnmarshalBinaryLengthPrefixed(value, &validator)
-	return validator, err
+// UnmarshalJSON unmarshals the validator from JSON using Bech32.
+func (v *Validator) UnmarshalJSON(data []byte) error {
+	bv := &bechValidator{}
+	if err := codec.Cdc.UnmarshalJSON(data, bv); err != nil {
+		return err
+	}
+	consPubKey, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, bv.ConsPubKey)
+	if err != nil {
+		return err
+	}
+	*v = Validator{
+		OperatorAddress:   bv.OperatorAddress,
+		ConsPubKey:        consPubKey,
+		Jailed:            bv.Jailed,
+		ScheduledToUnbond: bv.ScheduledToUnbond,
+		Status:            bv.Status,
+		Bonding: ValidatorTokens{
+			DelegatorShares: bv.BondingDelegatorShares,
+			Tokens:          bv.BondingTokens,
+		},
+		LP: ValidatorTokens{
+			DelegatorShares: bv.LPDelegatorShares,
+			Tokens:          bv.LPTokens,
+		},
+		Description:              bv.Description,
+		UnbondingHeight:          bv.UnbondingHeight,
+		UnbondingCompletionTime:  bv.UnbondingCompletionTime,
+		ScheduledUnbondHeight:    bv.ScheduledUnbondHeight,
+		ScheduledUnbondStartTime: bv.ScheduledUnbondStartTime,
+		Commission:               bv.Commission,
+		MinSelfDelegation:        bv.MinSelfDelegation,
+	}
+	return nil
 }
 
 // String returns a human readable string representation of a validator.
@@ -201,8 +424,8 @@ func (v Validator) String() string {
   Jailed:                      %v
   ScheduledToUnbond:           %v
   Status:                      %s
-  Tokens:                      %s
-  Delegator Shares:            %s
+  %s
+  %s
   Description:                 %s
   Unbonding Height:            %d
   Unbonding Completion Time:   %v
@@ -212,535 +435,49 @@ func (v Validator) String() string {
   Commission:                  %s`,
 		v.OperatorAddress, bechConsPubKey,
 		v.Jailed, v.ScheduledToUnbond, v.Status,
-		v.Tokens, v.DelegatorShares, v.Description,
+		v.Bonding.String("Bonding"), v.LP.String("LP"),
+		v.Description,
 		v.UnbondingHeight, v.UnbondingCompletionTime,
 		v.ScheduledUnbondHeight, v.ScheduledUnbondStartTime,
 		v.MinSelfDelegation, v.Commission)
 }
 
-// this is a helper struct used for JSON de- and encoding only
-type bechValidator struct {
-	OperatorAddress          sdk.ValAddress `json:"operator_address" yaml:"operator_address"`               // the bech32 address of the validator's operator
-	ConsPubKey               string         `json:"consensus_pubkey" yaml:"consensus_pubkey"`               // the bech32 consensus public key of the validator
-	Jailed                   bool           `json:"jailed" yaml:"jailed"`                                   // has the validator been jailed from bonded status?
-	ScheduledToUnbond        bool           `json:"scheduled_to_unbond" yaml:"scheduled_to_unbond"`         // has the validator been scheduled to force unbond due to low SelfStake amount compared to TotalDelegationsAmount
-	Status                   sdk.BondStatus `json:"status" yaml:"status"`                                   // validator status (bonded/unbonding/unbonded)
-	Tokens                   sdk.Int        `json:"tokens" yaml:"tokens"`                                   // delegated tokens (incl. self-delegation)
-	DelegatorShares          sdk.Dec        `json:"delegator_shares" yaml:"delegator_shares"`               // total shares issued to a validator's delegators
-	Description              Description    `json:"description" yaml:"description"`                         // description terms for the validator
-	UnbondingHeight          int64          `json:"unbonding_height" yaml:"unbonding_height"`               // if unbonding, height at which this validator has begun unbonding
-	UnbondingCompletionTime  time.Time      `json:"unbonding_time" yaml:"unbonding_time"`                   // if unbonding, min time for the validator to complete unbonding
-	ScheduledUnbondHeight    int64          `json:"scheduled_unbond_height" yaml:"scheduled_unbond_height"` // if ScheduledToUnbond, height at which this schedule started
-	ScheduledUnbondStartTime time.Time      `json:"scheduled_unbond_time" yaml:"scheduled_unbond_time"`     // is ScheduledToUnbond, min time for the validator to begin force unbond
-	Commission               Commission     `json:"commission" yaml:"commission"`                           // commission parameters
-	MinSelfDelegation        sdk.Int        `json:"min_self_delegation" yaml:"min_self_delegation"`         // minimum self delegation
+// NewValidator initializes a new validator.
+func NewValidator(operator sdk.ValAddress, pubKey crypto.PubKey, description Description) Validator {
+	return Validator{
+		OperatorAddress:          operator,
+		ConsPubKey:               pubKey,
+		Jailed:                   false,
+		ScheduledToUnbond:        false,
+		Status:                   sdk.Unbonded,
+		Bonding:                  NewValidatorTokens(),
+		LP:                       NewValidatorTokens(),
+		Description:              description,
+		UnbondingHeight:          int64(0),
+		UnbondingCompletionTime:  time.Unix(0, 0).UTC(),
+		ScheduledUnbondHeight:    int64(0),
+		ScheduledUnbondStartTime: time.Unix(0, 0).UTC(),
+		Commission:               NewCommission(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec()),
+		MinSelfDelegation:        sdk.OneInt(),
+	}
 }
 
-// MarshalJSON marshals the validator to JSON using Bech32
-func (v Validator) MarshalJSON() ([]byte, error) {
-	bechConsPubKey, err := sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey)
+// MustMarshalValidator serializes Validator for storage.
+func MustMarshalValidator(cdc *codec.Codec, validator Validator) []byte {
+	return cdc.MustMarshalBinaryLengthPrefixed(validator)
+}
+
+// MustMarshalValidator unserializes Validator from the storage.
+func MustUnmarshalValidator(cdc *codec.Codec, value []byte) Validator {
+	validator, err := UnmarshalValidator(cdc, value)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-
-	return codec.Cdc.MarshalJSON(bechValidator{
-		OperatorAddress:          v.OperatorAddress,
-		ConsPubKey:               bechConsPubKey,
-		Jailed:                   v.Jailed,
-		ScheduledToUnbond:        v.ScheduledToUnbond,
-		Status:                   v.Status,
-		Tokens:                   v.Tokens,
-		DelegatorShares:          v.DelegatorShares,
-		Description:              v.Description,
-		UnbondingHeight:          v.UnbondingHeight,
-		UnbondingCompletionTime:  v.UnbondingCompletionTime,
-		ScheduledUnbondHeight:    v.ScheduledUnbondHeight,
-		ScheduledUnbondStartTime: v.ScheduledUnbondStartTime,
-		MinSelfDelegation:        v.MinSelfDelegation,
-		Commission:               v.Commission,
-	})
+	return validator
 }
 
-// UnmarshalJSON unmarshals the validator from JSON using Bech32
-func (v *Validator) UnmarshalJSON(data []byte) error {
-	bv := &bechValidator{}
-	if err := codec.Cdc.UnmarshalJSON(data, bv); err != nil {
-		return err
-	}
-	consPubKey, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, bv.ConsPubKey)
-	if err != nil {
-		return err
-	}
-	*v = Validator{
-		OperatorAddress:          bv.OperatorAddress,
-		ConsPubKey:               consPubKey,
-		Jailed:                   bv.Jailed,
-		ScheduledToUnbond:        bv.ScheduledToUnbond,
-		Tokens:                   bv.Tokens,
-		Status:                   bv.Status,
-		DelegatorShares:          bv.DelegatorShares,
-		Description:              bv.Description,
-		UnbondingHeight:          bv.UnbondingHeight,
-		UnbondingCompletionTime:  bv.UnbondingCompletionTime,
-		ScheduledUnbondHeight:    bv.ScheduledUnbondHeight,
-		ScheduledUnbondStartTime: bv.ScheduledUnbondStartTime,
-		Commission:               bv.Commission,
-		MinSelfDelegation:        bv.MinSelfDelegation,
-	}
-	return nil
-}
-
-// only the vitals
-func (v Validator) TestEquivalent(v2 Validator) bool {
-	return v.ConsPubKey.Equals(v2.ConsPubKey) &&
-		bytes.Equal(v.OperatorAddress, v2.OperatorAddress) &&
-		v.Status.Equal(v2.Status) &&
-		v.Tokens.Equal(v2.Tokens) &&
-		v.DelegatorShares.Equal(v2.DelegatorShares) &&
-		v.Description == v2.Description &&
-		v.Commission.Equal(v2.Commission)
-}
-
-// return the TM validator address
-func (v Validator) ConsAddress() sdk.ConsAddress {
-	return sdk.ConsAddress(v.ConsPubKey.Address())
-}
-
-// IsBonded checks if the validator status equals Bonded
-func (v Validator) IsBonded() bool {
-	return v.GetStatus().Equal(sdk.Bonded)
-}
-
-// IsUnbonded checks if the validator status equals Unbonded
-func (v Validator) IsUnbonded() bool {
-	return v.GetStatus().Equal(sdk.Unbonded)
-}
-
-// IsUnbonding checks if the validator status equals Unbonding
-func (v Validator) IsUnbonding() bool {
-	return v.GetStatus().Equal(sdk.Unbonding)
-}
-
-// constant used in flags to indicate that description field should not be updated
-const DoNotModifyDesc = "[do-not-modify]"
-
-// Description - description fields for a validator
-type Description struct {
-	Moniker         string `json:"moniker" yaml:"moniker"`                   // name
-	Identity        string `json:"identity" yaml:"identity"`                 // optional identity signature (ex. UPort or Keybase)
-	Website         string `json:"website" yaml:"website"`                   // optional website link
-	SecurityContact string `json:"security_contact" yaml:"security_contact"` // optional security contact info
-	Details         string `json:"details" yaml:"details"`                   // optional details
-}
-
-// NewDescription returns a new Description with the provided values.
-func NewDescription(moniker, identity, website, securityContact, details string) Description {
-	return Description{
-		Moniker:         moniker,
-		Identity:        identity,
-		Website:         website,
-		SecurityContact: securityContact,
-		Details:         details,
-	}
-}
-
-// UpdateDescription updates the fields of a given description. An error is
-// returned if the resulting description contains an invalid length.
-func (d Description) UpdateDescription(d2 Description) (Description, error) {
-	if d2.Moniker == DoNotModifyDesc {
-		d2.Moniker = d.Moniker
-	}
-	if d2.Identity == DoNotModifyDesc {
-		d2.Identity = d.Identity
-	}
-	if d2.Website == DoNotModifyDesc {
-		d2.Website = d.Website
-	}
-	if d2.SecurityContact == DoNotModifyDesc {
-		d2.SecurityContact = d.SecurityContact
-	}
-	if d2.Details == DoNotModifyDesc {
-		d2.Details = d.Details
-	}
-
-	return NewDescription(
-		d2.Moniker,
-		d2.Identity,
-		d2.Website,
-		d2.SecurityContact,
-		d2.Details,
-	).EnsureLength()
-}
-
-// EnsureLength ensures the length of a validator's description.
-func (d Description) EnsureLength() (Description, error) {
-	if len(d.Moniker) > MaxMonikerLength {
-		return d, sdkerrors.Wrapf(sdkerrors.ErrInvalidRequest, "invalid moniker length; got: %d, max: %d", len(d.Moniker), MaxMonikerLength)
-	}
-	if len(d.Identity) > MaxIdentityLength {
-		return d, sdkerrors.Wrapf(sdkerrors.ErrInvalidRequest, "invalid identity length; got: %d, max: %d", len(d.Identity), MaxIdentityLength)
-	}
-	if len(d.Website) > MaxWebsiteLength {
-		return d, sdkerrors.Wrapf(sdkerrors.ErrInvalidRequest, "invalid website length; got: %d, max: %d", len(d.Website), MaxWebsiteLength)
-	}
-	if len(d.SecurityContact) > MaxSecurityContactLength {
-		return d, sdkerrors.Wrapf(sdkerrors.ErrInvalidRequest, "invalid security contact length; got: %d, max: %d", len(d.SecurityContact), MaxSecurityContactLength)
-	}
-	if len(d.Details) > MaxDetailsLength {
-		return d, sdkerrors.Wrapf(sdkerrors.ErrInvalidRequest, "invalid details length; got: %d, max: %d", len(d.Details), MaxDetailsLength)
-	}
-
-	return d, nil
-}
-
-// ABCIValidatorUpdate returns an abci.ValidatorUpdate from a staking validator type
-// with the full validator power
-func (v Validator) ABCIValidatorUpdate() abci.ValidatorUpdate {
-	return abci.ValidatorUpdate{
-		PubKey: tmtypes.TM2PB.PubKey(v.ConsPubKey),
-		Power:  v.ConsensusPower(),
-	}
-}
-
-// ABCIValidatorUpdateZero returns an abci.ValidatorUpdate from a staking validator type
-// with zero power used for validator updates.
-func (v Validator) ABCIValidatorUpdateZero() abci.ValidatorUpdate {
-	return abci.ValidatorUpdate{
-		PubKey: tmtypes.TM2PB.PubKey(v.ConsPubKey),
-		Power:  0,
-	}
-}
-
-// SetInitialCommission attempts to set a validator's initial commission. An
-// error is returned if the commission is invalid.
-func (v Validator) SetInitialCommission(commission Commission) (Validator, error) {
-	if err := commission.Validate(); err != nil {
-		return v, err
-	}
-
-	v.Commission = commission
-	return v, nil
-}
-
-// In some situations, the exchange rate becomes invalid, e.g. if
-// Validator loses all tokens due to slashing. In this case,
-// make all future delegations invalid.
-func (v Validator) InvalidExRate() bool {
-	return v.Tokens.IsZero() && v.DelegatorShares.IsPositive()
-}
-
-// calculate the token worth of provided shares
-func (v Validator) TokensFromShares(shares sdk.Dec) sdk.Dec {
-	return (shares.MulInt(v.Tokens)).Quo(v.DelegatorShares)
-}
-
-// calculate the token worth of provided shares, truncated
-func (v Validator) TokensFromSharesTruncated(shares sdk.Dec) sdk.Dec {
-	return (shares.MulInt(v.Tokens)).QuoTruncate(v.DelegatorShares)
-}
-
-// TokensFromSharesRoundUp returns the token worth of provided shares, rounded
-// up.
-func (v Validator) TokensFromSharesRoundUp(shares sdk.Dec) sdk.Dec {
-	return (shares.MulInt(v.Tokens)).QuoRoundUp(v.DelegatorShares)
-}
-
-// SharesFromTokens returns the shares of a delegation given a bond amount. It
-// returns an error if the validator has no tokens.
-func (v Validator) SharesFromTokens(amt sdk.Int) (sdk.Dec, error) {
-	if v.Tokens.IsZero() {
-		return sdk.ZeroDec(), ErrInsufficientShares
-	}
-
-	return v.GetDelegatorShares().MulInt(amt).QuoInt(v.GetTokens()), nil
-}
-
-// SharesFromTokensTruncated returns the truncated shares of a delegation given
-// a bond amount. It returns an error if the validator has no tokens.
-func (v Validator) SharesFromTokensTruncated(amt sdk.Int) (sdk.Dec, error) {
-	if v.Tokens.IsZero() {
-		return sdk.ZeroDec(), ErrInsufficientShares
-	}
-
-	return v.GetDelegatorShares().MulInt(amt).QuoTruncate(v.GetTokens().ToDec()), nil
-}
-
-// get the bonded tokens which the validator holds
-func (v Validator) BondedTokens() sdk.Int {
-	if v.IsBonded() {
-		return v.Tokens
-	}
-	return sdk.ZeroInt()
-}
-
-// get the consensus-engine power
-// a reduction of 10^6 from validator tokens is applied
-func (v Validator) ConsensusPower() int64 {
-	if v.IsBonded() {
-		return v.PotentialConsensusPower()
-	}
-	return 0
-}
-
-// potential consensus-engine power
-func (v Validator) PotentialConsensusPower() int64 {
-	return sdk.TokensToConsensusPower(v.Tokens)
-}
-
-// UpdateStatus updates the location of the shares within a validator
-// to reflect the new status
-func (v Validator) UpdateStatus(newStatus sdk.BondStatus) Validator {
-	v.Status = newStatus
-	return v
-}
-
-// AddTokensFromDel adds tokens to a validator
-func (v Validator) AddTokensFromDel(amount sdk.Int) (Validator, sdk.Dec) {
-
-	// calculate the shares to issue
-	var issuedShares sdk.Dec
-	if v.DelegatorShares.IsZero() {
-		// the first delegation to a validator sets the exchange rate to one
-		issuedShares = amount.ToDec()
-	} else {
-		shares, err := v.SharesFromTokens(amount)
-		if err != nil {
-			panic(err)
-		}
-
-		issuedShares = shares
-	}
-
-	v.Tokens = v.Tokens.Add(amount)
-	v.DelegatorShares = v.DelegatorShares.Add(issuedShares)
-
-	return v, issuedShares
-}
-
-// RemoveTokens removes tokens from a validator
-func (v Validator) RemoveTokens(tokens sdk.Int) Validator {
-	if tokens.IsNegative() {
-		panic(fmt.Sprintf("should not happen: trying to remove negative tokens %v", tokens))
-	}
-	if v.Tokens.LT(tokens) {
-		panic(fmt.Sprintf("should not happen: only have %v tokens, trying to remove %v", v.Tokens, tokens))
-	}
-	v.Tokens = v.Tokens.Sub(tokens)
-	return v
-}
-
-// RemoveDelShares removes delegator shares from a validator.
-// NOTE: because token fractions are left in the valiadator,
-//       the exchange rate of future shares of this validator can increase.
-func (v Validator) RemoveDelShares(delShares sdk.Dec) (Validator, sdk.Int) {
-
-	remainingShares := v.DelegatorShares.Sub(delShares)
-	var issuedTokens sdk.Int
-	if remainingShares.IsZero() {
-
-		// last delegation share gets any trimmings
-		issuedTokens = v.Tokens
-		v.Tokens = sdk.ZeroInt()
-	} else {
-
-		// leave excess tokens in the validator
-		// however fully use all the delegator shares
-		issuedTokens = v.TokensFromShares(delShares).TruncateInt()
-		v.Tokens = v.Tokens.Sub(issuedTokens)
-		if v.Tokens.IsNegative() {
-			panic("attempting to remove more tokens than available in validator")
-		}
-	}
-
-	v.DelegatorShares = remainingShares
-	return v, issuedTokens
-}
-
-// ScheduleValidatorForceUnbond set ScheduledToUnbond state
-func (v Validator) ScheduleValidatorForceUnbond(curBlockHeight int64, curBlockTime time.Time, unbondDelay time.Duration) Validator {
-	v.ScheduledToUnbond = true
-	v.ScheduledUnbondHeight = curBlockHeight
-	v.ScheduledUnbondStartTime = curBlockTime.Add(unbondDelay)
-
-	return v
-}
-
-// UnscheduleValidatorForceUnbond drops ScheduledToUnbond state
-func (v Validator) UnscheduleValidatorForceUnbond() Validator {
-	v.ScheduledToUnbond = false
-	v.ScheduledUnbondHeight = int64(0)
-	v.ScheduledUnbondStartTime = time.Unix(0, 0).UTC()
-
-	return v
-}
-
-// nolint - for ValidatorI
-func (v Validator) IsJailed() bool                { return v.Jailed }
-func (v Validator) IsScheduledToUnbond() bool     { return v.ScheduledToUnbond }
-func (v Validator) GetMoniker() string            { return v.Description.Moniker }
-func (v Validator) GetStatus() sdk.BondStatus     { return v.Status }
-func (v Validator) GetOperator() sdk.ValAddress   { return v.OperatorAddress }
-func (v Validator) GetConsPubKey() crypto.PubKey  { return v.ConsPubKey }
-func (v Validator) GetConsAddr() sdk.ConsAddress  { return sdk.ConsAddress(v.ConsPubKey.Address()) }
-func (v Validator) GetTokens() sdk.Int            { return v.Tokens }
-func (v Validator) GetBondedTokens() sdk.Int      { return v.BondedTokens() }
-func (v Validator) GetConsensusPower() int64      { return v.ConsensusPower() }
-func (v Validator) GetCommission() sdk.Dec        { return v.Commission.Rate }
-func (v Validator) GetMinSelfDelegation() sdk.Int { return v.MinSelfDelegation }
-func (v Validator) GetDelegatorShares() sdk.Dec   { return v.DelegatorShares }
-
-// ValidatorStakingState keeps validator staking state.
-// Used to avoid iterating over all validator delegations on delegate/undelegate/redelegate operations (gas reduction)
-// ValidatorAddress is encoded within storage key.
-type ValidatorStakingState struct {
-	// Validator operator delegation data
-	Operator DelegationTruncated `json:"operator"`
-	// Delegators delegation data excluding the operators
-	Delegators []DelegationTruncated `json:"delegators"`
-}
-
-// DelegationTruncated keeps essential data used by ValidatorStakingState.
-type DelegationTruncated struct {
-	Address sdk.AccAddress `json:"address"`
-	Shares  sdk.Dec        `json:"shares"`
-}
-
-// Sort sorts state.Delegators.
-// Sort is performed on every store.Set operation to achieve genesis consistency.
-func (s ValidatorStakingState) Sort() {
-	sort.Sort(s)
-}
-
-// Len implements sort interface for state.Delegators.
-func (s ValidatorStakingState) Len() int {
-	return len(s.Delegators)
-}
-
-// Less implements sort interface for state.Delegators.
-func (s ValidatorStakingState) Less(i, j int) bool {
-	return bytes.Compare(s.Delegators[i].Address, s.Delegators[j].Address) == -1
-}
-
-// Swap implements sort interface for state.Delegators.
-func (s ValidatorStakingState) Swap(i, j int) {
-	s.Delegators[i], s.Delegators[j] = s.Delegators[j], s.Delegators[i]
-}
-
-// SetDelegator adds / updates delegation info.
-func (s ValidatorStakingState) SetDelegator(validatorAddr sdk.ValAddress, delegatorAddr sdk.AccAddress, delegatedShares sdk.Dec) ValidatorStakingState {
-	if validatorAddr.Equals(delegatorAddr) {
-		s.Operator.Address = delegatorAddr
-		s.Operator.Shares = delegatedShares
-		return s
-	}
-
-	for i := 0; i < len(s.Delegators); i++ {
-		if s.Delegators[i].Address.Equals(delegatorAddr) {
-			s.Delegators[i].Shares = delegatedShares
-			return s
-		}
-	}
-
-	s.Delegators = append(s.Delegators, DelegationTruncated{
-		Address: delegatorAddr,
-		Shares:  delegatedShares,
-	})
-
-	return s
-}
-
-// RemoveDelegator removes delegation info.
-// nolint: interfacer
-func (s ValidatorStakingState) RemoveDelegator(delegatorAddr sdk.AccAddress) ValidatorStakingState {
-	if s.Operator.Address.Equals(delegatorAddr) {
-		s.Operator.Address = sdk.AccAddress{}
-		s.Operator.Shares = sdk.ZeroDec()
-		return s
-	}
-
-	rmIdx := -1
-	for i := 0; i < len(s.Delegators); i++ {
-		if s.Delegators[i].Address.Equals(delegatorAddr) {
-			rmIdx = i
-			break
-		}
-	}
-
-	if rmIdx >= 0 {
-		s.Delegators = append(s.Delegators[:rmIdx], s.Delegators[rmIdx+1:]...)
-	}
-
-	return s
-}
-
-// GetSelfAndTotalStakes returns selfStake and totalStakes values.
-func (s ValidatorStakingState) GetSelfAndTotalStakes(validator Validator) (selfStake, totalStakes sdk.Int) {
-	selfStake, totalStakes = sdk.ZeroInt(), sdk.ZeroInt()
-
-	getTokens := func(shares sdk.Dec) sdk.Int {
-		return validator.TokensFromShares(shares).TruncateInt()
-	}
-
-	if !s.Operator.Shares.IsZero() {
-		selfStake = selfStake.Add(getTokens(s.Operator.Shares))
-	}
-
-	for i := 0; i < len(s.Delegators); i++ {
-		delegation := &s.Delegators[i]
-		if delegation.Shares.IsZero() {
-			continue
-		}
-
-		totalStakes = totalStakes.Add(getTokens(delegation.Shares))
-	}
-	totalStakes = totalStakes.Add(selfStake)
-
-	return
-}
-
-// InvariantCheck verifies that delegation exists in the state and it is correct.
-// Used by module invariants check.
-func (s ValidatorStakingState) InvariantCheck(validator Validator, delegation Delegation) error {
-	const msgPrefixFmt = "broken validator %s staking state for delegator %s:\n"
-
-	if s.Operator.Address.Equals(delegation.DelegatorAddress) {
-		if !s.Operator.Address.Equals(validator.OperatorAddress) {
-			return fmt.Errorf(msgPrefixFmt+"\tinvalid operator address: %s",
-				validator.OperatorAddress, delegation.DelegatorAddress, s.Operator.Address,
-			)
-		}
-		if !s.Operator.Shares.Equal(delegation.Shares) {
-			return fmt.Errorf(msgPrefixFmt+"\tinvalid operator shares: %s / %s",
-				validator.OperatorAddress, delegation.DelegatorAddress, s.Operator.Shares, delegation.Shares,
-			)
-		}
-		return nil
-	}
-
-	for i := 0; i < len(s.Delegators); i++ {
-		stateDel := &s.Delegators[i]
-		if delegation.DelegatorAddress.Equals(stateDel.Address) {
-			if !delegation.Shares.Equal(stateDel.Shares) {
-				return fmt.Errorf(msgPrefixFmt+"\tinvalid shares: %s / %s",
-					validator.OperatorAddress, delegation.DelegatorAddress, stateDel.Shares, delegation.Shares,
-				)
-			}
-			return nil
-		}
-	}
-
-	return fmt.Errorf(msgPrefixFmt+"not found",
-		validator.OperatorAddress, delegation.DelegatorAddress,
-	)
-}
-
-// NewValidatorStakingState creates an empty ValidatorStakingState object.
-func NewValidatorStakingState() ValidatorStakingState {
-	return ValidatorStakingState{
-		Operator: DelegationTruncated{
-			Address: sdk.AccAddress{},
-			Shares:  sdk.ZeroDec(),
-		},
-		Delegators: make([]DelegationTruncated, 0),
-	}
+// UnmarshalValidator unserializes Validator from the storage without a panic.
+func UnmarshalValidator(cdc *codec.Codec, value []byte) (validator Validator, err error) {
+	err = cdc.UnmarshalBinaryLengthPrefixed(value, &validator)
+	return validator, err
 }

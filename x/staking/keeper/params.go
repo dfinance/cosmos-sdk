@@ -44,9 +44,21 @@ func (k Keeper) HistoricalEntries(ctx sdk.Context) (res uint16) {
 	return
 }
 
-// BondDenom - Bondable coin denomination
+// BondDenom - bondable coin denomination
 func (k Keeper) BondDenom(ctx sdk.Context) (res string) {
 	k.paramstore.Get(ctx, types.KeyBondDenom, &res)
+	return
+}
+
+// LPDenom - liquidity coin denomination
+func (k Keeper) LPDenom(ctx sdk.Context) (res string) {
+	k.paramstore.Get(ctx, types.KeyLPDenom, &res)
+	return
+}
+
+// LPDistrRatio - validator distribution and gov voting power LP ratio (BTokens + LPDistrRatio * LPTokens)
+func (k Keeper) LPDistrRatio(ctx sdk.Context) (res sdk.Dec) {
+	k.paramstore.Get(ctx, types.KeyLPDistrRatio, &res)
 	return
 }
 
@@ -75,6 +87,8 @@ func (k Keeper) GetParams(ctx sdk.Context) types.Params {
 		k.MaxEntries(ctx),
 		k.HistoricalEntries(ctx),
 		k.BondDenom(ctx),
+		k.LPDenom(ctx),
+		k.LPDistrRatio(ctx),
 		k.MinSelfDelegationLvl(ctx),
 		k.MaxDelegationsRatio(ctx),
 		k.ScheduledUnbondDelay(ctx),

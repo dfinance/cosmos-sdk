@@ -126,6 +126,7 @@ func createTestInput(t *testing.T, isCheckTx bool, initPower int64) (sdk.Context
 		types.ModuleName:          nil,
 		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
 		staking.BondedPoolName:    {supply.Burner, supply.Staking},
+		staking.LiquidityPoolName: nil,
 	}
 
 	// create module accounts

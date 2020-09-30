@@ -30,14 +30,16 @@ func TestInitGenesis(t *testing.T) {
 	validators[0].ConsPubKey = keep.PKs[0]
 	validators[0].Description = NewDescription("hoop", "", "", "", "")
 	validators[0].Status = sdk.Bonded
-	validators[0].Tokens = valTokens
-	validators[0].DelegatorShares = valTokens.ToDec()
+	validators[0].Bonding.Tokens = valTokens
+	validators[0].Bonding.DelegatorShares = valTokens.ToDec()
+	validators[0].LP = types.NewValidatorTokens()
 	validators[1].OperatorAddress = sdk.ValAddress(keep.Addrs[1])
 	validators[1].ConsPubKey = keep.PKs[1]
 	validators[1].Description = NewDescription("bloop", "", "", "", "")
 	validators[1].Status = sdk.Bonded
-	validators[1].Tokens = valTokens
-	validators[1].DelegatorShares = valTokens.ToDec()
+	validators[1].Bonding.Tokens = valTokens
+	validators[1].Bonding.DelegatorShares = valTokens.ToDec()
+	validators[1].LP = types.NewValidatorTokens()
 
 	genesisState := types.NewGenesisState(params, validators, delegations)
 	vals := InitGenesis(ctx, keeper, accKeeper, supplyKeeper, genesisState)
@@ -84,8 +86,8 @@ func TestInitGenesisLargeValidatorSet(t *testing.T) {
 		if i < 100 {
 			tokens = sdk.TokensFromConsensusPower(2)
 		}
-		validators[i].Tokens = tokens
-		validators[i].DelegatorShares = tokens.ToDec()
+		validators[i].Bonding.Tokens = tokens
+		validators[i].Bonding.DelegatorShares = tokens.ToDec()
 	}
 
 	genesisState := types.NewGenesisState(params, validators, delegations)
@@ -103,8 +105,8 @@ func TestValidateGenesis(t *testing.T) {
 	genValidators1 := make([]types.Validator, 1, 5)
 	pk := ed25519.GenPrivKey().PubKey()
 	genValidators1[0] = types.NewValidator(sdk.ValAddress(pk.Address()), pk, types.NewDescription("", "", "", "", ""))
-	genValidators1[0].Tokens = sdk.OneInt()
-	genValidators1[0].DelegatorShares = sdk.OneDec()
+	genValidators1[0].Bonding.Tokens = sdk.OneInt()
+	genValidators1[0].Bonding.DelegatorShares = sdk.OneDec()
 
 	tests := []struct {
 		name    string
@@ -119,7 +121,7 @@ func TestValidateGenesis(t *testing.T) {
 		}, true},
 		{"no delegator shares", func(data *types.GenesisState) {
 			data.Validators = genValidators1
-			data.Validators[0].DelegatorShares = sdk.ZeroDec()
+			data.Validators[0].Bonding.DelegatorShares = sdk.ZeroDec()
 		}, true},
 		{"jailed and bonded validator", func(data *types.GenesisState) {
 			data.Validators = genValidators1

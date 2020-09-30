@@ -47,6 +47,8 @@ var (
 	KeyMaxValidators            = []byte("MaxValidators")
 	KeyMaxEntries               = []byte("KeyMaxEntries")
 	KeyBondDenom                = []byte("BondDenom")
+	KeyLPDenom                  = []byte("LPDenom")
+	KeyLPDistrRatio             = []byte("LPDistrRatio")
 	KeyHistoricalEntries        = []byte("HistoricalEntries")
 	KeyMinSelfDelegationLvl     = []byte("MinSelfDelegationLvl")
 	KeyMaxDelegationsRatio      = []byte("MaxDelegationsRatio")
@@ -67,6 +69,10 @@ type Params struct {
 	HistoricalEntries uint16 `json:"historical_entries" yaml:"historical_entries"`
 	// Bondable coin denomination
 	BondDenom string `json:"bond_denom" yaml:"bond_denom"`
+	// Liquidity coin denomination
+	LPDenom string `json:"lp_denom" yaml:"lp_denom"`
+	// Gov voting and distribution ratio between bonding tokens and liquidity tokens (BTokens + LPDistrRatio * LPTokens)
+	LPDistrRatio sdk.Dec `json:"lp_distr_ratio" yaml:"lp_distr_ratio"`
 	// Min self delegation level for validator creation
 	MinSelfDelegationLvl sdk.Int `json:"min_self_delegation_lvl" yaml:"min_self_delegation_lvl"`
 	// Max delegations per validator is limited by (CurrentSelfDelegation * KeyMaxDelegationsRatio)
@@ -79,7 +85,8 @@ type Params struct {
 func NewParams(
 	unbondingTime time.Duration,
 	maxValidators, maxEntries, historicalEntries uint16,
-	bondDenom string,
+	bondDenom, lpDenom string,
+	lpDistrRatio sdk.Dec,
 	minSelfDelegationLvl sdk.Int,
 	maxDelegationsRatio sdk.Dec,
 	scheduledUnbondDelay time.Duration,
@@ -91,6 +98,8 @@ func NewParams(
 		MaxEntries:               maxEntries,
 		HistoricalEntries:        historicalEntries,
 		BondDenom:                bondDenom,
+		LPDenom:                  lpDenom,
+		LPDistrRatio:             lpDistrRatio,
 		MinSelfDelegationLvl:     minSelfDelegationLvl,
 		MaxDelegationsRatio:      maxDelegationsRatio,
 		ScheduledUnbondDelayTime: scheduledUnbondDelay,
@@ -105,6 +114,8 @@ func (p *Params) ParamSetPairs() params.ParamSetPairs {
 		params.NewParamSetPair(KeyMaxEntries, &p.MaxEntries, validateMaxEntries),
 		params.NewParamSetPair(KeyHistoricalEntries, &p.HistoricalEntries, validateHistoricalEntries),
 		params.NewParamSetPair(KeyBondDenom, &p.BondDenom, validateBondDenom),
+		params.NewParamSetPair(KeyLPDenom, &p.LPDenom, validateLPDenom),
+		params.NewParamSetPair(KeyLPDistrRatio, &p.LPDistrRatio, validateLPDistrRatio),
 		params.NewParamSetPair(KeyMinSelfDelegationLvl, &p.MinSelfDelegationLvl, validateMinSelfDelegationLvl),
 		params.NewParamSetPair(KeyMaxDelegationsRatio, &p.MaxDelegationsRatio, validateMaxDelegationsRatio),
 		params.NewParamSetPair(KeyScheduledUnbondDelayTime, &p.ScheduledUnbondDelayTime, validateScheduledUnbondDelayTime),
@@ -127,6 +138,8 @@ func DefaultParams() Params {
 		DefaultMaxEntries,
 		DefaultHistoricalEntries,
 		sdk.DefaultBondDenom,
+		sdk.DefaultLiquidityDenom,
+		sdk.NewDecWithPrec(1, 0),
 		sdk.NewInt(DefaultMinSelfDelegationLvl),
 		sdk.NewDecWithPrec(DefaultMaxDelegationsRatioBase, DefaultMaxDelegationsRatioPrecision),
 		DefaultScheduledUnbondTime,
@@ -141,11 +154,14 @@ func (p Params) String() string {
   Max Entries:            %d
   Historical Entries:     %d
   Bonded Coin Denom:      %s
+  Liquidity Coin Denom:   %s
+  LP Tokens Distr Ratio:  %s
   Min SelfDelegation lvl: %s
   Max Delegations Ratio:  %s
   Scheduled Unbond Delay: %s
 `,
-		p.UnbondingTime, p.MaxValidators, p.MaxEntries, p.HistoricalEntries, p.BondDenom,
+		p.UnbondingTime, p.MaxValidators, p.MaxEntries, p.HistoricalEntries,
+		p.BondDenom, p.LPDenom, p.LPDistrRatio,
 		p.MinSelfDelegationLvl, p.MaxDelegationsRatio, p.ScheduledUnbondDelayTime,
 	)
 }
@@ -180,6 +196,12 @@ func (p Params) Validate() error {
 		return err
 	}
 	if err := validateBondDenom(p.BondDenom); err != nil {
+		return err
+	}
+	if err := validateLPDenom(p.LPDenom); err != nil {
+		return err
+	}
+	if err := validateLPDistrRatio(p.LPDistrRatio); err != nil {
 		return err
 	}
 	if err := validateMinSelfDelegationLvl(p.MinSelfDelegationLvl); err != nil {
@@ -272,6 +294,24 @@ func validateBondDenom(i interface{}) error {
 	return nil
 }
 
+func validateLPDenom(i interface{}) error {
+	const paramName = "liquidity denom"
+
+	v, ok := i.(string)
+	if !ok {
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	if strings.TrimSpace(v) == "" {
+		return fmt.Errorf("%s: cannot be blank", paramName)
+	}
+	if err := sdk.ValidateDenom(v); err != nil {
+		return fmt.Errorf("%s: validation: %v", paramName, err)
+	}
+
+	return nil
+}
+
 func validateMinSelfDelegationLvl(i interface{}) error {
 	const paramName = "min self-delegation level"
 
@@ -312,6 +352,21 @@ func validateScheduledUnbondDelayTime(i interface{}) error {
 
 	if v <= 0 {
 		return fmt.Errorf("%s: must be positive: %d", paramName, v)
+	}
+
+	return nil
+}
+
+func validateLPDistrRatio(i interface{}) error {
+	const paramName = "liquidity tokens distribution ratio"
+
+	v, ok := i.(sdk.Dec)
+	if !ok {
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	if v.IsNegative() {
+		return fmt.Errorf("%s: must be GTE than 0.0: %s", paramName, v.String())
 	}
 
 	return nil

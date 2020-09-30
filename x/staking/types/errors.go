@@ -11,6 +11,7 @@ import (
 //
 // REF: https://github.com/cosmos/cosmos-sdk/issues/5450
 var (
+	ErrInternal                        = sdkerrors.Register(ModuleName, 0, "internal")
 	ErrEmptyValidatorAddr              = sdkerrors.Register(ModuleName, 1, "empty validator address")
 	ErrBadValidatorAddr                = sdkerrors.Register(ModuleName, 2, "validator address is invalid")
 	ErrNoValidatorFound                = sdkerrors.Register(ModuleName, 3, "validator does not exist")

@@ -40,9 +40,11 @@ func NewKeeper(
 	if addr := supplyKeeper.GetModuleAddress(types.BondedPoolName); addr == nil {
 		panic(fmt.Sprintf("%s module account has not been set", types.BondedPoolName))
 	}
-
 	if addr := supplyKeeper.GetModuleAddress(types.NotBondedPoolName); addr == nil {
 		panic(fmt.Sprintf("%s module account has not been set", types.NotBondedPoolName))
+	}
+	if addr := supplyKeeper.GetModuleAddress(types.LiquidityPoolName); addr == nil {
+		panic(fmt.Sprintf("%s module account has not been set", types.LiquidityPoolName))
 	}
 
 	return Keeper{

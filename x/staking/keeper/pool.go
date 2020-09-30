@@ -16,6 +16,11 @@ func (k Keeper) GetNotBondedPool(ctx sdk.Context) (notBondedPool exported.Module
 	return k.supplyKeeper.GetModuleAccount(ctx, types.NotBondedPoolName)
 }
 
+// GetLiquidityPool returns the liquidity tokens pool's module account
+func (k Keeper) GetLiquidityPool(ctx sdk.Context) (notBondedPool exported.ModuleAccountI) {
+	return k.supplyKeeper.GetModuleAccount(ctx, types.LiquidityPoolName)
+}
+
 // bondedTokensToNotBonded transfers coins from the bonded to the not bonded pool within staking
 func (k Keeper) bondedTokensToNotBonded(ctx sdk.Context, tokens sdk.Int) {
 	coins := sdk.NewCoins(sdk.NewCoin(k.BondDenom(ctx), tokens))

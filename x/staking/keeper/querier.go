@@ -367,16 +367,19 @@ func queryHistoricalInfo(ctx sdk.Context, req abci.RequestQuery, k Keeper) ([]by
 
 func queryPool(ctx sdk.Context, k Keeper) ([]byte, error) {
 	bondDenom := k.BondDenom(ctx)
+	lpDenom := k.LPDenom(ctx)
 
 	bondedPool := k.GetBondedPool(ctx)
 	notBondedPool := k.GetNotBondedPool(ctx)
-	if bondedPool == nil || notBondedPool == nil {
+	liquidityPool := k.GetLiquidityPool(ctx)
+	if bondedPool == nil || notBondedPool == nil || liquidityPool == nil {
 		return nil, errors.New("pool accounts haven't been set")
 	}
 
 	pool := types.NewPool(
 		notBondedPool.GetCoins().AmountOf(bondDenom),
 		bondedPool.GetCoins().AmountOf(bondDenom),
+		liquidityPool.GetCoins().AmountOf(lpDenom),
 	)
 
 	res, err := codec.MarshalJSONIndent(types.ModuleCdc, pool)
@@ -410,8 +413,10 @@ func delegationToDelegationResponse(ctx sdk.Context, k Keeper, del types.Delegat
 	return types.NewDelegationResp(
 		del.DelegatorAddress,
 		del.ValidatorAddress,
-		del.Shares,
-		sdk.NewCoin(k.BondDenom(ctx), val.TokensFromShares(del.Shares).TruncateInt()),
+		del.BondingShares,
+		del.LPShares,
+		sdk.NewCoin(k.BondDenom(ctx), val.Bonding.TokensFromShares(del.BondingShares).TruncateInt()),
+		sdk.NewCoin(k.LPDenom(ctx), val.LP.TokensFromShares(del.LPShares).TruncateInt()),
 	), nil
 }
 
@@ -448,9 +453,10 @@ func redelegationsToRedelegationResponses(
 			entryResponses[j] = types.NewRedelegationEntryResponse(
 				entry.CreationHeight,
 				entry.CompletionTime,
+				types.BondingDelOpType,
 				entry.SharesDst,
 				entry.InitialBalance,
-				val.TokensFromShares(entry.SharesDst).TruncateInt(),
+				val.Bonding.TokensFromShares(entry.SharesDst).TruncateInt(),
 			)
 		}
 

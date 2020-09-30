@@ -100,7 +100,7 @@ func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k k
 	// move coins from the msg.Address account to a (self-delegation) delegator account
 	// the validator account and global shares are updated within here
 	// NOTE source will always be from a wallet which are unbonded
-	_, err = k.Delegate(ctx, msg.DelegatorAddress, msg.Value.Amount, sdk.Unbonded, validator, true)
+	_, err = k.Delegate(ctx, msg.DelegatorAddress, types.BondingDelOpType, msg.Value.Amount, sdk.Unbonded, validator, true)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k k
 		sdk.NewEvent(
 			types.EventTypeCreateValidator,
 			sdk.NewAttribute(types.AttributeKeyValidator, msg.ValidatorAddress.String()),
-			sdk.NewAttribute(sdk.AttributeKeyAmount, msg.Value.Amount.String()),
+			sdk.NewAttribute(sdk.AttributeKeyCoin, msg.Value.String()),
 		),
 		sdk.NewEvent(
 			sdk.EventTypeMessage,
@@ -157,7 +157,7 @@ func handleMsgEditValidator(ctx sdk.Context, msg types.MsgEditValidator, k keepe
 		if !msg.MinSelfDelegation.GT(validator.MinSelfDelegation) {
 			return nil, ErrMinSelfDelegationDecreased
 		}
-		if msg.MinSelfDelegation.GT(validator.Tokens) {
+		if msg.MinSelfDelegation.GT(validator.GetBondedTokens()) {
 			return nil, ErrSelfDelegationBelowMinimum
 		}
 
@@ -193,12 +193,18 @@ func handleMsgDelegate(ctx sdk.Context, msg types.MsgDelegate, k keeper.Keeper) 
 		return nil, ErrNoValidatorFound
 	}
 
-	if msg.Amount.Denom != k.BondDenom(ctx) {
+	var delOpType types.DelegationOpType
+	switch msg.Amount.Denom {
+	case k.BondDenom(ctx):
+		delOpType = types.BondingDelOpType
+	case k.LPDenom(ctx):
+		delOpType = types.LiquidityDelOpType
+	default:
 		return nil, ErrBadDenom
 	}
 
 	// NOTE: source funds are always unbonded
-	_, err := k.Delegate(ctx, msg.DelegatorAddress, msg.Amount.Amount, sdk.Unbonded, validator, true)
+	_, err := k.Delegate(ctx, msg.DelegatorAddress, delOpType, msg.Amount.Amount, sdk.Unbonded, validator, true)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +213,7 @@ func handleMsgDelegate(ctx sdk.Context, msg types.MsgDelegate, k keeper.Keeper) 
 		sdk.NewEvent(
 			types.EventTypeDelegate,
 			sdk.NewAttribute(types.AttributeKeyValidator, msg.ValidatorAddress.String()),
-			sdk.NewAttribute(sdk.AttributeKeyAmount, msg.Amount.Amount.String()),
+			sdk.NewAttribute(sdk.AttributeKeyCoin, msg.Amount.String()),
 		),
 		sdk.NewEvent(
 			sdk.EventTypeMessage,
@@ -225,18 +231,22 @@ func handleMsgUndelegate(ctx sdk.Context, msg types.MsgUndelegate, k keeper.Keep
 		return nil, ErrDeniedStakingOps
 	}
 
-	shares, err := k.ValidateUnbondAmount(
-		ctx, msg.DelegatorAddress, msg.ValidatorAddress, msg.Amount.Amount,
-	)
+	var delOpType types.DelegationOpType
+	switch msg.Amount.Denom {
+	case k.BondDenom(ctx):
+		delOpType = types.BondingDelOpType
+	case k.LPDenom(ctx):
+		delOpType = types.LiquidityDelOpType
+	default:
+		return nil, ErrBadDenom
+	}
+
+	shares, err := k.ValidateUnbondAmount(ctx, msg.DelegatorAddress, msg.ValidatorAddress, delOpType, msg.Amount.Amount)
 	if err != nil {
 		return nil, err
 	}
 
-	if msg.Amount.Denom != k.BondDenom(ctx) {
-		return nil, ErrBadDenom
-	}
-
-	completionTime, err := k.Undelegate(ctx, msg.DelegatorAddress, msg.ValidatorAddress, shares, false)
+	completionTime, err := k.Undelegate(ctx, msg.DelegatorAddress, msg.ValidatorAddress, delOpType, shares, false)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +256,7 @@ func handleMsgUndelegate(ctx sdk.Context, msg types.MsgUndelegate, k keeper.Keep
 		sdk.NewEvent(
 			types.EventTypeUnbond,
 			sdk.NewAttribute(types.AttributeKeyValidator, msg.ValidatorAddress.String()),
-			sdk.NewAttribute(sdk.AttributeKeyAmount, msg.Amount.Amount.String()),
+			sdk.NewAttribute(sdk.AttributeKeyCoin, msg.Amount.String()),
 			sdk.NewAttribute(types.AttributeKeyCompletionTime, completionTime.Format(time.RFC3339)),
 		),
 		sdk.NewEvent(
@@ -265,20 +275,22 @@ func handleMsgBeginRedelegate(ctx sdk.Context, msg types.MsgBeginRedelegate, k k
 		return nil, ErrDeniedStakingOps
 	}
 
-	shares, err := k.ValidateUnbondAmount(
-		ctx, msg.DelegatorAddress, msg.ValidatorSrcAddress, msg.Amount.Amount,
-	)
+	var delOpType types.DelegationOpType
+	switch msg.Amount.Denom {
+	case k.BondDenom(ctx):
+		delOpType = types.BondingDelOpType
+	case k.LPDenom(ctx):
+		delOpType = types.LiquidityDelOpType
+	default:
+		return nil, ErrBadDenom
+	}
+
+	shares, err := k.ValidateUnbondAmount(ctx, msg.DelegatorAddress, msg.ValidatorSrcAddress, delOpType, msg.Amount.Amount)
 	if err != nil {
 		return nil, err
 	}
 
-	if msg.Amount.Denom != k.BondDenom(ctx) {
-		return nil, ErrBadDenom
-	}
-
-	completionTime, err := k.BeginRedelegation(
-		ctx, msg.DelegatorAddress, msg.ValidatorSrcAddress, msg.ValidatorDstAddress, shares,
-	)
+	completionTime, err := k.BeginRedelegation(ctx, msg.DelegatorAddress, msg.ValidatorSrcAddress, msg.ValidatorDstAddress, delOpType, shares)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +301,7 @@ func handleMsgBeginRedelegate(ctx sdk.Context, msg types.MsgBeginRedelegate, k k
 			types.EventTypeRedelegate,
 			sdk.NewAttribute(types.AttributeKeySrcValidator, msg.ValidatorSrcAddress.String()),
 			sdk.NewAttribute(types.AttributeKeyDstValidator, msg.ValidatorDstAddress.String()),
-			sdk.NewAttribute(sdk.AttributeKeyAmount, msg.Amount.Amount.String()),
+			sdk.NewAttribute(sdk.AttributeKeyCoin, msg.Amount.String()),
 			sdk.NewAttribute(types.AttributeKeyCompletionTime, completionTime.Format(time.RFC3339)),
 		),
 		sdk.NewEvent(

@@ -22,6 +22,7 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeep
 
 	bondedTokens := sdk.ZeroInt()
 	notBondedTokens := sdk.ZeroInt()
+	liquidityTokens := sdk.ZeroInt()
 
 	// We need to pretend to be "n blocks before genesis", where "n" is the
 	// validator update delay, so that e.g. slashing periods are correctly
@@ -52,12 +53,14 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeep
 
 		switch validator.GetStatus() {
 		case sdk.Bonded:
-			bondedTokens = bondedTokens.Add(validator.GetTokens())
+			bondedTokens = bondedTokens.Add(validator.GetBondedTokens())
 		case sdk.Unbonding, sdk.Unbonded:
-			notBondedTokens = notBondedTokens.Add(validator.GetTokens())
+			notBondedTokens = notBondedTokens.Add(validator.GetBondedTokens())
 		default:
 			panic("invalid validator status")
 		}
+
+		liquidityTokens = liquidityTokens.Add(validator.GetLPTokens())
 	}
 
 	for _, delegation := range data.Delegations {
@@ -73,7 +76,7 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeep
 		}
 
 		// Update validator staking state
-		keeper.SetValidatorStakingStateDelegation(ctx, delegation.ValidatorAddress, delegation.DelegatorAddress, delegation.Shares)
+		keeper.SetValidatorStakingStateDelegation(ctx, delegation.ValidatorAddress, delegation.DelegatorAddress, delegation.BondingShares, delegation.LPShares)
 	}
 
 	for _, ubd := range data.UnbondingDelegations {
@@ -106,6 +109,7 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeep
 
 	bondedCoins := sdk.NewCoins(sdk.NewCoin(data.Params.BondDenom, bondedTokens))
 	notBondedCoins := sdk.NewCoins(sdk.NewCoin(data.Params.BondDenom, notBondedTokens))
+	liquidityCoins := sdk.NewCoins(sdk.NewCoin(data.Params.LPDenom, liquidityTokens))
 
 	// check if the unbonded and bonded pools accounts exists
 	bondedPool := keeper.GetBondedPool(ctx)
@@ -132,6 +136,18 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeep
 			panic(err)
 		}
 		supplyKeeper.SetModuleAccount(ctx, notBondedPool)
+	}
+
+	liquidityPool := keeper.GetLiquidityPool(ctx)
+	if liquidityPool == nil {
+		panic(fmt.Sprintf("%s module account has not been set", types.LiquidityPoolName))
+	}
+
+	if liquidityPool.GetCoins().IsZero() {
+		if err := liquidityPool.SetCoins(liquidityCoins); err != nil {
+			panic(err)
+		}
+		supplyKeeper.SetModuleAccount(ctx, liquidityPool)
 	}
 
 	// don't need to run Tendermint updates if we exported
@@ -252,12 +268,12 @@ func validateGenesisStateValidators(validators []types.Validator) (err error) {
 		val := validators[i]
 		strKey := string(val.ConsPubKey.Bytes())
 		if _, ok := addrMap[strKey]; ok {
-			return fmt.Errorf("duplicate validator in genesis state: moniker %v, address %v", val.Description.Moniker, val.ConsAddress())
+			return fmt.Errorf("duplicate validator in genesis state: moniker %v, address %v", val.Description.Moniker, val.GetConsAddr())
 		}
 		if val.Jailed && val.IsBonded() {
-			return fmt.Errorf("validator is bonded and jailed in genesis state: moniker %v, address %v", val.Description.Moniker, val.ConsAddress())
+			return fmt.Errorf("validator is bonded and jailed in genesis state: moniker %v, address %v", val.Description.Moniker, val.GetConsAddr())
 		}
-		if val.DelegatorShares.IsZero() && !val.IsUnbonding() {
+		if val.GetBondingDelegatorShares().IsZero() && !val.IsUnbonding() {
 			return fmt.Errorf("bonded/unbonded genesis validator cannot have zero delegator shares, validator: %v", val)
 		}
 		addrMap[strKey] = true

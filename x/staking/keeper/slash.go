@@ -101,12 +101,12 @@ func (k Keeper) Slash(ctx sdk.Context, consAddr sdk.ConsAddress, infractionHeigh
 	}
 
 	// cannot decrease balance below zero
-	tokensToBurn := sdk.MinInt(remainingSlashAmount, validator.Tokens)
+	tokensToBurn := sdk.MinInt(remainingSlashAmount, validator.GetBondedTokens())
 	tokensToBurn = sdk.MaxInt(tokensToBurn, sdk.ZeroInt()) // defensive.
 
 	// we need to calculate the *effective* slash fraction for distribution
-	if validator.Tokens.IsPositive() {
-		effectiveFraction := tokensToBurn.ToDec().QuoRoundUp(validator.Tokens.ToDec())
+	if validator.GetBondedTokens().IsPositive() {
+		effectiveFraction := tokensToBurn.ToDec().QuoRoundUp(validator.GetBondedTokens().ToDec())
 		// possible if power has changed
 		if effectiveFraction.GT(sdk.OneDec()) {
 			effectiveFraction = sdk.OneDec()
@@ -117,7 +117,7 @@ func (k Keeper) Slash(ctx sdk.Context, consAddr sdk.ConsAddress, infractionHeigh
 
 	// Deduct from validator's bonded tokens and update the validator.
 	// Burn the slashed tokens from the pool account and decrease the total supply.
-	validator = k.RemoveValidatorTokens(ctx, validator, tokensToBurn)
+	validator = k.RemoveValidatorTokens(ctx, validator, types.BondingDelOpType, tokensToBurn)
 
 	switch validator.GetStatus() {
 	case sdk.Bonded:
@@ -160,8 +160,10 @@ func (k Keeper) Unjail(ctx sdk.Context, consAddr sdk.ConsAddress) {
 // the unbonding delegation had enough stake to slash
 // (the amount actually slashed may be less if there's
 // insufficient stake remaining)
-func (k Keeper) slashUnbondingDelegation(ctx sdk.Context, unbondingDelegation types.UnbondingDelegation,
-	infractionHeight int64, slashFactor sdk.Dec) (totalSlashAmount sdk.Int) {
+func (k Keeper) slashUnbondingDelegation(ctx sdk.Context,
+	unbondingDelegation types.UnbondingDelegation,
+	infractionHeight int64, slashFactor sdk.Dec,
+) (totalSlashAmount sdk.Int) {
 
 	now := ctx.BlockHeader().Time
 	totalSlashAmount = sdk.ZeroInt()
@@ -177,6 +179,11 @@ func (k Keeper) slashUnbondingDelegation(ctx sdk.Context, unbondingDelegation ty
 
 		if entry.IsMature(now) {
 			// Unbonding delegation no longer eligible for slashing, skip it
+			continue
+		}
+
+		if !entry.OpType.IsBonding() {
+			// Slash only bonding tokens based undelegations
 			continue
 		}
 
@@ -215,8 +222,10 @@ func (k Keeper) slashUnbondingDelegation(ctx sdk.Context, unbondingDelegation ty
 // (the amount actually slashed may be less if there's
 // insufficient stake remaining)
 // NOTE this is only slashing for prior infractions from the source validator
-func (k Keeper) slashRedelegation(ctx sdk.Context, srcValidator types.Validator, redelegation types.Redelegation,
-	infractionHeight int64, slashFactor sdk.Dec) (totalSlashAmount sdk.Int) {
+func (k Keeper) slashRedelegation(ctx sdk.Context, srcValidator types.Validator,
+	redelegation types.Redelegation,
+	infractionHeight int64, slashFactor sdk.Dec,
+) (totalSlashAmount sdk.Int) {
 
 	now := ctx.BlockHeader().Time
 	totalSlashAmount = sdk.ZeroInt()
@@ -235,6 +244,11 @@ func (k Keeper) slashRedelegation(ctx sdk.Context, srcValidator types.Validator,
 			continue
 		}
 
+		if !entry.OpType.IsBonding() {
+			// Slash only bonding tokens redelegations
+			continue
+		}
+
 		// Calculate slash amount proportional to stake contributing to infraction
 		slashAmountDec := slashFactor.MulInt(entry.InitialBalance)
 		slashAmount := slashAmountDec.TruncateInt()
@@ -250,11 +264,11 @@ func (k Keeper) slashRedelegation(ctx sdk.Context, srcValidator types.Validator,
 			// If deleted, delegation has zero shares, and we can't unbond any more
 			continue
 		}
-		if sharesToUnbond.GT(delegation.Shares) {
-			sharesToUnbond = delegation.Shares
+		if sharesToUnbond.GT(delegation.BondingShares) {
+			sharesToUnbond = delegation.BondingShares
 		}
 
-		tokensToBurn, err := k.unbond(ctx, redelegation.DelegatorAddress, redelegation.ValidatorDstAddress, sharesToUnbond)
+		tokensToBurn, err := k.unbond(ctx, redelegation.DelegatorAddress, redelegation.ValidatorDstAddress, types.BondingDelOpType, sharesToUnbond)
 		if err != nil {
 			panic(fmt.Errorf("error unbonding delegator: %v", err))
 		}
