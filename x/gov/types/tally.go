@@ -8,23 +8,32 @@ import (
 
 // ValidatorGovInfo used for tallying
 type ValidatorGovInfo struct {
-	Address             sdk.ValAddress // address of the validator operator
-	BondedTokens        sdk.Int        // Power of a Validator
-	DelegatorShares     sdk.Dec        // Total outstanding delegator shares
-	DelegatorDeductions sdk.Dec        // Delegator deductions from validator's delegators voting independently
-	Vote                VoteOption     // Vote of the validator
+	Address                    sdk.ValAddress // address of the validator operator
+	BondedTokens               sdk.Int        // bonding tokens: power of a Validator
+	DelegatorBondingShares     sdk.Dec        // bonding tokens: total outstanding delegator shares
+	DelegatorBondingDeductions sdk.Dec        // bonding tokens: delegator deductions from validator's delegators voting independently
+	LPTokens                   sdk.Int        // liquidity tokens: power of a Validator
+	DelegatorLPShares          sdk.Dec        // liquidity tokens: total outstanding delegator shares
+	DelegatorLPDeductions      sdk.Dec        // liquidity tokens: delegator deductions from validator's delegators voting independently
+	Vote                       VoteOption     // Vote of the validator
 }
 
 // NewValidatorGovInfo creates a ValidatorGovInfo instance
-func NewValidatorGovInfo(address sdk.ValAddress, bondedTokens sdk.Int, delegatorShares,
-	delegatorDeductions sdk.Dec, vote VoteOption) ValidatorGovInfo {
+func NewValidatorGovInfo(address sdk.ValAddress,
+	bondedTokens sdk.Int, lpTokens sdk.Int,
+	delegatorBondingShares, delegatorBondingDeductions sdk.Dec,
+	delegatorLPShares, delegatorLPDeductions sdk.Dec,
+	vote VoteOption) ValidatorGovInfo {
 
 	return ValidatorGovInfo{
-		Address:             address,
-		BondedTokens:        bondedTokens,
-		DelegatorShares:     delegatorShares,
-		DelegatorDeductions: delegatorDeductions,
-		Vote:                vote,
+		Address:                    address,
+		BondedTokens:               bondedTokens,
+		DelegatorBondingShares:     delegatorBondingShares,
+		DelegatorBondingDeductions: delegatorBondingDeductions,
+		LPTokens:                   lpTokens,
+		DelegatorLPShares:          delegatorLPShares,
+		DelegatorLPDeductions:      delegatorLPDeductions,
+		Vote:                       vote,
 	}
 }
 

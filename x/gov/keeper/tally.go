@@ -17,6 +17,9 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 	results[types.OptionNo] = sdk.ZeroDec()
 	results[types.OptionNoWithVeto] = sdk.ZeroDec()
 
+	// get LP vs bonding vote ratio
+	voteLPRatio := keeper.sk.LPDistrRatio(ctx)
+
 	totalVotingPower := sdk.ZeroDec()
 	currValidators := make(map[string]types.ValidatorGovInfo)
 
@@ -24,9 +27,9 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 	keeper.sk.IterateBondedValidatorsByPower(ctx, func(index int64, validator exported.ValidatorI) (stop bool) {
 		currValidators[validator.GetOperator().String()] = types.NewValidatorGovInfo(
 			validator.GetOperator(),
-			validator.GetBondedTokens(),
-			validator.GetBondingDelegatorShares(),
-			sdk.ZeroDec(),
+			validator.GetBondedTokens(), validator.GetLPTokens(),
+			validator.GetBondingDelegatorShares(), sdk.ZeroDec(),
+			validator.GetLPDelegatorShares(), sdk.ZeroDec(),
 			types.OptionEmpty,
 		)
 
@@ -48,11 +51,19 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 			if val, ok := currValidators[valAddrStr]; ok {
 				// There is no need to handle the special case that validator address equal to voter address.
 				// Because voter's voting power will tally again even if there will deduct voter's voting power from validator.
-				val.DelegatorDeductions = val.DelegatorDeductions.Add(delegation.GetBondingShares())
+
+				// add deduction shares
+				val.DelegatorBondingDeductions = val.DelegatorBondingDeductions.Add(delegation.GetBondingShares())
+				val.DelegatorLPDeductions = val.DelegatorLPDeductions.Add(delegation.GetLPShares())
 				currValidators[valAddrStr] = val
 
-				delegatorShare := delegation.GetBondingShares().Quo(val.DelegatorShares)
-				votingPower := delegatorShare.MulInt(val.BondedTokens)
+				// get delegator voting power
+				votingPower := getVoterPower(
+					delegation.GetBondingShares(), delegation.GetLPShares(),
+					val.DelegatorBondingShares, val.DelegatorLPShares,
+					val.BondedTokens, val.LPTokens,
+					voteLPRatio,
+				)
 
 				results[vote.Option] = results[vote.Option].Add(votingPower)
 				totalVotingPower = totalVotingPower.Add(votingPower)
@@ -71,9 +82,17 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 			continue
 		}
 
-		sharesAfterDeductions := val.DelegatorShares.Sub(val.DelegatorDeductions)
-		fractionAfterDeductions := sharesAfterDeductions.Quo(val.DelegatorShares)
-		votingPower := fractionAfterDeductions.MulInt(val.BondedTokens)
+		// get shares leftovers (after delegator votes)
+		bondingSharesAfterDeductions := val.DelegatorBondingShares.Sub(val.DelegatorBondingDeductions)
+		lpSharesAfterDeductions := val.DelegatorLPShares.Sub(val.DelegatorLPDeductions)
+
+		// get validator voting power
+		votingPower := getVoterPower(
+			bondingSharesAfterDeductions, lpSharesAfterDeductions,
+			val.DelegatorBondingShares, val.DelegatorLPShares,
+			val.BondedTokens, val.LPTokens,
+			voteLPRatio,
+		)
 
 		results[val.Vote] = results[val.Vote].Add(votingPower)
 		totalVotingPower = totalVotingPower.Add(votingPower)
@@ -111,4 +130,32 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 
 	// If more than 1/2 of non-abstaining voters vote No, proposal fails
 	return false, false, tallyResults
+}
+
+// getVoterPower returns delegator / validator total voting power based on bonding/lp shares and tokens.
+func getVoterPower(
+	voterBondingShares, voterLPShares sdk.Dec,
+	totalBondingShares, totalLPShares sdk.Dec,
+	totalBondingTokens, totalLPTokens sdk.Int,
+	lpRatio sdk.Dec,
+) sdk.Dec {
+
+	bondingVotingPower, lpVotingPower := sdk.ZeroDec(), sdk.ZeroDec()
+
+	// estimate bonding voting power
+	if voterBondingShares.IsPositive() {
+		bondingShareRatio := voterBondingShares.Quo(totalBondingShares)
+		bondingVotingPower = bondingShareRatio.MulInt(totalBondingTokens)
+	}
+
+	// estimate bonding voting power
+	if voterLPShares.IsPositive() {
+		lpShareRatio := voterLPShares.Quo(totalLPShares)
+		lpVotingPower = lpShareRatio.MulInt(totalLPTokens)
+	}
+
+	// get total voting power (bondingPower + lpPower * lpRatio)
+	votingPower := bondingVotingPower.Add(lpVotingPower.Mul(lpRatio))
+
+	return votingPower
 }

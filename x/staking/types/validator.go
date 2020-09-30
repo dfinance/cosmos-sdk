@@ -122,7 +122,7 @@ func (v Validator) ConsensusPower() int64 {
 // LPPower gets the LP distribution / gov voting power fraction, a reduction of 10^6 from validator tokens is applied.
 func (v Validator) LPPower() int64 {
 	if v.IsBonded() {
-		return v.PotentialConsensusPower()
+		return v.PotentialLPPower()
 	}
 
 	return 0
