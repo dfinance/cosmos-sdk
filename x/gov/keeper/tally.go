@@ -21,6 +21,7 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 	voteLPRatio := keeper.sk.LPDistrRatio(ctx)
 
 	totalVotingPower := sdk.ZeroDec()
+	totalBondedLPTokens := sdk.ZeroInt()
 	currValidators := make(map[string]types.ValidatorGovInfo)
 
 	// fetch all the bonded validators, insert them into currValidators
@@ -32,6 +33,7 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 			validator.GetLPDelegatorShares(), sdk.ZeroDec(),
 			types.OptionEmpty,
 		)
+		totalBondedLPTokens = totalBondedLPTokens.Add(validator.GetLPTokens())
 
 		return false
 	})
@@ -108,7 +110,9 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 	}
 
 	// If there is not enough quorum of votes, the proposal fails
-	percentVoting := totalVotingPower.Quo(keeper.sk.TotalBondedTokens(ctx).ToDec())
+	maxVotingPower := keeper.sk.TotalBondedTokens(ctx).ToDec()
+	maxVotingPower = maxVotingPower.Add(totalBondedLPTokens.ToDec().Mul(voteLPRatio))
+	percentVoting := totalVotingPower.Quo(maxVotingPower)
 	if percentVoting.LT(tallyParams.Quorum) {
 		return false, true, tallyResults
 	}

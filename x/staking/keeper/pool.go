@@ -65,6 +65,12 @@ func (k Keeper) TotalBondedTokens(ctx sdk.Context) sdk.Int {
 	return bondedPool.GetCoins().AmountOf(k.BondDenom(ctx))
 }
 
+// TotalLPTokens total liquidity tokens stored in the staking pool
+func (k Keeper) TotalLPTokens(ctx sdk.Context) sdk.Int {
+	lpPool := k.GetLiquidityPool(ctx)
+	return lpPool.GetCoins().AmountOf(k.LPDenom(ctx))
+}
+
 // StakingTokenSupply staking tokens from the total supply
 func (k Keeper) StakingTokenSupply(ctx sdk.Context) sdk.Int {
 	return k.supplyKeeper.GetSupply(ctx).GetTotal().AmountOf(k.BondDenom(ctx))
