@@ -39,35 +39,38 @@ func NewValidatorGovInfo(address sdk.ValAddress,
 
 // TallyResult defines a standard tally for a proposal
 type TallyResult struct {
-	Yes        sdk.Int `json:"yes" yaml:"yes"`
-	Abstain    sdk.Int `json:"abstain" yaml:"abstain"`
-	No         sdk.Int `json:"no" yaml:"no"`
-	NoWithVeto sdk.Int `json:"no_with_veto" yaml:"no_with_veto"`
+	Yes              sdk.Int `json:"yes" yaml:"yes"`
+	Abstain          sdk.Int `json:"abstain" yaml:"abstain"`
+	No               sdk.Int `json:"no" yaml:"no"`
+	NoWithVeto       sdk.Int `json:"no_with_veto" yaml:"no_with_veto"`
+	TotalVotingPower sdk.Int `json:"total_voting_power" yaml:"total_voting_power"`
 }
 
 // NewTallyResult creates a new TallyResult instance
-func NewTallyResult(yes, abstain, no, noWithVeto sdk.Int) TallyResult {
+func NewTallyResult(yes, abstain, no, noWithVeto, total sdk.Int) TallyResult {
 	return TallyResult{
-		Yes:        yes,
-		Abstain:    abstain,
-		No:         no,
-		NoWithVeto: noWithVeto,
+		Yes:              yes,
+		Abstain:          abstain,
+		No:               no,
+		NoWithVeto:       noWithVeto,
+		TotalVotingPower: total,
 	}
 }
 
 // NewTallyResultFromMap creates a new TallyResult instance from a Option -> Dec map
-func NewTallyResultFromMap(results map[VoteOption]sdk.Dec) TallyResult {
+func NewTallyResultFromMap(results map[VoteOption]sdk.Dec, total sdk.Int) TallyResult {
 	return NewTallyResult(
 		results[OptionYes].TruncateInt(),
 		results[OptionAbstain].TruncateInt(),
 		results[OptionNo].TruncateInt(),
 		results[OptionNoWithVeto].TruncateInt(),
+		total,
 	)
 }
 
 // EmptyTallyResult returns an empty TallyResult.
 func EmptyTallyResult() TallyResult {
-	return NewTallyResult(sdk.ZeroInt(), sdk.ZeroInt(), sdk.ZeroInt(), sdk.ZeroInt())
+	return NewTallyResult(sdk.ZeroInt(), sdk.ZeroInt(), sdk.ZeroInt(), sdk.ZeroInt(), sdk.ZeroInt())
 }
 
 // Equals returns if two proposals are equal.
@@ -84,5 +87,7 @@ func (tr TallyResult) String() string {
   Yes:        %s
   Abstain:    %s
   No:         %s
-  NoWithVeto: %s`, tr.Yes, tr.Abstain, tr.No, tr.NoWithVeto)
+  NoWithVeto: %s
+  TotalPower: %s`,
+		tr.Yes, tr.Abstain, tr.No, tr.NoWithVeto, tr.TotalVotingPower)
 }

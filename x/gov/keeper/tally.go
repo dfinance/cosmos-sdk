@@ -100,8 +100,12 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 		totalVotingPower = totalVotingPower.Add(votingPower)
 	}
 
+	// calculate total voting power
+	maxVotingPower := keeper.sk.TotalBondedTokens(ctx).ToDec()
+	maxVotingPower = maxVotingPower.Add(totalBondedLPTokens.ToDec().Mul(voteLPRatio))
+
 	tallyParams := keeper.GetTallyParams(ctx)
-	tallyResults = types.NewTallyResultFromMap(results)
+	tallyResults = types.NewTallyResultFromMap(results, maxVotingPower.TruncateInt())
 
 	// TODO: Upgrade the spec to cover all of these cases & remove pseudocode.
 	// If there is no staked coins, the proposal fails
@@ -110,8 +114,6 @@ func (keeper Keeper) Tally(ctx sdk.Context, proposal types.Proposal) (passes boo
 	}
 
 	// If there is not enough quorum of votes, the proposal fails
-	maxVotingPower := keeper.sk.TotalBondedTokens(ctx).ToDec()
-	maxVotingPower = maxVotingPower.Add(totalBondedLPTokens.ToDec().Mul(voteLPRatio))
 	percentVoting := totalVotingPower.Quo(maxVotingPower)
 	if percentVoting.LT(tallyParams.Quorum) {
 		return false, true, tallyResults

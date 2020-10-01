@@ -430,7 +430,7 @@ func TestTallyValidatorMultipleDelegations(t *testing.T) {
 	expectedAbstain := sdk.TokensFromConsensusPower(0)
 	expectedNo := sdk.TokensFromConsensusPower(10)
 	expectedNoWithVeto := sdk.TokensFromConsensusPower(0)
-	expectedTallyResult := types.NewTallyResult(expectedYes, expectedAbstain, expectedNo, expectedNoWithVeto)
+	expectedTallyResult := types.NewTallyResult(expectedYes, expectedAbstain, expectedNo, expectedNoWithVeto, sdk.ZeroInt())
 
 	require.True(t, tallyResults.Equals(expectedTallyResult))
 }

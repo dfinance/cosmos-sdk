@@ -904,7 +904,8 @@ func TestRewardsBankUndelegatingToZero(t *testing.T) {
 
 // Test rewards distribution with LP stakes.
 func TestLPRewardsWithLock(t *testing.T) {
-	ctx, _, k, sk, spk := CreateTestInputDefault(t, false, 1000)
+	initPower := int64(1000)
+	ctx, ak, k, sk, spk := CreateTestInputDefault(t, false, initPower)
 	sh := staking.NewHandler(sk)
 
 	allocateRewards := func(amtPower int64, distrPowerCmp, lpPowerCmp int) {
@@ -994,11 +995,32 @@ func TestLPRewardsWithLock(t *testing.T) {
 		ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 	}
 
+	checkInvariants := func() {
+		msg, broken := AllInvariants(k)(ctx)
+		require.False(t, broken, msg)
+	}
+
 	// set proposer rewards to zero (for equal rewards distribution)
 	params := k.GetParams(ctx)
 	params.BaseProposerReward = sdk.ZeroDec()
 	params.BonusProposerReward = sdk.ZeroDec()
 	k.SetParams(ctx, params)
+
+	// add LPs to delegators
+	{
+		initTokens := sdk.TokensFromConsensusPower(initPower)
+		coin := sdk.NewCoin(sk.LPDenom(ctx), initTokens)
+
+		del1 := ak.GetAccount(ctx, delAddr1)
+		err := del1.SetCoins(del1.GetCoins().Add(coin))
+		require.NoError(t, err)
+		ak.SetAccount(ctx, del1)
+
+		del2 := ak.GetAccount(ctx, delAddr2)
+		err = del2.SetCoins(del2.GetCoins().Add(coin))
+		require.NoError(t, err)
+		ak.SetAccount(ctx, del2)
+	}
 
 	// create validators
 	{
@@ -1017,6 +1039,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 
 		endBlock()
 	}
+	checkInvariants()
 
 	// delegate bonding tokens by two delegator to both validators
 	{
@@ -1034,6 +1057,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 
 		endBlock()
 	}
+	checkInvariants()
 
 	// distribute rewards (LPPool shouldn't be distributed)
 	{
@@ -1055,6 +1079,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 		// ...and they are equal, as all shares are the same
 		require.True(t, del1Rewards.IsEqual(del2Rewards), "%s / %s", del1Rewards.String(), del2Rewards.String())
 	}
+	checkInvariants()
 
 	// delegate LP tokens by two delegator to both validators
 	{
@@ -1072,6 +1097,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 
 		endBlock()
 	}
+	checkInvariants()
 
 	// distribute rewards (LPPool should be distributed)
 	{
@@ -1093,6 +1119,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 		// ...and they are equal, as all shares are the same
 		require.True(t, del1Rewards.IsEqual(del2Rewards), "%s / %s", del1Rewards.String(), del2Rewards.String())
 	}
+	checkInvariants()
 
 	// rebalance distribution by raising delegator 1 LP shares (delegator 1 is a winner now)
 	{
@@ -1105,6 +1132,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 
 		endBlock()
 	}
+	checkInvariants()
 
 	// distribute rewards and check rewards are not the same
 	{
@@ -1127,6 +1155,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 
 		require.True(t, del1Rewards.AmountOf(sdk.DefaultBondDenom).GT(del2Rewards.AmountOf(sdk.DefaultBondDenom)), "%s / %s", del1Rewards.String(), del2Rewards.String())
 	}
+	checkInvariants()
 
 	// rebalance distribution by locking validator 2 rewards
 	var unlockTime time.Time
@@ -1135,6 +1164,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 		require.NoError(t, err)
 		unlockTime = ut
 	}
+	checkInvariants()
 
 	// distribute rewards and check rewards are not the same
 	{
@@ -1154,6 +1184,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 		del2Rewards := getRewards(delAddr2, valOpAddr2)
 		require.True(t, del2Rewards.IsAllPositive())
 	}
+	checkInvariants()
 
 	// withdraw delegator 1 rewards
 	{
@@ -1166,6 +1197,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, coins.IsZero())
 	}
+	checkInvariants()
 
 	// withdraw delegator 2 rewards
 	{
@@ -1177,7 +1209,6 @@ func TestLPRewardsWithLock(t *testing.T) {
 		require.NoError(t, err)
 
 		// emulate lock stop
-		t.Logf(unlockTime.String())
 		ctx = ctx.WithBlockTime(unlockTime)
 		k.ProcessAllMatureRewardsUnlockQueueItems(ctx)
 
@@ -1190,4 +1221,5 @@ func TestLPRewardsWithLock(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, coins.IsZero())
 	}
+	checkInvariants()
 }
