@@ -2,10 +2,12 @@ package keeper
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 )
 
@@ -897,5 +899,295 @@ func TestRewardsBankUndelegatingToZero(t *testing.T) {
 	{
 		_, err := k.WithdrawDelegationRewards(ctx, delAddr, val.GetOperator())
 		require.Error(t, err)
+	}
+}
+
+// Test rewards distribution with LP stakes.
+func TestLPRewardsWithLock(t *testing.T) {
+	ctx, _, k, sk, spk := CreateTestInputDefault(t, false, 1000)
+	sh := staking.NewHandler(sk)
+
+	allocateRewards := func(amtPower int64, distrPowerCmp, lpPowerCmp int) {
+		// get validator 1 params
+		val1, found := sk.GetValidator(ctx, valOpAddr1)
+		require.True(t, found)
+		distrPower1, lpPower1 := k.GetDistributionPower(ctx, val1.GetOperator(), val1.ConsensusPower(), val1.LPPower(), sk.LPDistrRatio(ctx))
+
+		// get validator 2 params
+		val2, found := sk.GetValidator(ctx, valOpAddr2)
+		require.True(t, found)
+		distrPower2, lpPower2 := k.GetDistributionPower(ctx, val2.GetOperator(), val2.ConsensusPower(), val2.LPPower(), sk.LPDistrRatio(ctx))
+
+		switch distrPowerCmp {
+		case -1:
+			require.Greater(t, distrPower1, distrPower2)
+		case 0:
+			require.Equal(t, distrPower1, distrPower2)
+		case 1:
+			require.Greater(t, distrPower2, distrPower1)
+		}
+
+		switch lpPowerCmp {
+		case -1:
+			require.Greater(t, lpPower1, lpPower2)
+		case 0:
+			require.Equal(t, lpPower1, lpPower2)
+		case 1:
+			require.Greater(t, lpPower2, lpPower1)
+		}
+
+		// build votes
+		abciVotes := types.ABCIVotes{
+			{
+				Validator:         val1,
+				DistributionPower: distrPower1,
+				LPPower:           lpPower1,
+				SignedLastBlock:   false,
+			},
+			{
+				Validator:         val2,
+				DistributionPower: distrPower2,
+				LPPower:           lpPower2,
+				SignedLastBlock:   false,
+			},
+		}
+
+		// set minted amount
+		coin := sdk.NewCoin(sdk.DefaultBondDenom, sdk.TokensFromConsensusPower(amtPower))
+		feeCollector := spk.GetModuleAccount(ctx, k.feeCollectorName)
+		err := feeCollector.SetCoins(sdk.NewCoins(coin))
+		require.NoError(t, err)
+		spk.SetModuleAccount(ctx, feeCollector)
+
+		// allocate
+		k.AllocateTokens(
+			ctx,
+			distrPower1, lpPower1,
+			distrPower1+distrPower2,
+			lpPower1+lpPower2,
+			val1.GetConsAddr(),
+			abciVotes,
+			sdk.ZeroDec(),
+		)
+	}
+
+	getRewards := func(delAddr sdk.AccAddress, valAddr sdk.ValAddress) sdk.DecCoins {
+		ctxCache, _ := ctx.CacheContext()
+
+		val := sk.Validator(ctxCache, valAddr)
+		require.NotNil(t, val)
+
+		del := sk.Delegation(ctxCache, delAddr, valAddr)
+		require.NotNil(t, del)
+
+		endingPeriod := k.incrementValidatorPeriod(ctxCache, val)
+		rewards := k.calculateDelegationTotalRewards(ctxCache, val, del, endingPeriod)
+		if rewards == nil {
+			return sdk.DecCoins{}
+		}
+
+		return rewards
+	}
+
+	endBlock := func() {
+		staking.EndBlocker(ctx, sk)
+		ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
+	}
+
+	// set proposer rewards to zero (for equal rewards distribution)
+	params := k.GetParams(ctx)
+	params.BaseProposerReward = sdk.ZeroDec()
+	params.BonusProposerReward = sdk.ZeroDec()
+	k.SetParams(ctx, params)
+
+	// create validators
+	{
+		commission := staking.NewCommissionRates(sdk.NewDecWithPrec(1, 1), sdk.NewDecWithPrec(1, 1), sdk.NewDec(0))
+		selfDelCoin := sdk.NewCoin(sdk.DefaultBondDenom, sdk.TokensFromConsensusPower(100))
+
+		msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1, selfDelCoin, staking.Description{}, commission, minSelfDelegation)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = staking.NewMsgCreateValidator(valOpAddr2, valConsPk2, selfDelCoin, staking.Description{}, commission, minSelfDelegation)
+		res, err = sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		endBlock()
+	}
+
+	// delegate bonding tokens by two delegator to both validators
+	{
+		delTokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.TokensFromConsensusPower(10))
+
+		msg := staking.NewMsgDelegate(delAddr1, valOpAddr1, delTokens)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = staking.NewMsgDelegate(delAddr2, valOpAddr2, delTokens)
+		res, err = sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		endBlock()
+	}
+
+	// distribute rewards (LPPool shouldn't be distributed)
+	{
+		// distr and LP powers should be equal
+		allocateRewards(10, 0, 0)
+		endBlock()
+
+		// check LPPool wasn't distributed
+		pools := k.GetRewardPools(ctx)
+		require.True(t, pools.LiquidityProvidersPool.IsAllPositive())
+
+		// check delegators have rewards
+		del1Rewards := getRewards(delAddr1, valOpAddr1)
+		require.True(t, del1Rewards.IsAllPositive())
+
+		del2Rewards := getRewards(delAddr2, valOpAddr2)
+		require.True(t, del2Rewards.IsAllPositive())
+
+		// ...and they are equal, as all shares are the same
+		require.True(t, del1Rewards.IsEqual(del2Rewards), "%s / %s", del1Rewards.String(), del2Rewards.String())
+	}
+
+	// delegate LP tokens by two delegator to both validators
+	{
+		delTokens := sdk.NewCoin(sdk.DefaultLiquidityDenom, sdk.TokensFromConsensusPower(10))
+
+		msg := staking.NewMsgDelegate(delAddr1, valOpAddr1, delTokens)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = staking.NewMsgDelegate(delAddr2, valOpAddr2, delTokens)
+		res, err = sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		endBlock()
+	}
+
+	// distribute rewards (LPPool should be distributed)
+	{
+		// distr and LP powers should be equal
+		allocateRewards(10, 0, 0)
+		endBlock()
+
+		// check LPPool was distributed
+		pools := k.GetRewardPools(ctx)
+		require.True(t, pools.LiquidityProvidersPool.IsZero())
+
+		// check delegators have rewards
+		del1Rewards := getRewards(delAddr1, valOpAddr1)
+		require.True(t, del1Rewards.IsAllPositive())
+
+		del2Rewards := getRewards(delAddr2, valOpAddr2)
+		require.True(t, del2Rewards.IsAllPositive())
+
+		// ...and they are equal, as all shares are the same
+		require.True(t, del1Rewards.IsEqual(del2Rewards), "%s / %s", del1Rewards.String(), del2Rewards.String())
+	}
+
+	// rebalance distribution by raising delegator 1 LP shares (delegator 1 is a winner now)
+	{
+		delTokens := sdk.NewCoin(sdk.DefaultLiquidityDenom, sdk.TokensFromConsensusPower(10))
+
+		msg := staking.NewMsgDelegate(delAddr1, valOpAddr1, delTokens)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		endBlock()
+	}
+
+	// distribute rewards and check rewards are not the same
+	{
+		// as validator 1 has more LPs now, its power should be higher
+		// the same for LP power
+		// distr powers should be the same, but validator 1 has more LPs now
+		allocateRewards(10, -1, -1)
+		endBlock()
+
+		// check LPPool was distributed
+		pools := k.GetRewardPools(ctx)
+		require.True(t, pools.LiquidityProvidersPool.IsZero())
+
+		// check delegators have rewards
+		del1Rewards := getRewards(delAddr1, valOpAddr1)
+		require.True(t, del1Rewards.IsAllPositive())
+
+		del2Rewards := getRewards(delAddr2, valOpAddr2)
+		require.True(t, del2Rewards.IsAllPositive())
+
+		require.True(t, del1Rewards.AmountOf(sdk.DefaultBondDenom).GT(del2Rewards.AmountOf(sdk.DefaultBondDenom)), "%s / %s", del1Rewards.String(), del2Rewards.String())
+	}
+
+	// rebalance distribution by locking validator 2 rewards
+	var unlockTime time.Time
+	{
+		ut, err := k.LockValidatorRewards(ctx, valOpAddr2)
+		require.NoError(t, err)
+		unlockTime = ut
+	}
+
+	// distribute rewards and check rewards are not the same
+	{
+		// due to locking validator 2 distr power should be higher
+		// locking should increase validator 2 power, but validator 1 should be a winner still
+		allocateRewards(10, 1, -1)
+		endBlock()
+
+		// check LPPool was distributed
+		pools := k.GetRewardPools(ctx)
+		require.True(t, pools.LiquidityProvidersPool.IsZero())
+
+		// check delegators have rewards
+		del1Rewards := getRewards(delAddr1, valOpAddr1)
+		require.True(t, del1Rewards.IsAllPositive())
+
+		del2Rewards := getRewards(delAddr2, valOpAddr2)
+		require.True(t, del2Rewards.IsAllPositive())
+	}
+
+	// withdraw delegator 1 rewards
+	{
+		coins, err := k.WithdrawDelegationRewards(ctx, delAddr1, valOpAddr1)
+		require.NoError(t, err)
+		require.True(t, coins.IsAllPositive())
+
+		// withdraw more (no rewards left)
+		coins, err = k.WithdrawDelegationRewards(ctx, delAddr1, valOpAddr1)
+		require.NoError(t, err)
+		require.True(t, coins.IsZero())
+	}
+
+	// withdraw delegator 2 rewards
+	{
+		_, err := k.WithdrawDelegationRewards(ctx, delAddr2, valOpAddr2)
+		require.Error(t, err)
+
+		// disable auto-lock
+		err = k.DisableLockedRewardsAutoRenewal(ctx, valOpAddr2)
+		require.NoError(t, err)
+
+		// emulate lock stop
+		t.Logf(unlockTime.String())
+		ctx = ctx.WithBlockTime(unlockTime)
+		k.ProcessAllMatureRewardsUnlockQueueItems(ctx)
+
+		coins, err := k.WithdrawDelegationRewards(ctx, delAddr2, valOpAddr2)
+		require.NoError(t, err)
+		require.True(t, coins.IsAllPositive())
+
+		// withdraw more (no rewards left)
+		coins, err = k.WithdrawDelegationRewards(ctx, delAddr2, valOpAddr2)
+		require.NoError(t, err)
+		require.True(t, coins.IsZero())
 	}
 }

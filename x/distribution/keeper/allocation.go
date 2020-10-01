@@ -103,29 +103,20 @@ func (k Keeper) AllocateTokens(
 	proposerBondingMultiplier := params.BaseProposerReward.Add(params.BonusProposerReward.Mul(proposerPowerBondingRatio))
 	proposerBondingReward := validatorsPool.MulDecTruncate(proposerBondingMultiplier)
 
-	// calculate previous proposer LP reward relative to its LP power
-	proposerLPMultiplier := sdk.ZeroDec()
-	proposerLPReward := sdk.DecCoins{}
-	if proposerLPPower > 0 {
-		proposerLPMultiplier = sdk.NewDec(proposerLPPower).QuoTruncate(sdk.NewDec(totalLPPower))
-		proposerLPReward = lpPool.MulDecTruncate(proposerLPMultiplier)
-	}
-
 	// pay previous proposer
+	// LP rewards has no bonus for proposer, they would be distributed between voter below
 	proposerValidator := k.stakingKeeper.ValidatorByConsAddr(ctx, proposer)
 	if proposerValidator != nil {
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				types.EventTypeProposerReward,
 				sdk.NewAttribute(sdk.AttributeKeyBondingAmount, proposerBondingReward.String()),
-				sdk.NewAttribute(sdk.AttributeKeyLPAmount, proposerLPReward.String()),
 				sdk.NewAttribute(types.AttributeKeyValidator, proposerValidator.GetOperator().String()),
 			),
 		)
 
-		k.AllocateTokensToValidator(ctx, proposerValidator, proposerBondingReward, proposerLPReward)
+		k.AllocateTokensToValidator(ctx, proposerValidator, proposerBondingReward, sdk.DecCoins{})
 		feesRemainder = feesRemainder.Sub(proposerBondingReward)
-		lpRemainder = lpRemainder.Sub(proposerLPReward)
 	} else {
 		// previous proposer can be unknown if say, the unbonding period is 1 block, so
 		// e.g. a validator undelegates at block X, it's removed entirely by
@@ -141,7 +132,6 @@ func (k Keeper) AllocateTokens(
 
 	// calculate previous voters rewards relative to their power (distribution / LP)
 	voterBondingMultiplier := sdk.OneDec().Sub(proposerBondingMultiplier)
-	voterLPMultiplier := sdk.OneDec().Sub(proposerLPMultiplier)
 	for _, vote := range votes {
 		// estimate bonding reward
 		validatorBondingPowerRatio := sdk.NewDec(vote.DistributionPower).QuoTruncate(sdk.NewDec(totalDistrPower))
@@ -151,7 +141,7 @@ func (k Keeper) AllocateTokens(
 		validatorLPReward := sdk.DecCoins{}
 		if vote.LPPower > 0 {
 			validatorLPPowerRatio := sdk.NewDec(vote.LPPower).QuoTruncate(sdk.NewDec(totalLPPower))
-			validatorLPReward = lpPool.MulDecTruncate(voterLPMultiplier).MulDecTruncate(validatorLPPowerRatio)
+			validatorLPReward = lpPool.MulDecTruncate(validatorLPPowerRatio)
 		}
 
 		k.AllocateTokensToValidator(ctx, vote.Validator, validatorBondingReward, validatorLPReward)

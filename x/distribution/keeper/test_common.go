@@ -150,7 +150,10 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 
 	keeper := NewKeeper(cdc, keyDistr, pk.Subspace(types.DefaultParamspace), sk, supplyKeeper, auth.FeeCollectorName, blacklistedAddrs)
 
-	initCoins := sdk.NewCoins(sdk.NewCoin(sk.BondDenom(ctx), initTokens))
+	initCoins := sdk.NewCoins(
+		sdk.NewCoin(sk.BondDenom(ctx), initTokens),
+		sdk.NewCoin(sk.LPDenom(ctx), initTokens),
+	)
 	totalSupply := sdk.NewCoins(sdk.NewCoin(sk.BondDenom(ctx), initTokens.MulRaw(int64(len(TestAddrs)))))
 	supplyKeeper.SetSupply(ctx, supply.NewSupply(totalSupply))
 
