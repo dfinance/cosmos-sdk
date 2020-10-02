@@ -14,10 +14,8 @@ func (k Keeper) BondedRatio(ctx sdk.Context) sdk.Dec {
 	return k.sk.BondedRatio(ctx)
 }
 
-// LockedRatio implements an alias call to the underlying staking keeper's
+// LockedRatio implements an alias call to the underlying distribution keeper's
 // LockedRatio to be used in BeginBlocker.
-// LockedRatio = LockedAmount / BondedAmount.
 func (k Keeper) LockedRatio(ctx sdk.Context) sdk.Dec {
-	// TODO: update on locking mechanism implementation
-	return sdk.ZeroDec()
+	return k.dk.LockedRatio(ctx)
 }

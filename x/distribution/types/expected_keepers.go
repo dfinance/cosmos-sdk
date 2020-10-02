@@ -45,6 +45,9 @@ type StakingKeeper interface {
 	// LPDistrRatio coefficient
 	LPDistrRatio(sdk.Context) sdk.Dec
 
+	// staking BondedPool current supply
+	TotalBondedTokens(sdk.Context) sdk.Int
+
 	IterateDelegations(ctx sdk.Context, delegator sdk.AccAddress,
 		fn func(index int64, delegation stakingexported.DelegationI) (stop bool))
 

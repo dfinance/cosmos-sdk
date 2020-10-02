@@ -33,6 +33,32 @@ func (k Keeper) GetDistributionPower(ctx sdk.Context, valAddr sdk.ValAddress,
 	return
 }
 
+// GetLockedBondedTokens returns locked and bonded tokens amount.
+func (k Keeper) GetLockedBondedTokens(ctx sdk.Context) sdk.Int {
+	result := sdk.ZeroInt()
+	k.IterateRewardsUnlockQueue(ctx, func(timestamp time.Time, valAddrs []sdk.ValAddress) (stop bool) {
+		for _, valAddr := range valAddrs {
+			val := k.stakingKeeper.Validator(ctx, valAddr)
+			result = result.Add(val.GetBondedTokens())
+		}
+		return false
+	})
+
+	return result
+}
+
+// LockedRatio returns locked bonded tokens to all bonded tokens relation.
+func (k Keeper) LockedRatio(ctx sdk.Context) sdk.Dec {
+	bondedTokens := k.stakingKeeper.TotalBondedTokens(ctx)
+	if bondedTokens.IsZero() {
+		return sdk.ZeroDec()
+	}
+
+	lockedTokens := k.GetLockedBondedTokens(ctx)
+
+	return lockedTokens.ToDec().Quo(bondedTokens.ToDec())
+}
+
 // LockValidatorRewards locks validator rewards.
 func (k Keeper) LockValidatorRewards(ctx sdk.Context, valAddr sdk.ValAddress) (time.Time, error) {
 	// get state

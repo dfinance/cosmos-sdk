@@ -29,9 +29,13 @@ var (
 
 	priv1 = secp256k1.GenPrivKey()
 	addr1 = sdk.AccAddress(priv1.PubKey().Address())
-	//priv2 = secp256k1.GenPrivKey()
-	//addr2 = sdk.AccAddress(priv2.PubKey().Address())
 )
+
+type MockDistributionKeeper struct{}
+
+func (dk MockDistributionKeeper) LockedRatio(ctx sdk.Context) sdk.Dec {
+	return sdk.ZeroDec()
+}
 
 // getMockApp returns an initialized mock application for this module.
 func getMockApp(t *testing.T, mintParams Params) (*mock.App, supply.Keeper, staking.Keeper, Keeper) {
@@ -59,7 +63,7 @@ func getMockApp(t *testing.T, mintParams Params) (*mock.App, supply.Keeper, stak
 	bankKeeper := bank.NewBaseKeeper(mApp.AccountKeeper, mApp.ParamsKeeper.Subspace(bank.DefaultParamspace), blacklistedAddrs)
 	supplyKeeper := supply.NewKeeper(mApp.Cdc, keySupply, mApp.AccountKeeper, bankKeeper, maccPerms)
 	stakingKeeper := staking.NewKeeper(mApp.Cdc, keyStaking, supplyKeeper, mApp.ParamsKeeper.Subspace(staking.DefaultParamspace))
-	keeper := NewKeeper(mApp.Cdc, keyMint, mApp.ParamsKeeper.Subspace(DefaultParamspace), &stakingKeeper, supplyKeeper, auth.FeeCollectorName)
+	keeper := NewKeeper(mApp.Cdc, keyMint, mApp.ParamsKeeper.Subspace(DefaultParamspace), &stakingKeeper, MockDistributionKeeper{}, supplyKeeper, auth.FeeCollectorName)
 
 	mApp.Router().AddRoute(staking.RouterKey, staking.NewHandler(stakingKeeper))
 	mApp.SetBeginBlocker(getBeginBlocker(keeper))

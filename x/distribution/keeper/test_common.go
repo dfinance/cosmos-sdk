@@ -145,10 +145,10 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 	skParams.MinSelfDelegationLvl = sdk.OneInt()
 	sk.SetParams(ctx, skParams)
 
-	mintKeeper := mint.NewKeeper(cdc, keyMint, pk.Subspace(mint.DefaultParamspace), sk, supplyKeeper, auth.FeeCollectorName)
-	mintKeeper.SetParams(ctx, mint.DefaultParams())
-
 	keeper := NewKeeper(cdc, keyDistr, pk.Subspace(types.DefaultParamspace), sk, supplyKeeper, auth.FeeCollectorName, blacklistedAddrs)
+
+	mintKeeper := mint.NewKeeper(cdc, keyMint, pk.Subspace(mint.DefaultParamspace), sk, keeper, supplyKeeper, auth.FeeCollectorName)
+	mintKeeper.SetParams(ctx, mint.DefaultParams())
 
 	initCoins := sdk.NewCoins(
 		sdk.NewCoin(sk.BondDenom(ctx), initTokens),

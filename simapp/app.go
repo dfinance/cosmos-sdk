@@ -188,13 +188,12 @@ func NewSimApp(
 	stakingKeeper := staking.NewKeeper(
 		app.cdc, keys[staking.StoreKey], app.SupplyKeeper, app.subspaces[staking.ModuleName],
 	)
-	app.MintKeeper = mint.NewKeeper(
-		app.cdc, keys[mint.StoreKey], app.subspaces[mint.ModuleName], &stakingKeeper,
-		app.SupplyKeeper, auth.FeeCollectorName,
-	)
 	app.DistrKeeper = distr.NewKeeper(
 		app.cdc, keys[distr.StoreKey], app.subspaces[distr.ModuleName], &stakingKeeper,
 		app.SupplyKeeper, auth.FeeCollectorName, app.ModuleAccountAddrs(),
+	)
+	app.MintKeeper = mint.NewKeeper(
+		app.cdc, keys[mint.StoreKey], app.subspaces[mint.ModuleName], &stakingKeeper, app.DistrKeeper, app.SupplyKeeper, auth.FeeCollectorName,
 	)
 	app.SlashingKeeper = slashing.NewKeeper(
 		app.cdc, keys[slashing.StoreKey], &stakingKeeper, app.subspaces[slashing.ModuleName],
