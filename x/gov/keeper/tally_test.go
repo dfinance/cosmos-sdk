@@ -434,3 +434,69 @@ func TestTallyValidatorMultipleDelegations(t *testing.T) {
 
 	require.True(t, tallyResults.Equals(expectedTallyResult))
 }
+
+func TestTallyValidatorWithLPDelegation(t *testing.T) {
+	// 3 validators with the same amount of bonding tokens
+	ctx, ak, keeper, sk, _ := createTestInput(t, false, 100)
+	createValidators(ctx, sk, []int64{10, 10, 10})
+
+	// add delegator some LPs
+	{
+		tokens := sdk.TokensFromConsensusPower(10)
+		coin := sdk.NewCoin(sdk.DefaultLiquidityDenom, tokens)
+		del := ak.GetAccount(ctx, delAddr1)
+		err := del.SetCoins(del.GetCoins().Add(coin))
+		require.NoError(t, err)
+		ak.SetAccount(ctx, del)
+	}
+
+	// delegate validator 2 some LPs
+	{
+		delTokens := sdk.TokensFromConsensusPower(10)
+		val2, found := sk.GetValidator(ctx, valOpAddr2)
+		require.True(t, found)
+
+		_, err := sk.Delegate(ctx, delAddr1, staking.LiquidityDelOpType, delTokens, sdk.Unbonded, val2, true)
+		require.NoError(t, err)
+	}
+
+	// create a proposal
+	var proposalID uint64
+	{
+		tp := TestProposal
+		proposal, err := keeper.SubmitProposal(ctx, tp)
+		require.NoError(t, err)
+		proposal.Status = types.StatusVotingPeriod
+		keeper.SetProposal(ctx, proposal)
+
+		proposalID = proposal.ProposalID
+	}
+
+	// vote
+	{
+		require.NoError(t, keeper.AddVote(ctx, proposalID, valAccAddr1, types.OptionYes))
+		require.NoError(t, keeper.AddVote(ctx, proposalID, valAccAddr2, types.OptionNo))
+		require.NoError(t, keeper.AddVote(ctx, proposalID, valAccAddr3, types.OptionYes))
+	}
+
+	// check tally
+	//  Val1 -> YES: 10 Bonds
+	//  Val2 -> NO:  10 Bonds + 10 LPs
+	//  Val3 -> YES: 10 Bonds
+	//  Failed as 50/50, but NOs wins
+	proposal, ok := keeper.GetProposal(ctx, proposalID)
+	require.True(t, ok)
+	passes, burnDeposits, tallyResults := keeper.Tally(ctx, proposal)
+
+	require.False(t, passes)
+	require.False(t, burnDeposits)
+
+	expectedYes := sdk.TokensFromConsensusPower(20)
+	expectedAbstain := sdk.TokensFromConsensusPower(0)
+	expectedNo := sdk.TokensFromConsensusPower(20)
+	expectedNoWithVeto := sdk.TokensFromConsensusPower(0)
+	expectedTotal := sdk.TokensFromConsensusPower(40)
+	expectedTallyResult := types.NewTallyResult(expectedYes, expectedAbstain, expectedNo, expectedNoWithVeto, expectedTotal)
+
+	require.True(t, tallyResults.Equals(expectedTallyResult))
+}
