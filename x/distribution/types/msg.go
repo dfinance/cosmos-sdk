@@ -363,3 +363,40 @@ func (msg MsgDisableLockedRewardsAutoRenewal) ValidateBasic() error {
 
 	return nil
 }
+
+const TypeMsgSetStakingTotalSupplyShift = "set_mint_staking_totalsupply_shift"
+
+// MsgSetStakingTotalSupplyShift defines a Msg that changes the mint module StakingTotalSupplyShift param.
+type MsgSetStakingTotalSupplyShift struct {
+	FromAddress sdk.AccAddress `json:"from_address" yaml:"from_address"`
+	Value       sdk.Int        `json:"value" yaml:"value"`
+}
+
+// NewMsgSetStakingTotalSupplyShift - construct msg to change the mint module StakingTotalSupplyShift param.
+func NewMsgSetStakingTotalSupplyShift(fromAddr sdk.AccAddress, value sdk.Int) MsgSetStakingTotalSupplyShift {
+	return MsgSetStakingTotalSupplyShift{FromAddress: fromAddr, Value: value}
+}
+
+// Route Implements Msg.
+func (msg MsgSetStakingTotalSupplyShift) Route() string { return RouterKey }
+
+// Type Implements Msg.
+func (msg MsgSetStakingTotalSupplyShift) Type() string { return TypeMsgSetStakingTotalSupplyShift }
+
+// ValidateBasic Implements Msg.
+func (msg MsgSetStakingTotalSupplyShift) ValidateBasic() error {
+	if msg.FromAddress.Empty() {
+		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "missing sender address")
+	}
+	return nil
+}
+
+// GetSignBytes Implements Msg.
+func (msg MsgSetStakingTotalSupplyShift) GetSignBytes() []byte {
+	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(msg))
+}
+
+// GetSigners Implements Msg.
+func (msg MsgSetStakingTotalSupplyShift) GetSigners() []sdk.AccAddress {
+	return []sdk.AccAddress{msg.FromAddress}
+}

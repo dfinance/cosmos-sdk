@@ -17,6 +17,7 @@ var (
 	KeyInfPwrBondedLockedRatio   = []byte("InfPwrBondedLockedRatio")
 	KeyFoundationAllocationRatio = []byte("FoundationAllocRatio")
 	KeyAvgBlockTimeWindow        = []byte("AvgBlockTimeWindow")
+	KeyStakingTotalSupplyShift   = []byte("StakingTotalSupplyShift")
 )
 
 // mint parameters
@@ -35,6 +36,8 @@ type Params struct {
 	FoundationAllocationRatio sdk.Dec `json:"foundation_allocation_ratio" yaml:"foundation_allocation_ratio"`
 	// Avg block time filter window size
 	AvgBlockTimeWindow uint16 `json:"avg_block_time_window" yaml:"avg_block_time_window"`
+	// BondedRatio denominator (TotalSupply) shift coefficient
+	StakingTotalSupplyShift sdk.Int `json:"staking_total_supply_shift" yaml:"staking_total_supply_shift"`
 }
 
 // ParamTable for minting module.
@@ -48,6 +51,7 @@ func NewParams(
 	feeBurningRatio sdk.Dec,
 	infPwrBondedLockedRatio, foundationAllocationRatio sdk.Dec,
 	avgBlockTimeWindow uint16,
+	StakingTotalSupplyShift sdk.Int,
 ) Params {
 	return Params{
 		MintDenom:                 mintDenom,
@@ -57,6 +61,7 @@ func NewParams(
 		InfPwrBondedLockedRatio:   infPwrBondedLockedRatio,
 		FoundationAllocationRatio: foundationAllocationRatio,
 		AvgBlockTimeWindow:        avgBlockTimeWindow,
+		StakingTotalSupplyShift:   StakingTotalSupplyShift,
 	}
 }
 
@@ -70,6 +75,7 @@ func DefaultParams() Params {
 		InfPwrBondedLockedRatio:   sdk.NewDecWithPrec(4, 1),    // 40%
 		FoundationAllocationRatio: sdk.NewDecWithPrec(45, 2),   // 45%
 		AvgBlockTimeWindow:        100,                         // 100 blocks
+		StakingTotalSupplyShift:   sdk.ZeroInt(),               // no shift
 	}
 }
 
@@ -94,6 +100,9 @@ func (p Params) Validate() error {
 		return err
 	}
 	if err := validateAvgBlockTimeWindow(p.AvgBlockTimeWindow); err != nil {
+		return err
+	}
+	if err := validateStakingTotalSupplyShift(p.StakingTotalSupplyShift); err != nil {
 		return err
 	}
 
@@ -137,6 +146,7 @@ func (p *Params) ParamSetPairs() params.ParamSetPairs {
 		params.NewParamSetPair(KeyInfPwrBondedLockedRatio, &p.InfPwrBondedLockedRatio, validateInfPwrBondedLockedRatio),
 		params.NewParamSetPair(KeyFoundationAllocationRatio, &p.FoundationAllocationRatio, validateFoundationAllocationRatio),
 		params.NewParamSetPair(KeyAvgBlockTimeWindow, &p.AvgBlockTimeWindow, validateAvgBlockTimeWindow),
+		params.NewParamSetPair(KeyStakingTotalSupplyShift, &p.StakingTotalSupplyShift, validateStakingTotalSupplyShift),
 	}
 }
 
@@ -203,6 +213,21 @@ func validateAvgBlockTimeWindow(i interface{}) error {
 
 	if v < 2 {
 		return fmt.Errorf("%s: must be GTE than 2: %d", paramName, v)
+	}
+
+	return nil
+}
+
+func validateStakingTotalSupplyShift(i interface{}) error {
+	const paramName = "staking totalSupply shift"
+
+	v, ok := i.(sdk.Int)
+	if !ok {
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	if v.IsNegative() {
+		return fmt.Errorf("%s: must be GTE than 0: %s", paramName, v.String())
 	}
 
 	return nil
