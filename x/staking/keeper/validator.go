@@ -125,7 +125,7 @@ func (k Keeper) AddValidatorTokensAndShares(
 ) (valOut types.Validator, addedShares sdk.Dec) {
 
 	k.DeleteValidatorByPowerIndex(ctx, validator)
-	valOut, addedShares =  validator.AddTokensFromDel(delOpType, tokensToAdd)
+	valOut, addedShares = validator.AddTokensFromDel(delOpType, tokensToAdd)
 	k.SetValidator(ctx, valOut)
 	k.SetValidatorByPowerIndex(ctx, valOut)
 
@@ -263,7 +263,5 @@ func (k Keeper) ValidatorsPowerStoreIterator(ctx sdk.Context) sdk.Iterator {
 	store := ctx.KVStore(k.storeKey)
 	return sdk.KVStoreReversePrefixIterator(store, types.ValidatorsByPowerIndexKey)
 }
-
-
 
 //_______________________________________________________________________

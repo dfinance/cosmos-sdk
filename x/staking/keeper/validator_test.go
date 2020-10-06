@@ -923,7 +923,7 @@ func TestApplyAndReturnValidatorSetUpdatesNewValidator(t *testing.T) {
 
 	keeper.SetValidator(ctx, validator)
 
-	validator, _ =validator.RemoveDelShares(types.BondingDelOpType, amt.ToDec())
+	validator, _ = validator.RemoveDelShares(types.BondingDelOpType, amt.ToDec())
 	keeper.SetValidator(ctx, validator)
 	keeper.SetValidatorByPowerIndex(ctx, validator)
 

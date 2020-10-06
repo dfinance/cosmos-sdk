@@ -51,7 +51,7 @@ func NewParams(
 	feeBurningRatio sdk.Dec,
 	infPwrBondedLockedRatio, foundationAllocationRatio sdk.Dec,
 	avgBlockTimeWindow uint16,
-	StakingTotalSupplyShift sdk.Int,
+	stakingTotalSupplyShift sdk.Int,
 ) Params {
 	return Params{
 		MintDenom:                 mintDenom,
@@ -61,7 +61,7 @@ func NewParams(
 		InfPwrBondedLockedRatio:   infPwrBondedLockedRatio,
 		FoundationAllocationRatio: foundationAllocationRatio,
 		AvgBlockTimeWindow:        avgBlockTimeWindow,
-		StakingTotalSupplyShift:   StakingTotalSupplyShift,
+		StakingTotalSupplyShift:   stakingTotalSupplyShift,
 	}
 }
 

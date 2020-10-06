@@ -71,7 +71,7 @@ func (k Keeper) calculateDelegationRewardsBetween(ctx sdk.Context, val exported.
 	bondingRewards = bondingDifference.MulDecTruncate(bondingStake)
 	lpRewards = lpDifference.MulDecTruncate(lpStake)
 
-	return
+	return bondingRewards, lpRewards
 }
 
 // calculateDelegationRewards calculates the total rewards accrued by a delegation.
@@ -168,7 +168,7 @@ func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.Validat
 	bondingRewards = bondingRewards.Add(curBondingRewards...)
 	lpRewards = lpRewards.Add(curLPRewrds...)
 
-	return
+	return bondingRewards, lpRewards
 }
 
 // calculateDelegationTotalRewards sums current validator delegator rewards and stored RewardsBank coins.

@@ -344,12 +344,12 @@ func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Va
 		var delOpType types.DelegationOpType
 		var eventAttrShares string
 
-		undelegateHandler := func() {
-			completionTime, err := k.Undelegate(ctx, delegation.Address, validator.OperatorAddress, delOpType, delShares, true)
+		undelegateHandler := func(delAddr sdk.AccAddress) {
+			completionTime, err := k.Undelegate(ctx, delAddr, validator.OperatorAddress, delOpType, delShares, true)
 			if err != nil {
 				panic(fmt.Errorf(
 					"force unbond delegation %s (%s) for validator %s: %v",
-					delegation.Address, delOpType, validator.OperatorAddress, err),
+					delAddr, delOpType, validator.OperatorAddress, err),
 				)
 			}
 
@@ -363,7 +363,7 @@ func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Va
 				sdk.NewEvent(
 					sdk.EventTypeMessage,
 					sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
-					sdk.NewAttribute(sdk.AttributeKeySender, delegation.Address.String()),
+					sdk.NewAttribute(sdk.AttributeKeySender, delAddr.String()),
 				),
 			})
 		}
@@ -373,7 +373,7 @@ func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Va
 			delOpType = types.BondingDelOpType
 			eventAttrShares = sdk.AttributeKeyBondingShare
 
-			undelegateHandler()
+			undelegateHandler(delegation.Address)
 		}
 
 		if delegation.LPShares.IsPositive() {
@@ -381,7 +381,7 @@ func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Va
 			delOpType = types.LiquidityDelOpType
 			eventAttrShares = sdk.AttributeKeyLPShare
 
-			undelegateHandler()
+			undelegateHandler(delegation.Address)
 		}
 	}
 
