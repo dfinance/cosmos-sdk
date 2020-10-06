@@ -341,7 +341,7 @@ func SimulateMsgUndelegate(ak types.AccountKeeper, k keeper.Keeper) simulation.O
 			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
 
-		totalBond := validator.TokensFromShares(delegation.GetShares()).TruncateInt()
+		totalBond := validator.Bonding.TokensFromShares(delegation.GetBondingShares()).TruncateInt()
 		if !totalBond.IsPositive() {
 			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
@@ -435,7 +435,7 @@ func SimulateMsgBeginRedelegate(ak types.AccountKeeper, k keeper.Keeper) simulat
 			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
 
-		totalBond := srcVal.TokensFromShares(delegation.GetShares()).TruncateInt()
+		totalBond := srcVal.Bonding.TokensFromShares(delegation.GetBondingShares()).TruncateInt()
 		if !totalBond.IsPositive() {
 			return simulation.NoOpMsg(types.ModuleName), nil, nil
 		}
@@ -450,12 +450,12 @@ func SimulateMsgBeginRedelegate(ak types.AccountKeeper, k keeper.Keeper) simulat
 		}
 
 		// check if the shares truncate to zero
-		shares, err := srcVal.SharesFromTokens(redAmt)
+		shares, err := srcVal.Bonding.SharesFromTokens(redAmt)
 		if err != nil {
 			return simulation.NoOpMsg(types.ModuleName), nil, err
 		}
 
-		if srcVal.TokensFromShares(shares).TruncateInt().IsZero() {
+		if srcVal.Bonding.TokensFromShares(shares).TruncateInt().IsZero() {
 			return simulation.NoOpMsg(types.ModuleName), nil, nil // skip
 		}
 

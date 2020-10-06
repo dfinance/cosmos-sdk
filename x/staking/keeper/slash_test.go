@@ -31,7 +31,7 @@ func setupHelper(t *testing.T, power int64) (sdk.Context, Keeper, types.Params) 
 	// add numVals validators
 	for i := int64(0); i < numVals; i++ {
 		validator := types.NewValidator(addrVals[i], PKs[i], types.Description{})
-		validator, _ = validator.AddTokensFromDel(amt)
+		validator, _ = validator.AddTokensFromDel(types.BondingDelOpType, amt)
 		validator = TestingUpdateValidator(keeper, ctx, validator, true)
 		keeper.SetValidatorByConsAddr(ctx, validator)
 	}
@@ -74,8 +74,10 @@ func TestSlashUnbondingDelegation(t *testing.T) {
 
 	// set an unbonding delegation with expiration timestamp (beyond which the
 	// unbonding delegation shouldn't be slashed)
-	ubd := types.NewUnbondingDelegation(addrDels[0], addrVals[0], 0,
-		time.Unix(5, 0), sdk.NewInt(10))
+	ubd := types.NewUnbondingDelegation(addrDels[0], addrVals[0],
+		0, time.Unix(5, 0),
+		types.BondingDelOpType, sdk.NewInt(10),
+	)
 
 	keeper.SetUnbondingDelegation(ctx, ubd)
 
@@ -123,13 +125,14 @@ func TestSlashRedelegation(t *testing.T) {
 
 	// set a redelegation with an expiration timestamp beyond which the
 	// redelegation shouldn't be slashed
-	rd := types.NewRedelegation(addrDels[0], addrVals[0], addrVals[1], 0,
-		time.Unix(5, 0), sdk.NewInt(10), sdk.NewDec(10))
-
+	rd := types.NewRedelegation(addrDels[0], addrVals[0], addrVals[1],
+		0, time.Unix(5, 0),
+		types.BondingDelOpType, sdk.NewInt(10), sdk.NewDec(10),
+	)
 	keeper.SetRedelegation(ctx, rd)
 
 	// set the associated delegation
-	del := types.NewDelegation(addrDels[0], addrVals[1], sdk.NewDec(10))
+	del := types.NewDelegation(addrDels[0], addrVals[1], sdk.NewDec(10), sdk.ZeroDec())
 	keeper.SetDelegation(ctx, del)
 
 	// started redelegating prior to the current height, stake didn't contribute to infraction
@@ -167,7 +170,7 @@ func TestSlashRedelegation(t *testing.T) {
 	// shares decreased
 	del, found = keeper.GetDelegation(ctx, addrDels[0], addrVals[1])
 	require.True(t, found)
-	require.Equal(t, int64(5), del.Shares.RoundInt64())
+	require.Equal(t, int64(5), del.BondingShares.RoundInt64())
 
 	// pool bonded tokens should decrease
 	burnedCoins := sdk.NewCoins(sdk.NewCoin(keeper.BondDenom(ctx), slashAmount))
@@ -249,8 +252,10 @@ func TestSlashWithUnbondingDelegation(t *testing.T) {
 	// set an unbonding delegation with expiration timestamp beyond which the
 	// unbonding delegation shouldn't be slashed
 	ubdTokens := sdk.TokensFromConsensusPower(4)
-	ubd := types.NewUnbondingDelegation(addrDels[0], addrVals[0], 11,
-		time.Unix(0, 0), ubdTokens)
+	ubd := types.NewUnbondingDelegation(addrDels[0], addrVals[0],
+		11, time.Unix(0, 0),
+		types.BondingDelOpType, ubdTokens,
+	)
 	keeper.SetUnbondingDelegation(ctx, ubd)
 
 	// slash validator for the first time
@@ -359,12 +364,14 @@ func TestSlashWithRedelegation(t *testing.T) {
 
 	// set a redelegation
 	rdTokens := sdk.TokensFromConsensusPower(6)
-	rd := types.NewRedelegation(addrDels[0], addrVals[0], addrVals[1], 11,
-		time.Unix(0, 0), rdTokens, rdTokens.ToDec())
+	rd := types.NewRedelegation(addrDels[0], addrVals[0], addrVals[1],
+		11, time.Unix(0, 0),
+		types.BondingDelOpType, rdTokens, rdTokens.ToDec(),
+	)
 	keeper.SetRedelegation(ctx, rd)
 
 	// set the associated delegation
-	del := types.NewDelegation(addrDels[0], addrVals[1], rdTokens.ToDec())
+	del := types.NewDelegation(addrDels[0], addrVals[1], rdTokens.ToDec(), sdk.ZeroDec())
 	keeper.SetDelegation(ctx, del)
 
 	// update bonded tokens
@@ -493,20 +500,23 @@ func TestSlashBoth(t *testing.T) {
 	// set a redelegation with expiration timestamp beyond which the
 	// redelegation shouldn't be slashed
 	rdATokens := sdk.TokensFromConsensusPower(6)
-	rdA := types.NewRedelegation(addrDels[0], addrVals[0], addrVals[1], 11,
-		time.Unix(0, 0), rdATokens,
-		rdATokens.ToDec())
+	rdA := types.NewRedelegation(addrDels[0], addrVals[0], addrVals[1],
+		11, time.Unix(0, 0),
+		types.BondingDelOpType, rdATokens, rdATokens.ToDec(),
+	)
 	keeper.SetRedelegation(ctx, rdA)
 
 	// set the associated delegation
-	delA := types.NewDelegation(addrDels[0], addrVals[1], rdATokens.ToDec())
+	delA := types.NewDelegation(addrDels[0], addrVals[1], rdATokens.ToDec(), sdk.ZeroDec())
 	keeper.SetDelegation(ctx, delA)
 
 	// set an unbonding delegation with expiration timestamp (beyond which the
 	// unbonding delegation shouldn't be slashed)
 	ubdATokens := sdk.TokensFromConsensusPower(4)
-	ubdA := types.NewUnbondingDelegation(addrDels[0], addrVals[0], 11,
-		time.Unix(0, 0), ubdATokens)
+	ubdA := types.NewUnbondingDelegation(addrDels[0], addrVals[0],
+		11, time.Unix(0, 0),
+		types.BondingDelOpType, ubdATokens,
+	)
 	keeper.SetUnbondingDelegation(ctx, ubdA)
 
 	bondedCoins := sdk.NewCoins(sdk.NewCoin(bondDenom, rdATokens.MulRaw(2)))

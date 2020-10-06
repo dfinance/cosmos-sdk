@@ -26,7 +26,7 @@ func TestNewQuerier(t *testing.T) {
 	var validators [2]types.Validator
 	for i, amt := range amts {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
-		validators[i], _ = validators[i].AddTokensFromDel(amt)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, amt)
 		keeper.SetValidator(ctx, validators[i])
 		keeper.SetValidatorByPowerIndex(ctx, validators[i])
 	}
@@ -141,7 +141,7 @@ func TestQueryValidators(t *testing.T) {
 	var validators [3]types.Validator
 	for i, amt := range amts {
 		validators[i] = types.NewValidator(sdk.ValAddress(Addrs[i]), PKs[i], types.Description{})
-		validators[i], _ = validators[i].AddTokensFromDel(amt)
+		validators[i], _ = validators[i].AddTokensFromDel(types.BondingDelOpType, amt)
 		validators[i] = validators[i].UpdateStatus(status[i])
 	}
 
@@ -208,7 +208,7 @@ func TestQueryDelegation(t *testing.T) {
 	keeper.SetValidatorByPowerIndex(ctx, val2)
 
 	delTokens := sdk.TokensFromConsensusPower(20)
-	keeper.Delegate(ctx, addrAcc2, delTokens, sdk.Unbonded, val1, true)
+	keeper.Delegate(ctx, addrAcc2, types.BondingDelOpType, delTokens, sdk.Unbonded, val1, true)
 
 	// apply TM updates
 	keeper.ApplyAndReturnValidatorSetUpdates(ctx)
@@ -285,7 +285,7 @@ func TestQueryDelegation(t *testing.T) {
 
 	require.Equal(t, delegation.ValidatorAddress, delegationRes.ValidatorAddress)
 	require.Equal(t, delegation.DelegatorAddress, delegationRes.DelegatorAddress)
-	require.Equal(t, sdk.NewCoin(sdk.DefaultBondDenom, delegation.Shares.TruncateInt()), delegationRes.Balance)
+	require.Equal(t, sdk.NewCoin(sdk.DefaultBondDenom, delegation.BondingShares.TruncateInt()), delegationRes.BondingBalance)
 
 	// Query Delegator Delegations
 	query = abci.RequestQuery{
@@ -302,7 +302,7 @@ func TestQueryDelegation(t *testing.T) {
 	require.Len(t, delegatorDelegations, 1)
 	require.Equal(t, delegation.ValidatorAddress, delegatorDelegations[0].ValidatorAddress)
 	require.Equal(t, delegation.DelegatorAddress, delegatorDelegations[0].DelegatorAddress)
-	require.Equal(t, sdk.NewCoin(sdk.DefaultBondDenom, delegation.Shares.TruncateInt()), delegatorDelegations[0].Balance)
+	require.Equal(t, sdk.NewCoin(sdk.DefaultBondDenom, delegation.BondingShares.TruncateInt()), delegatorDelegations[0].BondingBalance)
 
 	// error unknown request
 	query.Data = bz[:len(bz)-1]
@@ -329,11 +329,11 @@ func TestQueryDelegation(t *testing.T) {
 	require.Len(t, delegatorDelegations, 1)
 	require.Equal(t, delegation.ValidatorAddress, delegationsRes[0].ValidatorAddress)
 	require.Equal(t, delegation.DelegatorAddress, delegationsRes[0].DelegatorAddress)
-	require.Equal(t, sdk.NewCoin(sdk.DefaultBondDenom, delegation.Shares.TruncateInt()), delegationsRes[0].Balance)
+	require.Equal(t, sdk.NewCoin(sdk.DefaultBondDenom, delegation.BondingShares.TruncateInt()), delegationsRes[0].BondingBalance)
 
 	// Query unbonging delegation
 	unbondingTokens := sdk.TokensFromConsensusPower(10)
-	_, err = keeper.Undelegate(ctx, addrAcc2, val1.OperatorAddress, unbondingTokens.ToDec(), false)
+	_, err = keeper.Undelegate(ctx, addrAcc2, val1.OperatorAddress, types.BondingDelOpType, unbondingTokens.ToDec(), false)
 	require.NoError(t, err)
 
 	queryBondParams = types.NewQueryBondsParams(addrAcc2, addrVal1)
@@ -386,8 +386,10 @@ func TestQueryDelegation(t *testing.T) {
 
 	// Query redelegation
 	redelegationTokens := sdk.TokensFromConsensusPower(10)
-	_, err = keeper.BeginRedelegation(ctx, addrAcc2, val1.OperatorAddress,
-		val2.OperatorAddress, redelegationTokens.ToDec())
+	_, err = keeper.BeginRedelegation(
+		ctx, addrAcc2, val1.OperatorAddress, val2.OperatorAddress,
+		types.BondingDelOpType, redelegationTokens.ToDec(),
+	)
 	require.NoError(t, err)
 	redel, found := keeper.GetRedelegation(ctx, addrAcc2, val1.OperatorAddress, val2.OperatorAddress)
 	require.True(t, found)
@@ -424,11 +426,11 @@ func TestQueryRedelegations(t *testing.T) {
 	keeper.SetValidator(ctx, val2)
 
 	delAmount := sdk.TokensFromConsensusPower(100)
-	keeper.Delegate(ctx, addrAcc2, delAmount, sdk.Unbonded, val1, true)
+	keeper.Delegate(ctx, addrAcc2, types.BondingDelOpType, delAmount, sdk.Unbonded, val1, true)
 	_ = keeper.ApplyAndReturnValidatorSetUpdates(ctx)
 
 	rdAmount := sdk.TokensFromConsensusPower(20)
-	keeper.BeginRedelegation(ctx, addrAcc2, val1.GetOperator(), val2.GetOperator(), rdAmount.ToDec())
+	keeper.BeginRedelegation(ctx, addrAcc2, val1.GetOperator(), val2.GetOperator(), types.BondingDelOpType, rdAmount.ToDec())
 	keeper.ApplyAndReturnValidatorSetUpdates(ctx)
 
 	redel, found := keeper.GetRedelegation(ctx, addrAcc2, val1.OperatorAddress, val2.OperatorAddress)
@@ -488,13 +490,13 @@ func TestQueryUnbondingDelegation(t *testing.T) {
 
 	// delegate
 	delAmount := sdk.TokensFromConsensusPower(100)
-	_, err := keeper.Delegate(ctx, addrAcc1, delAmount, sdk.Unbonded, val1, true)
+	_, err := keeper.Delegate(ctx, addrAcc1, types.BondingDelOpType, delAmount, sdk.Unbonded, val1, true)
 	require.NoError(t, err)
 	_ = keeper.ApplyAndReturnValidatorSetUpdates(ctx)
 
 	// undelegate
 	undelAmount := sdk.TokensFromConsensusPower(20)
-	_, err = keeper.Undelegate(ctx, addrAcc1, val1.GetOperator(), undelAmount.ToDec(), false)
+	_, err = keeper.Undelegate(ctx, addrAcc1, val1.GetOperator(), types.BondingDelOpType, undelAmount.ToDec(), false)
 	require.NoError(t, err)
 	keeper.ApplyAndReturnValidatorSetUpdates(ctx)
 

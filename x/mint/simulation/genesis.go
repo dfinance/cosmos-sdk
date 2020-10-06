@@ -95,6 +95,7 @@ func RandomizedGenState(simState *module.SimulationState) {
 		infPwrBondedLockedRatio,
 		foundationAllocationRatio,
 		avgBlocksTimeWindow,
+		sdk.ZeroInt(),
 	)
 
 	mintGenesis := types.NewGenesisState(types.InitialMinter(inflation), params, types.BlockDurFilter{}, time.Time{})

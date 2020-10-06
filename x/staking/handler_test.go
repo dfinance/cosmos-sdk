@@ -37,7 +37,7 @@ func TestValidatorByPowerIndex(t *testing.T) {
 	// verify the self-delegation exists
 	bond, found := keeper.GetDelegation(ctx, sdk.AccAddress(validatorAddr), validatorAddr)
 	require.True(t, found)
-	gotBond := bond.Shares.RoundInt()
+	gotBond := bond.BondingShares.RoundInt()
 	require.Equal(t, initBond, gotBond)
 
 	// verify that the by power index exists
@@ -64,8 +64,8 @@ func TestValidatorByPowerIndex(t *testing.T) {
 
 	validator, found = keeper.GetValidator(ctx, validatorAddr)
 	require.True(t, found)
-	require.Equal(t, sdk.Unbonding, validator.Status)      // ensure is unbonding
-	require.Equal(t, initBond.QuoRaw(2), validator.Tokens) // ensure tokens slashed
+	require.Equal(t, sdk.Unbonding, validator.Status)                  // ensure is unbonding
+	require.Equal(t, initBond.QuoRaw(2), validator.GetBondingTokens()) // ensure tokens slashed
 	keeper.Unjail(ctx, consAddr0)
 
 	// the old power record should have been deleted as the power changed
@@ -82,7 +82,7 @@ func TestValidatorByPowerIndex(t *testing.T) {
 	require.Equal(t, power2, power3)
 
 	// unbond self-delegation
-	totalBond := validator.TokensFromShares(bond.GetShares()).TruncateInt()
+	totalBond := validator.Bonding.TokensFromShares(bond.GetBondingShares()).TruncateInt()
 	unbondAmt := sdk.NewCoin(sdk.DefaultBondDenom, totalBond)
 	msgUndelegate := NewMsgUndelegate(sdk.AccAddress(validatorAddr), validatorAddr, unbondAmt)
 
@@ -123,7 +123,7 @@ func TestDuplicatesMsgCreateValidator(t *testing.T) {
 	assert.Equal(t, addr1, validator.OperatorAddress)
 	assert.Equal(t, pk1, validator.ConsPubKey)
 	assert.Equal(t, valTokens, validator.BondedTokens())
-	assert.Equal(t, valTokens.ToDec(), validator.DelegatorShares)
+	assert.Equal(t, valTokens.ToDec(), validator.Bonding.DelegatorShares)
 	assert.Equal(t, Description{}, validator.Description)
 
 	// two validators can't have the same operator address
@@ -154,8 +154,8 @@ func TestDuplicatesMsgCreateValidator(t *testing.T) {
 	assert.Equal(t, sdk.Bonded, validator.Status)
 	assert.Equal(t, addr2, validator.OperatorAddress)
 	assert.Equal(t, pk2, validator.ConsPubKey)
-	assert.True(sdk.IntEq(t, valTokens, validator.Tokens))
-	assert.True(sdk.DecEq(t, valTokens.ToDec(), validator.DelegatorShares))
+	assert.True(sdk.IntEq(t, valTokens, validator.GetBondedTokens()))
+	assert.True(sdk.DecEq(t, valTokens.ToDec(), validator.GetBondingDelegatorShares()))
 	assert.Equal(t, Description{}, validator.Description)
 }
 
@@ -202,7 +202,7 @@ func TestLegacyValidatorDelegations(t *testing.T) {
 	validator, found := keeper.GetValidator(ctx, valAddr)
 	require.True(t, found)
 	require.Equal(t, sdk.Bonded, validator.Status)
-	require.Equal(t, bondAmount, validator.DelegatorShares.RoundInt())
+	require.Equal(t, bondAmount, validator.GetBondingDelegatorShares().RoundInt())
 	require.Equal(t, bondAmount, validator.BondedTokens())
 
 	// delegate tokens to the validator
@@ -214,7 +214,7 @@ func TestLegacyValidatorDelegations(t *testing.T) {
 	// verify validator bonded shares
 	validator, found = keeper.GetValidator(ctx, valAddr)
 	require.True(t, found)
-	require.Equal(t, bondAmount.MulRaw(2), validator.DelegatorShares.RoundInt())
+	require.Equal(t, bondAmount.MulRaw(2), validator.GetBondingDelegatorShares().RoundInt())
 	require.Equal(t, bondAmount.MulRaw(2), validator.BondedTokens())
 
 	// unbond validator total self-delegations (which should jail the validator)
@@ -234,13 +234,13 @@ func TestLegacyValidatorDelegations(t *testing.T) {
 	validator, found = keeper.GetValidator(ctx, valAddr)
 	require.True(t, found)
 	require.True(t, validator.Jailed)
-	require.Equal(t, bondAmount, validator.Tokens)
+	require.Equal(t, bondAmount, validator.GetBondingTokens())
 
 	// verify delegation still exists
 	bond, found := keeper.GetDelegation(ctx, delAddr, valAddr)
 	require.True(t, found)
-	require.Equal(t, bondAmount, bond.Shares.RoundInt())
-	require.Equal(t, bondAmount, validator.DelegatorShares.RoundInt())
+	require.Equal(t, bondAmount, bond.GetBondingShares().RoundInt())
+	require.Equal(t, bondAmount, validator.GetBondingDelegatorShares().RoundInt())
 
 	// verify the validator can still self-delegate
 	msgSelfDelegate := NewTestMsgDelegate(sdk.AccAddress(valAddr), valAddr, bondAmount)
@@ -251,8 +251,8 @@ func TestLegacyValidatorDelegations(t *testing.T) {
 	// verify validator bonded shares
 	validator, found = keeper.GetValidator(ctx, valAddr)
 	require.True(t, found)
-	require.Equal(t, bondAmount.MulRaw(2), validator.DelegatorShares.RoundInt())
-	require.Equal(t, bondAmount.MulRaw(2), validator.Tokens)
+	require.Equal(t, bondAmount.MulRaw(2), validator.GetBondingDelegatorShares().RoundInt())
+	require.Equal(t, bondAmount.MulRaw(2), validator.GetBondingTokens())
 
 	// unjail the validator now that is has non-zero self-delegated shares
 	keeper.Unjail(ctx, valConsAddr)
@@ -266,14 +266,14 @@ func TestLegacyValidatorDelegations(t *testing.T) {
 	// verify validator bonded shares
 	validator, found = keeper.GetValidator(ctx, valAddr)
 	require.True(t, found)
-	require.Equal(t, bondAmount.MulRaw(3), validator.DelegatorShares.RoundInt())
-	require.Equal(t, bondAmount.MulRaw(3), validator.Tokens)
+	require.Equal(t, bondAmount.MulRaw(3), validator.GetBondingDelegatorShares().RoundInt())
+	require.Equal(t, bondAmount.MulRaw(3), validator.GetBondingTokens())
 
 	// verify new delegation
 	bond, found = keeper.GetDelegation(ctx, delAddr, valAddr)
 	require.True(t, found)
-	require.Equal(t, bondAmount.MulRaw(2), bond.Shares.RoundInt())
-	require.Equal(t, bondAmount.MulRaw(3), validator.DelegatorShares.RoundInt())
+	require.Equal(t, bondAmount.MulRaw(2), bond.GetBondingShares().RoundInt())
+	require.Equal(t, bondAmount.MulRaw(3), validator.GetBondingDelegatorShares().RoundInt())
 }
 
 func TestIncrementsMsgDelegate(t *testing.T) {
@@ -297,7 +297,7 @@ func TestIncrementsMsgDelegate(t *testing.T) {
 	validator, found := keeper.GetValidator(ctx, validatorAddr)
 	require.True(t, found)
 	require.Equal(t, sdk.Bonded, validator.Status)
-	require.Equal(t, bondAmount, validator.DelegatorShares.RoundInt())
+	require.Equal(t, bondAmount, validator.GetBondingDelegatorShares().RoundInt())
 	require.Equal(t, bondAmount, validator.BondedTokens(), "validator: %v", validator)
 
 	_, found = keeper.GetDelegation(ctx, delegatorAddr, validatorAddr)
@@ -305,7 +305,7 @@ func TestIncrementsMsgDelegate(t *testing.T) {
 
 	bond, found := keeper.GetDelegation(ctx, sdk.AccAddress(validatorAddr), validatorAddr)
 	require.True(t, found)
-	require.Equal(t, bondAmount, bond.Shares.RoundInt())
+	require.Equal(t, bondAmount, bond.GetBondingShares().RoundInt())
 
 	bondedTokens := keeper.TotalBondedTokens(ctx)
 	require.Equal(t, bondAmount.Int64(), bondedTokens.Int64())
@@ -330,8 +330,8 @@ func TestIncrementsMsgDelegate(t *testing.T) {
 		expDelegatorShares := bondAmount.MulRaw(i + 2) // (1 self delegation)
 		expDelegatorAcc := initBond.Sub(expBond)
 
-		gotBond := bond.Shares.RoundInt()
-		gotDelegatorShares := validator.DelegatorShares.RoundInt()
+		gotBond := bond.GetBondingShares().RoundInt()
+		gotDelegatorShares := validator.GetBondingDelegatorShares().RoundInt()
 		gotDelegatorAcc := accMapper.GetAccount(ctx, delegatorAddr).GetCoins().AmountOf(params.BondDenom)
 
 		require.Equal(t, expBond, gotBond,
@@ -366,7 +366,7 @@ func TestEditValidatorDecreaseMinSelfDelegation(t *testing.T) {
 	// verify the self-delegation exists
 	bond, found := keeper.GetDelegation(ctx, sdk.AccAddress(validatorAddr), validatorAddr)
 	require.True(t, found)
-	gotBond := bond.Shares.RoundInt()
+	gotBond := bond.GetBondingShares().RoundInt()
 	require.Equal(t, initBond, gotBond,
 		"initBond: %v\ngotBond: %v\nbond: %v\n",
 		initBond, gotBond, bond)
@@ -398,7 +398,7 @@ func TestEditValidatorIncreaseMinSelfDelegationBeyondCurrentBond(t *testing.T) {
 	// verify the self-delegation exists
 	bond, found := keeper.GetDelegation(ctx, sdk.AccAddress(validatorAddr), validatorAddr)
 	require.True(t, found)
-	gotBond := bond.Shares.RoundInt()
+	gotBond := bond.GetBondingShares().RoundInt()
 	require.Equal(t, initBond, gotBond,
 		"initBond: %v\ngotBond: %v\nbond: %v\n",
 		initBond, gotBond, bond)
@@ -443,7 +443,7 @@ func TestIncrementsMsgUnbond(t *testing.T) {
 
 	validator, found := keeper.GetValidator(ctx, validatorAddr)
 	require.True(t, found)
-	require.Equal(t, initBond.MulRaw(2), validator.DelegatorShares.RoundInt())
+	require.Equal(t, initBond.MulRaw(2), validator.GetBondingDelegatorShares().RoundInt())
 	require.Equal(t, initBond.MulRaw(2), validator.BondedTokens())
 
 	// just send the same msgUnbond multiple times
@@ -473,8 +473,8 @@ func TestIncrementsMsgUnbond(t *testing.T) {
 		expDelegatorShares := initBond.MulRaw(2).Sub(unbondAmt.Amount.Mul(sdk.NewInt(i + 1)))
 		expDelegatorAcc := initBond.Sub(expBond)
 
-		gotBond := bond.Shares.RoundInt()
-		gotDelegatorShares := validator.DelegatorShares.RoundInt()
+		gotBond := bond.GetBondingShares().RoundInt()
+		gotDelegatorShares := validator.GetBondingDelegatorShares().RoundInt()
 		gotDelegatorAcc := accMapper.GetAccount(ctx, delegatorAddr).GetCoins().AmountOf(params.BondDenom)
 
 		require.Equal(t, expBond.Int64(), gotBond.Int64(),
@@ -553,7 +553,7 @@ func TestMultipleMsgCreateValidator(t *testing.T) {
 		balanceGot := accMapper.GetAccount(ctx, delegatorAddrs[i]).GetCoins().AmountOf(params.BondDenom)
 
 		require.Equal(t, i+1, len(validators), "expected %d validators got %d, validators: %v", i+1, len(validators), validators)
-		require.Equal(t, valTokens, val.DelegatorShares.RoundInt(), "expected %d shares, got %d", 10, val.DelegatorShares)
+		require.Equal(t, valTokens, val.GetBondingDelegatorShares().RoundInt(), "expected %d shares, got %d", 10, val.GetBondingDelegatorShares())
 		require.Equal(t, balanceExpd, balanceGot, "expected account to have %d, got %d", balanceExpd, balanceGot)
 	}
 
@@ -1281,7 +1281,7 @@ func TestBondUnbondRedelegateSlashTwice(t *testing.T) {
 	// destination delegation should have 6 shares
 	delegation, found := keeper.GetDelegation(ctx, del, valB)
 	require.True(t, found)
-	require.Equal(t, sdk.NewDecFromInt(redAmt.Amount), delegation.Shares)
+	require.Equal(t, sdk.NewDecFromInt(redAmt.Amount), delegation.GetBondingShares())
 
 	// must apply validator updates
 	updates = keeper.ApplyAndReturnValidatorSetUpdates(ctx)
@@ -1304,7 +1304,7 @@ func TestBondUnbondRedelegateSlashTwice(t *testing.T) {
 	// destination delegation should have been slashed by half
 	delegation, found = keeper.GetDelegation(ctx, del, valB)
 	require.True(t, found)
-	require.Equal(t, sdk.NewDecFromInt(redAmt.Amount.QuoRaw(2)), delegation.Shares)
+	require.Equal(t, sdk.NewDecFromInt(redAmt.Amount.QuoRaw(2)), delegation.GetBondingShares())
 
 	// validator power should have been reduced by half
 	validator, found := keeper.GetValidator(ctx, valA)
@@ -1329,7 +1329,7 @@ func TestBondUnbondRedelegateSlashTwice(t *testing.T) {
 	// destination delegation should be unchanged
 	delegation, found = keeper.GetDelegation(ctx, del, valB)
 	require.True(t, found)
-	require.Equal(t, sdk.NewDecFromInt(redAmt.Amount.QuoRaw(2)), delegation.Shares)
+	require.Equal(t, sdk.NewDecFromInt(redAmt.Amount.QuoRaw(2)), delegation.GetBondingShares())
 
 	// end blocker
 	EndBlocker(ctx, keeper)
@@ -1450,11 +1450,11 @@ func TestDebug(t *testing.T) {
 
 		dels := keeper.GetValidatorDelegations(ctx, valAddr)
 
-		t.Logf("%s: validator.Tokens: %s", prefix, val.GetTokens())
-		t.Logf("%s: validator.Shares: %s", prefix, val.GetDelegatorShares())
+		t.Logf("%s: validator.Tokens: %s", prefix, val.GetBondedTokens())
+		t.Logf("%s: validator.Shares: %s", prefix, val.GetBondingDelegatorShares())
 
 		for i, del := range dels {
-			t.Logf("%s: validator.Delegations[%d] (%s): %s", prefix, i, del.DelegatorAddress, del.Shares)
+			t.Logf("%s: validator.Delegations[%d] (%s): %s", prefix, i, del.DelegatorAddress, del.GetBondingShares())
 		}
 
 		return val, dels
@@ -1477,13 +1477,13 @@ func TestDebug(t *testing.T) {
 	// delegate
 	del1Power := int64(50)
 	del1Amt := sdk.TokensFromConsensusPower(del1Power)
-	_, err = keeper.Delegate(ctx, del1Addr, del1Amt, sdk.Unbonded, val, true)
+	_, err = keeper.Delegate(ctx, del1Addr, types.BondingDelOpType, del1Amt, sdk.Unbonded, val, true)
 	require.NoError(t, err)
 	val, _ = getCurState("Delegation1")
 	//
 	del2Power := int64(25)
 	del2Amt := sdk.TokensFromConsensusPower(del2Power)
-	_, err = keeper.Delegate(ctx, del2Addr, del2Amt, sdk.Unbonded, val, true)
+	_, err = keeper.Delegate(ctx, del2Addr, types.BondingDelOpType, del2Amt, sdk.Unbonded, val, true)
 	require.NoError(t, err)
 	getCurState("Delegation2")
 }
@@ -1525,7 +1525,7 @@ func TestDelegationOverMaxLimit(t *testing.T) {
 		delPower := sdk.TokensToConsensusPower(curDelLimit.QuoRaw(2))
 		delAmt := sdk.TokensFromConsensusPower(delPower)
 
-		_, err := keeper.Delegate(ctx, del1Addr, delAmt, sdk.Unbonded, getUpdatedVal(), true)
+		_, err := keeper.Delegate(ctx, del1Addr, types.BondingDelOpType, delAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
 		curDelLimit = curDelLimit.Sub(delAmt)
 	}
@@ -1535,7 +1535,7 @@ func TestDelegationOverMaxLimit(t *testing.T) {
 		delPower := sdk.TokensToConsensusPower(curDelLimit)
 		delAmt := sdk.TokensFromConsensusPower(delPower)
 
-		_, err := keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getUpdatedVal(), true)
+		_, err := keeper.Delegate(ctx, del2Addr, types.BondingDelOpType, delAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
 		curDelLimit = curDelLimit.Sub(delAmt)
 	}
@@ -1544,7 +1544,7 @@ func TestDelegationOverMaxLimit(t *testing.T) {
 	{
 		delAmt := sdk.OneInt()
 
-		_, err := keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getUpdatedVal(), true)
+		_, err := keeper.Delegate(ctx, del2Addr, types.BondingDelOpType, delAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.Error(t, err)
 		require.True(t, types.ErrMaxDelegationsLimit.Is(err))
 	}
@@ -1602,7 +1602,7 @@ func TestRedelegationOverMaxLimit(t *testing.T) {
 		delPower := sdk.TokensToConsensusPower(curDelLimit)
 		delAmt := sdk.TokensFromConsensusPower(delPower)
 
-		_, err := keeper.Delegate(ctx, del1Addr, delAmt, sdk.Unbonded, getUpdatedVal(1), true)
+		_, err := keeper.Delegate(ctx, del1Addr, types.BondingDelOpType, delAmt, sdk.Unbonded, getUpdatedVal(1), true)
 		require.NoError(t, err)
 	}
 
@@ -1611,7 +1611,7 @@ func TestRedelegationOverMaxLimit(t *testing.T) {
 		delPower := sdk.TokensToConsensusPower(curDelLimit.QuoRaw(2))
 		delAmt := sdk.TokensFromConsensusPower(delPower)
 
-		_, err := keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getUpdatedVal(2), true)
+		_, err := keeper.Delegate(ctx, del2Addr, types.BondingDelOpType, delAmt, sdk.Unbonded, getUpdatedVal(2), true)
 		require.NoError(t, err)
 	}
 
@@ -1622,10 +1622,10 @@ func TestRedelegationOverMaxLimit(t *testing.T) {
 		reDelPower := sdk.TokensToConsensusPower(curDelLimit.QuoRaw(2))
 		reDelAmt := sdk.TokensFromConsensusPower(reDelPower)
 
-		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val1.OperatorAddress, reDelAmt)
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val1.OperatorAddress, types.BondingDelOpType, reDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.BeginRedelegation(ctx, del1Addr, val1.OperatorAddress, val2.OperatorAddress, reDelShares)
+		_, err = keeper.BeginRedelegation(ctx, del1Addr, val1.OperatorAddress, val2.OperatorAddress, types.BondingDelOpType, reDelShares)
 		require.NoError(t, err)
 	}
 
@@ -1636,10 +1636,10 @@ func TestRedelegationOverMaxLimit(t *testing.T) {
 		reDelPower := sdk.TokensToConsensusPower(curDelLimit.QuoRaw(2))
 		reDelAmt := sdk.TokensFromConsensusPower(reDelPower)
 
-		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val1.OperatorAddress, reDelAmt)
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val1.OperatorAddress, types.BondingDelOpType, reDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.BeginRedelegation(ctx, del1Addr, val1.OperatorAddress, val2.OperatorAddress, reDelShares)
+		_, err = keeper.BeginRedelegation(ctx, del1Addr, val1.OperatorAddress, val2.OperatorAddress, types.BondingDelOpType, reDelShares)
 		require.Error(t, err)
 		require.True(t, types.ErrMaxDelegationsLimit.Is(err))
 	}
@@ -1710,7 +1710,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 	{
 		curDel1StakeAmt = getMaxDelegations().QuoRaw(2)
 
-		_, err := keeper.Delegate(ctx, del1Addr, curDel1StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
+		_, err := keeper.Delegate(ctx, del1Addr, types.BondingDelOpType, curDel1StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
 		checkInvariant()
 	}
@@ -1719,7 +1719,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 	{
 		curDel2StakeAmt = getMaxDelegations().QuoRaw(2)
 
-		_, err := keeper.Delegate(ctx, del2Addr, curDel2StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
+		_, err := keeper.Delegate(ctx, del2Addr, types.BondingDelOpType, curDel2StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
 		checkInvariant()
 	}
@@ -1732,10 +1732,10 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		unDelAmt := curSelfStakeAmt.QuoRaw(2)
 		curSelfStakeAmt = curSelfStakeAmt.Sub(unDelAmt)
 
-		unDelShares, err := keeper.ValidateUnbondAmount(ctx, valOpAddr, valAddr, unDelAmt)
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, valOpAddr, valAddr, types.BondingDelOpType, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares, false)
+		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, types.BondingDelOpType, unDelShares, false)
 		require.NoError(t, err)
 		checkScheduled()
 		checkInvariant()
@@ -1746,7 +1746,7 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		delAmt := curSelfStakeAmt
 		curSelfStakeAmt = curSelfStakeAmt.Add(delAmt)
 
-		_, err := keeper.Delegate(ctx, valOpAddr, delAmt, sdk.Unbonded, getUpdatedVal(), true)
+		_, err := keeper.Delegate(ctx, valOpAddr, types.BondingDelOpType, delAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
 		checkUnscheduled()
 		checkInvariant()
@@ -1760,16 +1760,16 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		unDelAmt := sdk.OneInt()
 		curSelfStakeAmt = curSelfStakeAmt.Sub(unDelAmt)
 
-		unDelShares, err := keeper.ValidateUnbondAmount(ctx, valOpAddr, valAddr, unDelAmt)
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, valOpAddr, valAddr, types.BondingDelOpType, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares, false)
+		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, types.BondingDelOpType, unDelShares, false)
 		require.NoError(t, err)
 		checkScheduled()
 		scheduledBlock := getUpdatedVal().ScheduledUnbondHeight
 		scheduledTime := getUpdatedVal().ScheduledUnbondStartTime
 
-		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares, false)
+		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, types.BondingDelOpType, unDelShares, false)
 		require.NoError(t, err)
 		checkScheduled()
 		require.Equal(t, scheduledBlock, getUpdatedVal().ScheduledUnbondHeight)
@@ -1785,10 +1785,10 @@ func TestForceUnbondScheduleUnschedule(t *testing.T) {
 		overflowDiff := curTotalShares.Sub(getMaxDelegations())
 
 		curDel1StakeAmt = curDel1StakeAmt.Sub(overflowDiff)
-		unDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, valAddr, overflowDiff)
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, valAddr, types.BondingDelOpType, overflowDiff)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, del1Addr, valAddr, unDelShares, false)
+		_, err = keeper.Undelegate(ctx, del1Addr, valAddr, types.BondingDelOpType, unDelShares, false)
 		require.NoError(t, err)
 		checkUnscheduled()
 
@@ -1856,7 +1856,7 @@ func TestForceUnbondCompletion(t *testing.T) {
 	{
 		curDel1StakeAmt = getMaxDelegations().QuoRaw(2)
 
-		_, err := keeper.Delegate(ctx, del1Addr, curDel1StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
+		_, err := keeper.Delegate(ctx, del1Addr, types.BondingDelOpType, curDel1StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
 	}
 
@@ -1864,7 +1864,7 @@ func TestForceUnbondCompletion(t *testing.T) {
 	{
 		curDel2StakeAmt = getMaxDelegations().QuoRaw(2)
 
-		_, err := keeper.Delegate(ctx, del2Addr, curDel2StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
+		_, err := keeper.Delegate(ctx, del2Addr, types.BondingDelOpType, curDel2StakeAmt, sdk.Unbonded, getUpdatedVal(), true)
 		require.NoError(t, err)
 	}
 
@@ -1877,10 +1877,10 @@ func TestForceUnbondCompletion(t *testing.T) {
 		unDelAmt := curSelfStakeAmt.QuoRaw(2)
 		curSelfStakeAmt = curSelfStakeAmt.Sub(unDelAmt)
 
-		unDelShares, err := keeper.ValidateUnbondAmount(ctx, valOpAddr, valAddr, unDelAmt)
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, valOpAddr, valAddr, types.BondingDelOpType, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, unDelShares, false)
+		_, err = keeper.Undelegate(ctx, valOpAddr, valAddr, types.BondingDelOpType, unDelShares, false)
 		require.NoError(t, err)
 		scheduledStartTime = checkScheduled()
 	}
@@ -2083,7 +2083,7 @@ func TestForceUnbondSafeBoat1(t *testing.T) {
 		// check the source stake existence
 		srcDel, srcDelFound := keeper.GetDelegation(ctx, acc.Addr, srcVal.OperatorAddress)
 		if expSrcDelAmt.IsZero() {
-			require.False(t, srcDelFound, srcDel.Shares.String())
+			require.False(t, srcDelFound, srcDel.GetBondingShares().String())
 		} else {
 			require.True(t, srcDelFound)
 		}
@@ -2091,7 +2091,7 @@ func TestForceUnbondSafeBoat1(t *testing.T) {
 		// check the destination stake existence
 		dstDel, dstDelFound := keeper.GetDelegation(ctx, acc.Addr, dstVal.OperatorAddress)
 		if expDstDelAmt.IsZero() {
-			require.False(t, dstDelFound, dstDel.Shares.String())
+			require.False(t, dstDelFound, dstDel.GetBondingShares().String())
 		} else {
 			require.True(t, dstDelFound)
 		}
@@ -2136,13 +2136,13 @@ func TestForceUnbondSafeBoat1(t *testing.T) {
 	{
 		accs[Del1Idx].Val1Stake = getMaxDelegation(1).QuoRaw(2)
 
-		_, err := keeper.Delegate(ctx, accs[Del1Idx].Addr, accs[Del1Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
+		_, err := keeper.Delegate(ctx, accs[Del1Idx].Addr, types.BondingDelOpType, accs[Del1Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
 		require.NoError(t, err)
 	}
 	{
 		accs[Del2Idx].Val1Stake = getMaxDelegation(1)
 
-		_, err := keeper.Delegate(ctx, accs[Del2Idx].Addr, accs[Del2Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
+		_, err := keeper.Delegate(ctx, accs[Del2Idx].Addr, types.BondingDelOpType, accs[Del2Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
 		require.NoError(t, err)
 	}
 
@@ -2162,10 +2162,10 @@ func TestForceUnbondSafeBoat1(t *testing.T) {
 		accs[ValOp1Idx].Val2Stake = accs[ValOp1Idx].Val1Stake.QuoRaw(2)
 		accs[ValOp1Idx].Val1Stake = accs[ValOp1Idx].Val2Stake
 
-		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[ValOp1Idx].Addr, val1Addr, accs[ValOp1Idx].Val2Stake)
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[ValOp1Idx].Addr, val1Addr, types.BondingDelOpType, accs[ValOp1Idx].Val2Stake)
 		require.NoError(t, err)
 
-		_, err = keeper.BeginRedelegation(ctx, accs[ValOp1Idx].Addr, val1Addr, val2Addr, reDelShares)
+		_, err = keeper.BeginRedelegation(ctx, accs[ValOp1Idx].Addr, val1Addr, val2Addr, types.BondingDelOpType, reDelShares)
 		require.NoError(t, err)
 	}
 
@@ -2178,10 +2178,10 @@ func TestForceUnbondSafeBoat1(t *testing.T) {
 		accs[Del1Idx].Val2Stake = accs[Del1Idx].Val1Stake
 		accs[Del1Idx].Val1Stake = sdk.ZeroInt()
 
-		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del1Idx].Addr, val1Addr, accs[Del1Idx].Val2Stake)
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del1Idx].Addr, val1Addr, types.BondingDelOpType, accs[Del1Idx].Val2Stake)
 		require.NoError(t, err)
 
-		_, err = keeper.BeginRedelegation(ctx, accs[Del1Idx].Addr, val1Addr, val2Addr, reDelShares)
+		_, err = keeper.BeginRedelegation(ctx, accs[Del1Idx].Addr, val1Addr, val2Addr, types.BondingDelOpType, reDelShares)
 		require.NoError(t, err)
 	}
 
@@ -2191,10 +2191,10 @@ func TestForceUnbondSafeBoat1(t *testing.T) {
 		accs[Del2Idx].Balance = accs[Del2Idx].Balance.Add(unDelAmt)
 		accs[Del2Idx].Val1Stake = sdk.ZeroInt()
 
-		unDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del2Idx].Addr, val1Addr, unDelAmt)
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del2Idx].Addr, val1Addr, types.BondingDelOpType, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, unDelShares, false)
+		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, types.BondingDelOpType, unDelShares, false)
 		require.NoError(t, err)
 	}
 
@@ -2350,7 +2350,7 @@ func TestForceUnbondSafeBoat2(t *testing.T) {
 		// check the source stake existence
 		srcDel, srcDelFound := keeper.GetDelegation(ctx, acc.Addr, srcVal.OperatorAddress)
 		if expSrcDelAmt.IsZero() {
-			require.False(t, srcDelFound, srcDel.Shares.String())
+			require.False(t, srcDelFound, srcDel.GetBondingShares().String())
 		} else {
 			require.True(t, srcDelFound)
 		}
@@ -2358,7 +2358,7 @@ func TestForceUnbondSafeBoat2(t *testing.T) {
 		// check the destination stake existence
 		dstDel, dstDelFound := keeper.GetDelegation(ctx, acc.Addr, dstVal.OperatorAddress)
 		if expDstDelAmt.IsZero() {
-			require.False(t, dstDelFound, dstDel.Shares.String())
+			require.False(t, dstDelFound, dstDel.BondingShares.String())
 		} else {
 			require.True(t, dstDelFound)
 		}
@@ -2407,13 +2407,13 @@ func TestForceUnbondSafeBoat2(t *testing.T) {
 	{
 		accs[Del1Idx].Val1Stake = getMaxDelegation(1).QuoRaw(2)
 
-		_, err := keeper.Delegate(ctx, accs[Del1Idx].Addr, accs[Del1Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
+		_, err := keeper.Delegate(ctx, accs[Del1Idx].Addr, types.BondingDelOpType, accs[Del1Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
 		require.NoError(t, err)
 	}
 	{
 		accs[Del2Idx].Val1Stake = getMaxDelegation(1)
 
-		_, err := keeper.Delegate(ctx, accs[Del2Idx].Addr, accs[Del2Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
+		_, err := keeper.Delegate(ctx, accs[Del2Idx].Addr, types.BondingDelOpType, accs[Del2Idx].Val1Stake, sdk.Unbonded, getVal(1), true)
 		require.NoError(t, err)
 	}
 
@@ -2433,10 +2433,10 @@ func TestForceUnbondSafeBoat2(t *testing.T) {
 		accs[ValOp1Idx].Val2Stake = accs[ValOp1Idx].Val1Stake.QuoRaw(2)
 		accs[ValOp1Idx].Val1Stake = accs[ValOp1Idx].Val2Stake
 
-		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[ValOp1Idx].Addr, val1Addr, accs[ValOp1Idx].Val2Stake)
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[ValOp1Idx].Addr, val1Addr, types.BondingDelOpType, accs[ValOp1Idx].Val2Stake)
 		require.NoError(t, err)
 
-		_, err = keeper.BeginRedelegation(ctx, accs[ValOp1Idx].Addr, val1Addr, val2Addr, reDelShares)
+		_, err = keeper.BeginRedelegation(ctx, accs[ValOp1Idx].Addr, val1Addr, val2Addr, types.BondingDelOpType, reDelShares)
 		require.NoError(t, err)
 	}
 
@@ -2449,10 +2449,10 @@ func TestForceUnbondSafeBoat2(t *testing.T) {
 		accs[Del1Idx].Val2Stake = accs[Del1Idx].Val1Stake
 		accs[Del1Idx].Val1Stake = sdk.ZeroInt()
 
-		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del1Idx].Addr, val1Addr, accs[Del1Idx].Val2Stake)
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del1Idx].Addr, val1Addr, types.BondingDelOpType, accs[Del1Idx].Val2Stake)
 		require.NoError(t, err)
 
-		_, err = keeper.BeginRedelegation(ctx, accs[Del1Idx].Addr, val1Addr, val2Addr, reDelShares)
+		_, err = keeper.BeginRedelegation(ctx, accs[Del1Idx].Addr, val1Addr, val2Addr, types.BondingDelOpType, reDelShares)
 		require.NoError(t, err)
 	}
 
@@ -2462,10 +2462,10 @@ func TestForceUnbondSafeBoat2(t *testing.T) {
 		accs[Del2Idx].Balance = accs[Del2Idx].Balance.Add(unDelAmt)
 		accs[Del2Idx].Val1Stake = sdk.ZeroInt()
 
-		unDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del2Idx].Addr, val1Addr, unDelAmt)
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, accs[Del2Idx].Addr, val1Addr, types.BondingDelOpType, unDelAmt)
 		require.NoError(t, err)
 
-		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, unDelShares, false)
+		_, err = keeper.Undelegate(ctx, accs[Del2Idx].Addr, val1Addr, types.BondingDelOpType, unDelShares, false)
 		require.NoError(t, err)
 	}
 
@@ -2547,20 +2547,20 @@ func TestForceRemoveDelegator(t *testing.T) {
 		rdAmt := sdk.TokensFromConsensusPower(2)
 		udAmt := sdk.TokensFromConsensusPower(2)
 
-		_, err := keeper.Delegate(ctx, del1Addr, delAmt, sdk.Unbonded, getVal(1), true)
+		_, err := keeper.Delegate(ctx, del1Addr, types.BondingDelOpType, delAmt, sdk.Unbonded, getVal(1), true)
 		require.NoError(t, err)
 
-		_, err = keeper.Delegate(ctx, del1Addr, delAmt, sdk.Unbonded, getVal(2), true)
+		_, err = keeper.Delegate(ctx, del1Addr, types.BondingDelOpType, delAmt, sdk.Unbonded, getVal(2), true)
 		require.NoError(t, err)
 
-		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val1Addr, rdAmt)
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val1Addr, types.BondingDelOpType, rdAmt)
 		require.NoError(t, err)
-		_, err = keeper.BeginRedelegation(ctx, del1Addr, val1Addr, val2Addr, reDelShares)
+		_, err = keeper.BeginRedelegation(ctx, del1Addr, val1Addr, val2Addr, types.BondingDelOpType, reDelShares)
 		require.NoError(t, err)
 
-		unDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val2Addr, udAmt)
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, del1Addr, val2Addr, types.BondingDelOpType, udAmt)
 		require.NoError(t, err)
-		_, err = keeper.Undelegate(ctx, del1Addr, val2Addr, unDelShares, false)
+		_, err = keeper.Undelegate(ctx, del1Addr, val2Addr, types.BondingDelOpType, unDelShares, false)
 		require.NoError(t, err)
 	}
 	// delegator 2:
@@ -2574,20 +2574,20 @@ func TestForceRemoveDelegator(t *testing.T) {
 		rdAmt := sdk.TokensFromConsensusPower(2)
 		udAmt := sdk.TokensFromConsensusPower(2)
 
-		_, err := keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getVal(1), true)
+		_, err := keeper.Delegate(ctx, del2Addr, types.BondingDelOpType, delAmt, sdk.Unbonded, getVal(1), true)
 		require.NoError(t, err)
 
-		_, err = keeper.Delegate(ctx, del2Addr, delAmt, sdk.Unbonded, getVal(2), true)
+		_, err = keeper.Delegate(ctx, del2Addr, types.BondingDelOpType, delAmt, sdk.Unbonded, getVal(2), true)
 		require.NoError(t, err)
 
-		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del2Addr, val2Addr, rdAmt)
+		reDelShares, err := keeper.ValidateUnbondAmount(ctx, del2Addr, val2Addr, types.BondingDelOpType, rdAmt)
 		require.NoError(t, err)
-		_, err = keeper.BeginRedelegation(ctx, del2Addr, val2Addr, val1Addr, reDelShares)
+		_, err = keeper.BeginRedelegation(ctx, del2Addr, val2Addr, val1Addr, types.BondingDelOpType, reDelShares)
 		require.NoError(t, err)
 
-		unDelShares, err := keeper.ValidateUnbondAmount(ctx, del2Addr, val1Addr, udAmt)
+		unDelShares, err := keeper.ValidateUnbondAmount(ctx, del2Addr, val1Addr, types.BondingDelOpType, udAmt)
 		require.NoError(t, err)
-		_, err = keeper.Undelegate(ctx, del2Addr, val1Addr, unDelShares, false)
+		_, err = keeper.Undelegate(ctx, del2Addr, val1Addr, types.BondingDelOpType, unDelShares, false)
 		require.NoError(t, err)
 	}
 
@@ -2709,5 +2709,363 @@ func TestBannedAccounts(t *testing.T) {
 		msg := NewMsgDelegate(valOpAddr, valAddr, sdk.NewCoin(sdk.DefaultBondDenom, sdk.OneInt()))
 		_, err := handleMsgDelegate(ctx, msg, keeper)
 		require.NoError(t, err)
+	}
+}
+
+// Test delegation ops with LP shares only.
+func TestLPDelegationBasic(t *testing.T) {
+	initPower := int64(100000)
+	ctx, ak, keeper, sk := keep.CreateTestInput(t, false, initPower)
+
+	// fix non-bonded pool supply
+	nbPoolAcc := sk.GetModuleAccount(ctx, types.NotBondedPoolName)
+	nbPoolAcc.SetCoins(sdk.Coins{})
+	sk.SetModuleAccount(ctx, nbPoolAcc)
+
+	val1OpAddr, val2OpAddr := keep.Addrs[0], keep.Addrs[1]
+	val1Addr, val1PubKey := sdk.ValAddress(val1OpAddr), keep.PKs[0]
+	val2Addr, val2PubKey := sdk.ValAddress(val2OpAddr), keep.PKs[1]
+	delAddr := keep.Addrs[2]
+
+	checkInvariants := func() {
+		msg, broken := AllInvariants(keeper)(ctx)
+		require.False(t, broken, msg)
+	}
+
+	// create validators
+	{
+		selfStakeAmt := sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val1Addr, val1PubKey, selfStakeAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msgCreateValidator = NewTestMsgCreateValidator(val2Addr, val2PubKey, selfStakeAmt)
+		res, err = handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	// next block to bond validators
+	ctx = ctx.WithBlockTime(ctx.BlockTime().Add(5 * time.Second))
+	EndBlocker(ctx, keeper)
+	checkInvariants()
+
+	// delegate LPs
+	delCoin := sdk.NewCoin(sdk.DefaultLiquidityDenom, sdk.NewInt(100))
+	var delShares sdk.Dec
+	{
+		msg := NewMsgDelegate(delAddr, val1Addr, delCoin)
+		_, err := handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check delegation
+		del, found := keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsZero())
+		require.True(t, del.LPShares.IsPositive())
+		delShares = del.GetLPShares()
+
+		// check validator
+		val, found := keeper.GetValidator(ctx, val1Addr)
+		require.True(t, found)
+		require.True(t, val.GetBondingTokens().IsPositive())
+		require.True(t, val.GetLPTokens().IsPositive())
+		require.True(t, val.GetBondingDelegatorShares().IsPositive())
+		require.True(t, val.GetLPDelegatorShares().IsPositive())
+	}
+	checkInvariants()
+
+	// redelegate all LPs
+	{
+		msg := NewMsgBeginRedelegate(delAddr, val1Addr, val2Addr, delCoin)
+		_, err := handleMsgBeginRedelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check redelegation
+		rd, found := keeper.GetRedelegation(ctx, delAddr, val1Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, rd.Entries, 1)
+		require.Equal(t, rd.Entries[0].OpType, types.LiquidityDelOpType)
+		require.Equal(t, rd.Entries[0].InitialBalance, delCoin.Amount)
+		require.True(t, rd.Entries[0].SharesDst.Equal(delShares))
+
+		// check old delegation removed
+		_, found = keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.False(t, found)
+
+		// check new delegation created
+		_, found = keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+	}
+	checkInvariants()
+
+	// check RD queue
+	{
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(keeper.UnbondingTime(ctx)))
+		EndBlocker(ctx, keeper)
+
+		// check RD removed
+		_, found := keeper.GetRedelegation(ctx, delAddr, val1Addr, val2Addr)
+		require.False(t, found)
+	}
+	checkInvariants()
+
+	// undelegate all LPs
+	{
+		msg := NewMsgUndelegate(delAddr, val2Addr, delCoin)
+		res, err := handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// check delegation removed
+		_, found := keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.False(t, found)
+
+		// check unbonding delegation exists
+		ub, found := keeper.GetUnbondingDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+		require.Len(t, ub.Entries, 1)
+		require.Equal(t, ub.Entries[0].OpType, types.LiquidityDelOpType)
+		require.Equal(t, ub.Entries[0].InitialBalance, delCoin.Amount)
+		require.Equal(t, ub.Entries[0].Balance, delCoin.Amount)
+	}
+	checkInvariants()
+
+	// check UB queue
+	{
+		prevLPBalance := ak.GetAccount(ctx, delAddr).GetCoins().AmountOf(sdk.DefaultLiquidityDenom)
+
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(keeper.UnbondingTime(ctx)))
+		EndBlocker(ctx, keeper)
+
+		// check UB removed
+		_, found := keeper.GetUnbondingDelegation(ctx, delAddr, val2Addr)
+		require.False(t, found)
+
+		curLPBalance := ak.GetAccount(ctx, delAddr).GetCoins().AmountOf(sdk.DefaultLiquidityDenom)
+		require.True(t, curLPBalance.GT(prevLPBalance))
+	}
+	checkInvariants()
+}
+
+// Test delegation ops with mixed bonding / LP shares.
+func TestLPDelegationMixed(t *testing.T) {
+	initPower := int64(100000)
+	ctx, ak, keeper, sk := keep.CreateTestInput(t, false, initPower)
+
+	// fix non-bonded pool supply
+	nbPoolAcc := sk.GetModuleAccount(ctx, types.NotBondedPoolName)
+	nbPoolAcc.SetCoins(sdk.Coins{})
+	sk.SetModuleAccount(ctx, nbPoolAcc)
+
+	val1OpAddr, val2OpAddr := keep.Addrs[0], keep.Addrs[1]
+	val1Addr, val1PubKey := sdk.ValAddress(val1OpAddr), keep.PKs[0]
+	val2Addr, val2PubKey := sdk.ValAddress(val2OpAddr), keep.PKs[1]
+	delAddr := keep.Addrs[2]
+
+	checkInvariants := func() {
+		msg, broken := AllInvariants(keeper)(ctx)
+		require.False(t, broken, msg)
+	}
+
+	getVal := func(id int) types.Validator {
+		var valAddr sdk.ValAddress
+		switch id {
+		case 1:
+			valAddr = val1Addr
+		case 2:
+			valAddr = val2Addr
+		}
+
+		val, found := keeper.GetValidator(ctx, valAddr)
+		require.True(t, found)
+		return val
+	}
+
+	// create validators
+	{
+		selfStakeAmt := sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val1Addr, val1PubKey, selfStakeAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msgCreateValidator = NewTestMsgCreateValidator(val2Addr, val2PubKey, selfStakeAmt)
+		res, err = handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	// next block to bond validators
+	{
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(5 * time.Second))
+		EndBlocker(ctx, keeper)
+	}
+	checkInvariants()
+
+	// get initial delegator balance
+	delInitBalance := ak.GetAccount(ctx, delAddr).GetCoins()
+
+	// delegate bonds and LPs
+	delBCoin := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100))
+	delLPCoin := sdk.NewCoin(sdk.DefaultLiquidityDenom, sdk.NewInt(100))
+	{
+		msg := NewMsgDelegate(delAddr, val1Addr, delBCoin)
+		_, err := handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		msg = NewMsgDelegate(delAddr, val1Addr, delLPCoin)
+		_, err = handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check delegation
+		del, found := keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsPositive())
+		require.True(t, del.LPShares.IsPositive())
+	}
+	checkInvariants()
+
+	// redelegate half bonds and LPs to validator 2
+	rdBCoin := sdk.NewCoin(delBCoin.Denom, delBCoin.Amount.QuoRaw(2))
+	rdLPCoin := sdk.NewCoin(delLPCoin.Denom, delLPCoin.Amount.QuoRaw(2))
+	{
+		msg := NewMsgBeginRedelegate(delAddr, val1Addr, val2Addr, rdBCoin)
+		_, err := handleMsgBeginRedelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		msg = NewMsgBeginRedelegate(delAddr, val1Addr, val2Addr, rdLPCoin)
+		_, err = handleMsgBeginRedelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check redelegation
+		rd, found := keeper.GetRedelegation(ctx, delAddr, val1Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, rd.Entries, 2)
+		//
+		require.Equal(t, rd.Entries[0].OpType, types.BondingDelOpType)
+		require.Equal(t, rd.Entries[0].InitialBalance, rdBCoin.Amount)
+		require.True(t, rd.Entries[0].SharesDst.IsPositive())
+		//
+		require.Equal(t, rd.Entries[1].OpType, types.LiquidityDelOpType)
+		require.Equal(t, rd.Entries[1].InitialBalance, rdLPCoin.Amount)
+		require.True(t, rd.Entries[1].SharesDst.IsPositive())
+
+		// check old delegation exists
+		delOld, found := keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.True(t, found)
+		require.True(t, delOld.BondingShares.IsPositive())
+		require.True(t, delOld.LPShares.IsPositive())
+
+		// check new delegation created
+		delNew, found := keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+		require.True(t, delNew.BondingShares.IsPositive())
+		require.True(t, delNew.LPShares.IsPositive())
+
+		// check validator1 still has both tokens
+		val := getVal(1)
+		require.True(t, val.GetBondingTokens().IsPositive())
+		require.True(t, val.GetBondingDelegatorShares().IsPositive())
+		require.True(t, val.GetLPTokens().IsPositive())
+		require.True(t, val.GetLPDelegatorShares().IsPositive())
+	}
+	checkInvariants()
+
+	// undelegate half bonds and LPs from validator 2
+	udBCoin := sdk.NewCoin(rdBCoin.Denom, rdBCoin.Amount.QuoRaw(2))
+	udLPCoin := sdk.NewCoin(rdLPCoin.Denom, rdLPCoin.Amount.QuoRaw(2))
+	{
+		msg := NewMsgUndelegate(delAddr, val2Addr, udBCoin)
+		res, err := handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = NewMsgUndelegate(delAddr, val2Addr, udLPCoin)
+		res, err = handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// check delegation exists
+		_, found := keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+
+		// check unbonding delegation exists
+		ub, found := keeper.GetUnbondingDelegation(ctx, delAddr, val2Addr)
+		require.True(t, found)
+		require.Len(t, ub.Entries, 2)
+		//
+		require.Equal(t, ub.Entries[0].OpType, types.BondingDelOpType)
+		require.Equal(t, ub.Entries[0].InitialBalance, udBCoin.Amount)
+		require.Equal(t, ub.Entries[0].Balance, udBCoin.Amount)
+		//
+		require.Equal(t, ub.Entries[1].OpType, types.LiquidityDelOpType)
+		require.Equal(t, ub.Entries[1].InitialBalance, udLPCoin.Amount)
+		require.Equal(t, ub.Entries[1].Balance, udLPCoin.Amount)
+	}
+	checkInvariants()
+
+	// wait for the 1st undelegation to finish
+	{
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(keeper.UnbondingTime(ctx)))
+		EndBlocker(ctx, keeper)
+	}
+	checkInvariants()
+
+	// undelegate the rest from validator 1 and 2
+	{
+		// 1st
+		msg := NewMsgUndelegate(delAddr, val1Addr, sdk.NewCoin(delBCoin.Denom, delBCoin.Amount.QuoRaw(2)))
+		res, err := handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		//
+		msg = NewMsgUndelegate(delAddr, val1Addr, sdk.NewCoin(delLPCoin.Denom, delLPCoin.Amount.QuoRaw(2)))
+		res, err = handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// 2nd
+		msg = NewMsgUndelegate(delAddr, val2Addr, udBCoin)
+		res, err = handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		//
+		msg = NewMsgUndelegate(delAddr, val2Addr, udLPCoin)
+		res, err = handleMsgUndelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// wait for UDs to finish
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(keeper.UnbondingTime(ctx)))
+		EndBlocker(ctx, keeper)
+	}
+	checkInvariants()
+
+	// check not delegations, redelegation exists and validators 1 and 2 has no LPs
+	{
+		_, found := keeper.GetDelegation(ctx, delAddr, val1Addr)
+		require.False(t, found)
+		_, found = keeper.GetDelegation(ctx, delAddr, val2Addr)
+		require.False(t, found)
+
+		_, found = keeper.GetRedelegation(ctx, delAddr, val1Addr, val2Addr)
+		require.False(t, found)
+
+		val1 := getVal(1)
+		val2 := getVal(2)
+		require.True(t, val1.GetLPTokens().IsZero())
+		require.True(t, val1.GetLPDelegatorShares().IsZero())
+		require.True(t, val2.GetLPTokens().IsZero())
+		require.True(t, val2.GetLPDelegatorShares().IsZero())
+	}
+
+	// check delegator balance
+	{
+		delCurBalance := ak.GetAccount(ctx, delAddr).GetCoins()
+		require.True(t, delCurBalance.IsEqual(delInitBalance))
 	}
 }

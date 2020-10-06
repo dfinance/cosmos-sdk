@@ -16,6 +16,11 @@ func (k Keeper) GetNotBondedPool(ctx sdk.Context) (notBondedPool exported.Module
 	return k.supplyKeeper.GetModuleAccount(ctx, types.NotBondedPoolName)
 }
 
+// GetLiquidityPool returns the liquidity tokens pool's module account
+func (k Keeper) GetLiquidityPool(ctx sdk.Context) (liquidityPool exported.ModuleAccountI) {
+	return k.supplyKeeper.GetModuleAccount(ctx, types.LiquidityPoolName)
+}
+
 // bondedTokensToNotBonded transfers coins from the bonded to the not bonded pool within staking
 func (k Keeper) bondedTokensToNotBonded(ctx sdk.Context, tokens sdk.Int) {
 	coins := sdk.NewCoins(sdk.NewCoin(k.BondDenom(ctx), tokens))
@@ -58,6 +63,12 @@ func (k Keeper) burnNotBondedTokens(ctx sdk.Context, amt sdk.Int) error {
 func (k Keeper) TotalBondedTokens(ctx sdk.Context) sdk.Int {
 	bondedPool := k.GetBondedPool(ctx)
 	return bondedPool.GetCoins().AmountOf(k.BondDenom(ctx))
+}
+
+// TotalLPTokens total liquidity tokens stored in the staking pool
+func (k Keeper) TotalLPTokens(ctx sdk.Context) sdk.Int {
+	lpPool := k.GetLiquidityPool(ctx)
+	return lpPool.GetCoins().AmountOf(k.LPDenom(ctx))
 }
 
 // StakingTokenSupply staking tokens from the total supply

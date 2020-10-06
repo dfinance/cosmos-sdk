@@ -7,8 +7,8 @@ import (
 
 // StakingKeeper defines the expected staking keeper
 type StakingKeeper interface {
+	TotalBondedTokens(ctx sdk.Context) sdk.Int
 	StakingTokenSupply(ctx sdk.Context) sdk.Int
-	BondedRatio(ctx sdk.Context) sdk.Dec
 }
 
 // SupplyKeeper defines the expected supply keeper
@@ -23,4 +23,9 @@ type SupplyKeeper interface {
 	SendCoinsFromModuleToModule(ctx sdk.Context, senderModule, recipientModule string, amt sdk.Coins) error
 	MintCoins(ctx sdk.Context, name string, amt sdk.Coins) error
 	BurnCoins(ctx sdk.Context, moduleName string, amt sdk.Coins) error
+}
+
+// DistributionKeeper defines the expected distribution keeper
+type DistributionKeeper interface {
+	LockedRatio(ctx sdk.Context) sdk.Dec
 }

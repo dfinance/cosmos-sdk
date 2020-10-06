@@ -224,7 +224,7 @@ func TestTallyDelgatorOverride(t *testing.T) {
 	val1, found := sk.GetValidator(ctx, valOpAddr1)
 	require.True(t, found)
 
-	_, err := sk.Delegate(ctx, TestAddrs[0], delTokens, sdk.Unbonded, val1, true)
+	_, err := sk.Delegate(ctx, TestAddrs[0], staking.BondingDelOpType, delTokens, sdk.Unbonded, val1, true)
 	require.NoError(t, err)
 
 	_ = staking.EndBlocker(ctx, sk)
@@ -258,7 +258,7 @@ func TestTallyDelgatorInherit(t *testing.T) {
 	val3, found := sk.GetValidator(ctx, valOpAddr3)
 	require.True(t, found)
 
-	_, err := sk.Delegate(ctx, TestAddrs[0], delTokens, sdk.Unbonded, val3, true)
+	_, err := sk.Delegate(ctx, TestAddrs[0], staking.BondingDelOpType, delTokens, sdk.Unbonded, val3, true)
 	require.NoError(t, err)
 
 	_ = staking.EndBlocker(ctx, sk)
@@ -293,9 +293,9 @@ func TestTallyDelgatorMultipleOverride(t *testing.T) {
 	val2, found := sk.GetValidator(ctx, valOpAddr2)
 	require.True(t, found)
 
-	_, err := sk.Delegate(ctx, TestAddrs[0], delTokens, sdk.Unbonded, val1, true)
+	_, err := sk.Delegate(ctx, TestAddrs[0], staking.BondingDelOpType, delTokens, sdk.Unbonded, val1, true)
 	require.NoError(t, err)
-	_, err = sk.Delegate(ctx, TestAddrs[0], delTokens, sdk.Unbonded, val2, true)
+	_, err = sk.Delegate(ctx, TestAddrs[0], staking.BondingDelOpType, delTokens, sdk.Unbonded, val2, true)
 	require.NoError(t, err)
 
 	_ = staking.EndBlocker(ctx, sk)
@@ -331,9 +331,9 @@ func TestTallyDelgatorMultipleInherit(t *testing.T) {
 	val3, found := sk.GetValidator(ctx, valOpAddr3)
 	require.True(t, found)
 
-	_, err := sk.Delegate(ctx, TestAddrs[0], delTokens, sdk.Unbonded, val2, true)
+	_, err := sk.Delegate(ctx, TestAddrs[0], staking.BondingDelOpType, delTokens, sdk.Unbonded, val2, true)
 	require.NoError(t, err)
-	_, err = sk.Delegate(ctx, TestAddrs[0], delTokens, sdk.Unbonded, val3, true)
+	_, err = sk.Delegate(ctx, TestAddrs[0], staking.BondingDelOpType, delTokens, sdk.Unbonded, val3, true)
 	require.NoError(t, err)
 
 	_ = staking.EndBlocker(ctx, sk)
@@ -368,9 +368,9 @@ func TestTallyJailedValidator(t *testing.T) {
 	val3, found := sk.GetValidator(ctx, valOpAddr3)
 	require.True(t, found)
 
-	_, err := sk.Delegate(ctx, TestAddrs[0], delTokens, sdk.Unbonded, val2, true)
+	_, err := sk.Delegate(ctx, TestAddrs[0], staking.BondingDelOpType, delTokens, sdk.Unbonded, val2, true)
 	require.NoError(t, err)
-	_, err = sk.Delegate(ctx, TestAddrs[0], delTokens, sdk.Unbonded, val3, true)
+	_, err = sk.Delegate(ctx, TestAddrs[0], staking.BondingDelOpType, delTokens, sdk.Unbonded, val3, true)
 	require.NoError(t, err)
 
 	_ = staking.EndBlocker(ctx, sk)
@@ -405,7 +405,7 @@ func TestTallyValidatorMultipleDelegations(t *testing.T) {
 	val2, found := sk.GetValidator(ctx, valOpAddr2)
 	require.True(t, found)
 
-	_, err := sk.Delegate(ctx, valAccAddr1, delTokens, sdk.Unbonded, val2, true)
+	_, err := sk.Delegate(ctx, valAccAddr1, staking.BondingDelOpType, delTokens, sdk.Unbonded, val2, true)
 	require.NoError(t, err)
 
 	tp := TestProposal
@@ -430,7 +430,73 @@ func TestTallyValidatorMultipleDelegations(t *testing.T) {
 	expectedAbstain := sdk.TokensFromConsensusPower(0)
 	expectedNo := sdk.TokensFromConsensusPower(10)
 	expectedNoWithVeto := sdk.TokensFromConsensusPower(0)
-	expectedTallyResult := types.NewTallyResult(expectedYes, expectedAbstain, expectedNo, expectedNoWithVeto)
+	expectedTallyResult := types.NewTallyResult(expectedYes, expectedAbstain, expectedNo, expectedNoWithVeto, sdk.ZeroInt())
+
+	require.True(t, tallyResults.Equals(expectedTallyResult))
+}
+
+func TestTallyValidatorWithLPDelegation(t *testing.T) {
+	// 3 validators with the same amount of bonding tokens
+	ctx, ak, keeper, sk, _ := createTestInput(t, false, 100)
+	createValidators(ctx, sk, []int64{10, 10, 10})
+
+	// add delegator some LPs
+	{
+		tokens := sdk.TokensFromConsensusPower(10)
+		coin := sdk.NewCoin(sdk.DefaultLiquidityDenom, tokens)
+		del := ak.GetAccount(ctx, delAddr1)
+		err := del.SetCoins(del.GetCoins().Add(coin))
+		require.NoError(t, err)
+		ak.SetAccount(ctx, del)
+	}
+
+	// delegate validator 2 some LPs
+	{
+		delTokens := sdk.TokensFromConsensusPower(10)
+		val2, found := sk.GetValidator(ctx, valOpAddr2)
+		require.True(t, found)
+
+		_, err := sk.Delegate(ctx, delAddr1, staking.LiquidityDelOpType, delTokens, sdk.Unbonded, val2, true)
+		require.NoError(t, err)
+	}
+
+	// create a proposal
+	var proposalID uint64
+	{
+		tp := TestProposal
+		proposal, err := keeper.SubmitProposal(ctx, tp)
+		require.NoError(t, err)
+		proposal.Status = types.StatusVotingPeriod
+		keeper.SetProposal(ctx, proposal)
+
+		proposalID = proposal.ProposalID
+	}
+
+	// vote
+	{
+		require.NoError(t, keeper.AddVote(ctx, proposalID, valAccAddr1, types.OptionYes))
+		require.NoError(t, keeper.AddVote(ctx, proposalID, valAccAddr2, types.OptionNo))
+		require.NoError(t, keeper.AddVote(ctx, proposalID, valAccAddr3, types.OptionYes))
+	}
+
+	// check tally
+	//  Val1 -> YES: 10 Bonds
+	//  Val2 -> NO:  10 Bonds + 10 LPs
+	//  Val3 -> YES: 10 Bonds
+	//  Failed as 50/50, but NOs wins
+	proposal, ok := keeper.GetProposal(ctx, proposalID)
+	require.True(t, ok)
+	passes, burnDeposits, tallyResults := keeper.Tally(ctx, proposal)
+
+	require.False(t, passes)
+	require.False(t, burnDeposits)
+
+	expectedYes := sdk.TokensFromConsensusPower(20)
+	expectedAbstain := sdk.TokensFromConsensusPower(0)
+	expectedNo := sdk.TokensFromConsensusPower(20)
+	expectedNoWithVeto := sdk.TokensFromConsensusPower(0)
+	expectedTotal := sdk.TokensFromConsensusPower(40)
+	expectedTallyResult := types.NewTallyResult(expectedYes, expectedAbstain, expectedNo, expectedNoWithVeto, expectedTotal)
 
 	require.True(t, tallyResults.Equals(expectedTallyResult))
 }

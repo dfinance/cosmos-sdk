@@ -90,6 +90,8 @@ var (
 	NewMsgWithdrawValidatorCommission          = types.NewMsgWithdrawValidatorCommission
 	NewMsgFundPublicTreasuryPool               = types.NewMsgFundPublicTreasuryPool
 	NewMsgWithdrawFoundationPool               = types.NewMsgWithdrawFoundationPool
+	NewMsgLockValidatorRewards                 = types.NewMsgLockValidatorRewards
+	NewMsgDisableLockedRewardsAutoRenewal      = types.NewMsgDisableLockedRewardsAutoRenewal
 	NewPublicTreasuryPoolSpendProposal         = types.NewPublicTreasuryPoolSpendProposal
 	NewTaxParamsUpdateProposal                 = types.NewTaxParamsUpdateProposal
 	NewQueryValidatorOutstandingRewardsParams  = types.NewQueryValidatorOutstandingRewardsParams
@@ -160,6 +162,8 @@ type (
 	MsgWithdrawDelegatorReward             = types.MsgWithdrawDelegatorReward
 	MsgWithdrawValidatorCommission         = types.MsgWithdrawValidatorCommission
 	MsgWithdrawFoundationPool              = types.MsgWithdrawFoundationPool
+	MsgLockValidatorRewards                = types.MsgLockValidatorRewards
+	MsgDisableLockedRewardsAutoRenewal     = types.MsgDisableLockedRewardsAutoRenewal
 	PublicTreasuryPoolSpendProposal        = types.PublicTreasuryPoolSpendProposal
 	TaxParamsUpdateProposal                = types.TaxParamsUpdateProposal
 	QueryValidatorOutstandingRewardsParams = types.QueryValidatorOutstandingRewardsParams
@@ -169,6 +173,8 @@ type (
 	QueryDelegatorParams                   = types.QueryDelegatorParams
 	QueryDelegatorWithdrawAddrParams       = types.QueryDelegatorWithdrawAddrParams
 	QueryDelegatorTotalRewardsResponse     = types.QueryDelegatorTotalRewardsResponse
+	QueryLockedRewardsStateParams          = types.QueryLockedRewardsStateParams
+	QueryLockedRewardsStateResponse        = types.QueryLockedRewardsStateResponse
 	DelegationDelegatorReward              = types.DelegationDelegatorReward
 	ValidatorHistoricalRewards             = types.ValidatorHistoricalRewards
 	ValidatorCurrentRewards                = types.ValidatorCurrentRewards

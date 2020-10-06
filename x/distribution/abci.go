@@ -17,22 +17,30 @@ func BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock, k keeper.Keeper, 
 	// process the rewards unlock queue here as distributionPower might change
 	k.ProcessAllMatureRewardsUnlockQueueItems(ctx)
 
-	// determine the total distribution power signing the block
-	// override voter's power with distribution power
-	var previousTotalPower, previousProposerPower int64
+	// get LPRatioCoef
+	lpRatio := k.GetValidatorLPDistrRatio(ctx)
+
+	// determine the total distribution power signing the block, override voter's power with distribution power
+	// determine the total LP power and voter's LP power to ABCIVote
+	var previousTotalDistrPower, previousProposerDistrPower, previousProposerLPPower int64
+	var previousTotalLPPower int64
 	abciVotes := make(ABCIVotes, 0, len(consVotes))
 	for _, consVote := range consVotes {
 		validator := k.ValidatorByConsAddr(ctx, consVote.Validator.Address)
-		distrPower := k.GetDistributionPower(ctx, validator.GetOperator(), consVote.Validator.Power)
+		distrPower, lpPower := k.GetDistributionPower(ctx, validator.GetOperator(), consVote.Validator.Power, validator.LPPower(), lpRatio)
 
-		previousTotalPower += distrPower
+		previousTotalDistrPower += distrPower
+		previousTotalLPPower += lpPower
+
 		if consVote.SignedLastBlock {
-			previousProposerPower += distrPower
+			previousProposerDistrPower += distrPower
+			previousProposerLPPower += lpPower
 		}
 
 		abciVotes = append(abciVotes, ABCIVote{
 			Validator:         validator,
 			DistributionPower: distrPower,
+			LPPower:           lpPower,
 			SignedLastBlock:   consVote.SignedLastBlock,
 		})
 	}
@@ -46,7 +54,7 @@ func BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock, k keeper.Keeper, 
 
 		previousProposer := k.GetPreviousProposerConsAddr(ctx)
 
-		k.AllocateTokens(ctx, previousProposerPower, previousTotalPower, previousProposer, abciVotes, dynamicFoundationPoolTax)
+		k.AllocateTokens(ctx, previousProposerDistrPower, previousProposerLPPower, previousTotalDistrPower, previousTotalLPPower, previousProposer, abciVotes, dynamicFoundationPoolTax)
 	}
 
 	// record the proposer for when we payout on the next block

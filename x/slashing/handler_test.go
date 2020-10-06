@@ -228,7 +228,7 @@ func TestHandleAbsentValidator(t *testing.T) {
 	slashAmt := amt.ToDec().Mul(keeper.SlashFractionDowntime(ctx)).RoundInt64()
 
 	// validator should have been slashed
-	require.Equal(t, amt.Int64()-slashAmt, validator.GetTokens().Int64())
+	require.Equal(t, amt.Int64()-slashAmt, validator.GetBondingTokens().Int64())
 
 	// 502nd block *also* missed (since the LastCommit would have still included the just-unbonded validator)
 	height++
@@ -244,7 +244,7 @@ func TestHandleAbsentValidator(t *testing.T) {
 
 	// validator should not have been slashed any more, since it was already jailed
 	validator, _ = sk.GetValidatorByConsAddr(ctx, sdk.GetConsAddress(val))
-	require.Equal(t, amt.Int64()-slashAmt, validator.GetTokens().Int64())
+	require.Equal(t, amt.Int64()-slashAmt, validator.GetBondingTokens().Int64())
 
 	// unrevocation should fail prior to jail expiration
 	res, err = slh(ctx, types.NewMsgUnjail(addr))

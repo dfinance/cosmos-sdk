@@ -84,10 +84,21 @@ func CanWithdrawInvariant(k Keeper) sdk.Invariant {
 		k.stakingKeeper.IterateValidators(ctx, func(_ int64, val exported.ValidatorI) (stop bool) {
 			_, _ = k.WithdrawValidatorCommission(ctx, val.GetOperator())
 
+			valRewardsAreLocked := false
+			if state, found := k.GetValidatorLockedState(ctx, val.GetOperator()); found {
+				valRewardsAreLocked = state.IsLocked()
+			}
+
 			delegationAddrs, ok := valDelegationAddrs[val.GetOperator().String()]
 			if ok {
 				for _, delAddr := range delegationAddrs {
 					if _, err := k.WithdrawDelegationRewards(ctx, delAddr, val.GetOperator()); err != nil {
+						if types.ErrWithdrawLocked.Is(err) {
+							if valRewardsAreLocked {
+								continue
+							}
+							panic(fmt.Errorf("withdraw delegator %s rewards invariant: invalid locked state", delAddr))
+						}
 						panic(err)
 					}
 				}

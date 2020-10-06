@@ -2,10 +2,12 @@ package keeper
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/distribution/types"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 )
 
@@ -44,7 +46,7 @@ func TestCalculateRewardsBasic(t *testing.T) {
 	require.Equal(t, uint64(2), k.GetValidatorHistoricalReferenceCount(ctx))
 
 	// calculate delegation rewards
-	rewards := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	rewards, _ := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
 
 	// rewards should be zero
 	require.True(t, rewards.IsZero())
@@ -52,13 +54,13 @@ func TestCalculateRewardsBasic(t *testing.T) {
 	// allocate some rewards
 	initial := int64(10)
 	tokens := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial)}}
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// end period
 	endingPeriod = k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards
-	rewards = k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del, endingPeriod)
 
 	// rewards should be half the tokens
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial / 2)}}, rewards)
@@ -97,7 +99,7 @@ func TestCalculateRewardsAfterSlash(t *testing.T) {
 	endingPeriod := k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards
-	rewards := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	rewards, _ := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
 
 	// rewards should be zero
 	require.True(t, rewards.IsZero())
@@ -117,13 +119,13 @@ func TestCalculateRewardsAfterSlash(t *testing.T) {
 	// allocate some rewards
 	initial := sdk.TokensFromConsensusPower(10)
 	tokens := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: initial.ToDec()}}
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// end period
 	endingPeriod = k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards
-	rewards = k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del, endingPeriod)
 
 	// rewards should be half the tokens
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: initial.QuoRaw(2).ToDec()}}, rewards)
@@ -163,7 +165,7 @@ func TestCalculateRewardsAfterManySlashes(t *testing.T) {
 	endingPeriod := k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards
-	rewards := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	rewards, _ := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
 
 	// rewards should be zero
 	require.True(t, rewards.IsZero())
@@ -183,7 +185,7 @@ func TestCalculateRewardsAfterManySlashes(t *testing.T) {
 	// allocate some rewards
 	initial := sdk.TokensFromConsensusPower(10)
 	tokens := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: initial.ToDec()}}
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// slash the validator by 50% again
 	sk.Slash(ctx, valConsAddr1, ctx.BlockHeight(), power/2, sdk.NewDecWithPrec(5, 1))
@@ -195,13 +197,13 @@ func TestCalculateRewardsAfterManySlashes(t *testing.T) {
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 3)
 
 	// allocate some more rewards
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// end period
 	endingPeriod = k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards
-	rewards = k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del, endingPeriod)
 
 	// rewards should be half the tokens
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: initial.ToDec()}}, rewards)
@@ -238,7 +240,7 @@ func TestCalculateRewardsMultiDelegator(t *testing.T) {
 	// allocate some rewards
 	initial := int64(20)
 	tokens := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial)}}
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// second delegation
 	msg2 := staking.NewMsgDelegate(sdk.AccAddress(valOpAddr2), valOpAddr1, sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)))
@@ -259,19 +261,19 @@ func TestCalculateRewardsMultiDelegator(t *testing.T) {
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 
 	// allocate some more rewards
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// end period
 	endingPeriod := k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards for del1
-	rewards := k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
+	rewards, _ := k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
 
 	// rewards for del1 should be 3/4 initial
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial * 3 / 4)}}, rewards)
 
 	// calculate delegation rewards for del2
-	rewards = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
 
 	// rewards for del2 should be 1/4 initial
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial * 1 / 4)}}, rewards)
@@ -326,7 +328,7 @@ func TestWithdrawDelegationRewardsBasic(t *testing.T) {
 	initial := sdk.TokensFromConsensusPower(10)
 	tokens := sdk.DecCoins{sdk.NewDecCoin(sdk.DefaultBondDenom, initial)}
 
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// historical count should be 2 (initial + latest for delegation)
 	require.Equal(t, uint64(2), k.GetValidatorHistoricalReferenceCount(ctx))
@@ -387,7 +389,7 @@ func TestCalculateRewardsAfterManySlashesInSameBlock(t *testing.T) {
 	endingPeriod := k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards
-	rewards := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	rewards, _ := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
 
 	// rewards should be zero
 	require.True(t, rewards.IsZero())
@@ -398,7 +400,7 @@ func TestCalculateRewardsAfterManySlashesInSameBlock(t *testing.T) {
 	// allocate some rewards
 	initial := sdk.TokensFromConsensusPower(10).ToDec()
 	tokens := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: initial}}
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// slash the validator by 50%
 	sk.Slash(ctx, valConsAddr1, ctx.BlockHeight(), power, sdk.NewDecWithPrec(5, 1))
@@ -413,13 +415,13 @@ func TestCalculateRewardsAfterManySlashesInSameBlock(t *testing.T) {
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 3)
 
 	// allocate some more rewards
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// end period
 	endingPeriod = k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards
-	rewards = k.calculateDelegationRewards(ctx, val, del, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del, endingPeriod)
 
 	// rewards should be half the tokens
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: initial}}, rewards)
@@ -456,7 +458,7 @@ func TestCalculateRewardsMultiDelegatorMultiSlash(t *testing.T) {
 	// allocate some rewards
 	initial := sdk.TokensFromConsensusPower(30).ToDec()
 	tokens := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: initial}}
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// slash the validator
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 3)
@@ -481,7 +483,7 @@ func TestCalculateRewardsMultiDelegatorMultiSlash(t *testing.T) {
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 
 	// allocate some more rewards
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// slash the validator again
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 3)
@@ -495,13 +497,13 @@ func TestCalculateRewardsMultiDelegatorMultiSlash(t *testing.T) {
 	endingPeriod := k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards for del1
-	rewards := k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
+	rewards, _ := k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
 
 	// rewards for del1 should be 2/3 initial (half initial first period, 1/6 initial second period)
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: initial.QuoInt64(2).Add(initial.QuoInt64(6))}}, rewards)
 
 	// calculate delegation rewards for del2
-	rewards = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
 
 	// rewards for del2 should be initial / 3
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: initial.QuoInt64(3)}}, rewards)
@@ -542,7 +544,7 @@ func TestCalculateRewardsMultiDelegatorMultWithdraw(t *testing.T) {
 	del1 := sk.Delegation(ctx, sdk.AccAddress(valOpAddr1), valOpAddr1)
 
 	// allocate some rewards
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// historical count should be 2 (validator init, delegation init)
 	require.Equal(t, uint64(2), k.GetValidatorHistoricalReferenceCount(ctx))
@@ -567,7 +569,7 @@ func TestCalculateRewardsMultiDelegatorMultWithdraw(t *testing.T) {
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 
 	// allocate some more rewards
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// first delegator withdraws
 	k.WithdrawDelegationRewards(ctx, sdk.AccAddress(valOpAddr1), valOpAddr1)
@@ -585,13 +587,13 @@ func TestCalculateRewardsMultiDelegatorMultWithdraw(t *testing.T) {
 	endingPeriod := k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards for del1
-	rewards := k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
+	rewards, _ := k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
 
 	// rewards for del1 should be zero
 	require.True(t, rewards.IsZero())
 
 	// calculate delegation rewards for del2
-	rewards = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
 
 	// rewards for del2 should be zero
 	require.True(t, rewards.IsZero())
@@ -603,7 +605,7 @@ func TestCalculateRewardsMultiDelegatorMultWithdraw(t *testing.T) {
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 
 	// allocate some more rewards
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// first delegator withdraws again
 	k.WithdrawDelegationRewards(ctx, sdk.AccAddress(valOpAddr1), valOpAddr1)
@@ -612,13 +614,13 @@ func TestCalculateRewardsMultiDelegatorMultWithdraw(t *testing.T) {
 	endingPeriod = k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards for del1
-	rewards = k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
 
 	// rewards for del1 should be zero
 	require.True(t, rewards.IsZero())
 
 	// calculate delegation rewards for del2
-	rewards = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
 
 	// rewards for del2 should be 1/4 initial
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial / 4)}}, rewards)
@@ -630,7 +632,7 @@ func TestCalculateRewardsMultiDelegatorMultWithdraw(t *testing.T) {
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 
 	// allocate some more rewards
-	k.AllocateTokensToValidator(ctx, val, tokens)
+	k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 	// withdraw commission
 	k.WithdrawValidatorCommission(ctx, valOpAddr1)
@@ -639,13 +641,13 @@ func TestCalculateRewardsMultiDelegatorMultWithdraw(t *testing.T) {
 	endingPeriod = k.incrementValidatorPeriod(ctx, val)
 
 	// calculate delegation rewards for del1
-	rewards = k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del1, endingPeriod)
 
 	// rewards for del1 should be 1/4 initial
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial / 4)}}, rewards)
 
 	// calculate delegation rewards for del2
-	rewards = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
+	rewards, _ = k.calculateDelegationRewards(ctx, val, del2, endingPeriod)
 
 	// rewards for del2 should be 1/2 initial
 	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial / 2)}}, rewards)
@@ -691,7 +693,7 @@ func TestRewardsBank(t *testing.T) {
 	// allocate some rewards
 	{
 		tokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(10))}
-		k.AllocateTokensToValidator(ctx, val, tokens)
+		k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 	}
 
 	// pre delegation checks
@@ -767,7 +769,7 @@ func TestRewardsBank(t *testing.T) {
 		del = sk.Delegation(ctx, del.GetDelegatorAddr(), del.GetValidatorAddr())
 
 		tokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(10))}
-		k.AllocateTokensToValidator(ctx, val, tokens)
+		k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 		// check accumulated delegation bank rewards are not empty
 		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
@@ -776,7 +778,7 @@ func TestRewardsBank(t *testing.T) {
 		// check current validator delegation rewards are not empty
 		cacheCtx, _ := ctx.CacheContext()
 		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
-		curRewards := k.calculateDelegationRewards(cacheCtx, val, del, endingPeriod)
+		curRewards, _ := k.calculateDelegationRewards(cacheCtx, val, del, endingPeriod)
 		require.False(t, curRewards.Empty())
 	}
 
@@ -808,7 +810,7 @@ func TestRewardsBank(t *testing.T) {
 		// total delegator rewards should be empty
 		cacheCtx, _ := ctx.CacheContext()
 		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
-		curRewards := k.calculateDelegationRewards(cacheCtx, val, del, endingPeriod)
+		curRewards, _ := k.calculateDelegationRewards(cacheCtx, val, del, endingPeriod)
 		require.True(t, curRewards.Empty())
 	}
 
@@ -874,7 +876,7 @@ func TestRewardsBankUndelegatingToZero(t *testing.T) {
 	// allocate some rewards
 	{
 		tokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(10))}
-		k.AllocateTokensToValidator(ctx, val, tokens)
+		k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 	}
 
 	// undelegate twice (till zero)
@@ -898,4 +900,326 @@ func TestRewardsBankUndelegatingToZero(t *testing.T) {
 		_, err := k.WithdrawDelegationRewards(ctx, delAddr, val.GetOperator())
 		require.Error(t, err)
 	}
+}
+
+// Test rewards distribution with LP stakes.
+func TestLPRewardsWithLock(t *testing.T) {
+	initPower := int64(1000)
+	ctx, ak, k, sk, spk := CreateTestInputDefault(t, false, initPower)
+	sh := staking.NewHandler(sk)
+
+	allocateRewards := func(amtPower int64, distrPowerCmp, lpPowerCmp int) {
+		// get validator 1 params
+		val1, found := sk.GetValidator(ctx, valOpAddr1)
+		require.True(t, found)
+		distrPower1, lpPower1 := k.GetDistributionPower(ctx, val1.GetOperator(), val1.ConsensusPower(), val1.LPPower(), sk.LPDistrRatio(ctx))
+
+		// get validator 2 params
+		val2, found := sk.GetValidator(ctx, valOpAddr2)
+		require.True(t, found)
+		distrPower2, lpPower2 := k.GetDistributionPower(ctx, val2.GetOperator(), val2.ConsensusPower(), val2.LPPower(), sk.LPDistrRatio(ctx))
+
+		switch distrPowerCmp {
+		case -1:
+			require.Greater(t, distrPower1, distrPower2)
+		case 0:
+			require.Equal(t, distrPower1, distrPower2)
+		case 1:
+			require.Greater(t, distrPower2, distrPower1)
+		}
+
+		switch lpPowerCmp {
+		case -1:
+			require.Greater(t, lpPower1, lpPower2)
+		case 0:
+			require.Equal(t, lpPower1, lpPower2)
+		case 1:
+			require.Greater(t, lpPower2, lpPower1)
+		}
+
+		// build votes
+		abciVotes := types.ABCIVotes{
+			{
+				Validator:         val1,
+				DistributionPower: distrPower1,
+				LPPower:           lpPower1,
+				SignedLastBlock:   false,
+			},
+			{
+				Validator:         val2,
+				DistributionPower: distrPower2,
+				LPPower:           lpPower2,
+				SignedLastBlock:   false,
+			},
+		}
+
+		// set minted amount
+		coin := sdk.NewCoin(sdk.DefaultBondDenom, sdk.TokensFromConsensusPower(amtPower))
+		feeCollector := spk.GetModuleAccount(ctx, k.feeCollectorName)
+		err := feeCollector.SetCoins(sdk.NewCoins(coin))
+		require.NoError(t, err)
+		spk.SetModuleAccount(ctx, feeCollector)
+
+		// allocate
+		k.AllocateTokens(
+			ctx,
+			distrPower1, lpPower1,
+			distrPower1+distrPower2,
+			lpPower1+lpPower2,
+			val1.GetConsAddr(),
+			abciVotes,
+			sdk.ZeroDec(),
+		)
+	}
+
+	getRewards := func(delAddr sdk.AccAddress, valAddr sdk.ValAddress) sdk.DecCoins {
+		ctxCache, _ := ctx.CacheContext()
+
+		val := sk.Validator(ctxCache, valAddr)
+		require.NotNil(t, val)
+
+		del := sk.Delegation(ctxCache, delAddr, valAddr)
+		require.NotNil(t, del)
+
+		endingPeriod := k.incrementValidatorPeriod(ctxCache, val)
+		rewards := k.calculateDelegationTotalRewards(ctxCache, val, del, endingPeriod)
+		if rewards == nil {
+			return sdk.DecCoins{}
+		}
+
+		return rewards
+	}
+
+	endBlock := func() {
+		staking.EndBlocker(ctx, sk)
+		ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
+	}
+
+	checkInvariants := func() {
+		msg, broken := AllInvariants(k)(ctx)
+		require.False(t, broken, msg)
+	}
+
+	// set proposer rewards to zero (for equal rewards distribution)
+	params := k.GetParams(ctx)
+	params.BaseProposerReward = sdk.ZeroDec()
+	params.BonusProposerReward = sdk.ZeroDec()
+	k.SetParams(ctx, params)
+
+	// add LPs to delegators
+	{
+		initTokens := sdk.TokensFromConsensusPower(initPower)
+		coin := sdk.NewCoin(sk.LPDenom(ctx), initTokens)
+
+		del1 := ak.GetAccount(ctx, delAddr1)
+		err := del1.SetCoins(del1.GetCoins().Add(coin))
+		require.NoError(t, err)
+		ak.SetAccount(ctx, del1)
+
+		del2 := ak.GetAccount(ctx, delAddr2)
+		err = del2.SetCoins(del2.GetCoins().Add(coin))
+		require.NoError(t, err)
+		ak.SetAccount(ctx, del2)
+	}
+
+	// create validators
+	{
+		commission := staking.NewCommissionRates(sdk.NewDecWithPrec(1, 1), sdk.NewDecWithPrec(1, 1), sdk.NewDec(0))
+		selfDelCoin := sdk.NewCoin(sdk.DefaultBondDenom, sdk.TokensFromConsensusPower(100))
+
+		msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1, selfDelCoin, staking.Description{}, commission, minSelfDelegation)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = staking.NewMsgCreateValidator(valOpAddr2, valConsPk2, selfDelCoin, staking.Description{}, commission, minSelfDelegation)
+		res, err = sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		endBlock()
+	}
+	checkInvariants()
+
+	// delegate bonding tokens by two delegator to both validators
+	{
+		delTokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.TokensFromConsensusPower(10))
+
+		msg := staking.NewMsgDelegate(delAddr1, valOpAddr1, delTokens)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = staking.NewMsgDelegate(delAddr2, valOpAddr2, delTokens)
+		res, err = sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		endBlock()
+	}
+	checkInvariants()
+
+	// distribute rewards (LPPool shouldn't be distributed)
+	{
+		// distr and LP powers should be equal
+		allocateRewards(10, 0, 0)
+		endBlock()
+
+		// check LPPool wasn't distributed
+		pools := k.GetRewardPools(ctx)
+		require.True(t, pools.LiquidityProvidersPool.IsAllPositive())
+
+		// check delegators have rewards
+		del1Rewards := getRewards(delAddr1, valOpAddr1)
+		require.True(t, del1Rewards.IsAllPositive())
+
+		del2Rewards := getRewards(delAddr2, valOpAddr2)
+		require.True(t, del2Rewards.IsAllPositive())
+
+		// ...and they are equal, as all shares are the same
+		require.True(t, del1Rewards.IsEqual(del2Rewards), "%s / %s", del1Rewards.String(), del2Rewards.String())
+	}
+	checkInvariants()
+
+	// delegate LP tokens by two delegator to both validators
+	{
+		delTokens := sdk.NewCoin(sdk.DefaultLiquidityDenom, sdk.TokensFromConsensusPower(10))
+
+		msg := staking.NewMsgDelegate(delAddr1, valOpAddr1, delTokens)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = staking.NewMsgDelegate(delAddr2, valOpAddr2, delTokens)
+		res, err = sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		endBlock()
+	}
+	checkInvariants()
+
+	// distribute rewards (LPPool should be distributed)
+	{
+		// distr and LP powers should be equal
+		allocateRewards(10, 0, 0)
+		endBlock()
+
+		// check LPPool was distributed
+		pools := k.GetRewardPools(ctx)
+		require.True(t, pools.LiquidityProvidersPool.IsZero())
+
+		// check delegators have rewards
+		del1Rewards := getRewards(delAddr1, valOpAddr1)
+		require.True(t, del1Rewards.IsAllPositive())
+
+		del2Rewards := getRewards(delAddr2, valOpAddr2)
+		require.True(t, del2Rewards.IsAllPositive())
+
+		// ...and they are equal, as all shares are the same
+		require.True(t, del1Rewards.IsEqual(del2Rewards), "%s / %s", del1Rewards.String(), del2Rewards.String())
+	}
+	checkInvariants()
+
+	// rebalance distribution by raising delegator 1 LP shares (delegator 1 is a winner now)
+	{
+		delTokens := sdk.NewCoin(sdk.DefaultLiquidityDenom, sdk.TokensFromConsensusPower(10))
+
+		msg := staking.NewMsgDelegate(delAddr1, valOpAddr1, delTokens)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		endBlock()
+	}
+	checkInvariants()
+
+	// distribute rewards and check rewards are not the same
+	{
+		// as validator 1 has more LPs now, its power should be higher
+		// the same for LP power
+		// distr powers should be the same, but validator 1 has more LPs now
+		allocateRewards(10, -1, -1)
+		endBlock()
+
+		// check LPPool was distributed
+		pools := k.GetRewardPools(ctx)
+		require.True(t, pools.LiquidityProvidersPool.IsZero())
+
+		// check delegators have rewards
+		del1Rewards := getRewards(delAddr1, valOpAddr1)
+		require.True(t, del1Rewards.IsAllPositive())
+
+		del2Rewards := getRewards(delAddr2, valOpAddr2)
+		require.True(t, del2Rewards.IsAllPositive())
+
+		require.True(t, del1Rewards.AmountOf(sdk.DefaultBondDenom).GT(del2Rewards.AmountOf(sdk.DefaultBondDenom)), "%s / %s", del1Rewards.String(), del2Rewards.String())
+	}
+	checkInvariants()
+
+	// rebalance distribution by locking validator 2 rewards
+	var unlockTime time.Time
+	{
+		ut, err := k.LockValidatorRewards(ctx, valOpAddr2)
+		require.NoError(t, err)
+		unlockTime = ut
+	}
+	checkInvariants()
+
+	// distribute rewards and check rewards are not the same
+	{
+		// due to locking validator 2 distr power should be higher
+		// locking should increase validator 2 power, but validator 1 should be a winner still
+		allocateRewards(10, 1, -1)
+		endBlock()
+
+		// check LPPool was distributed
+		pools := k.GetRewardPools(ctx)
+		require.True(t, pools.LiquidityProvidersPool.IsZero())
+
+		// check delegators have rewards
+		del1Rewards := getRewards(delAddr1, valOpAddr1)
+		require.True(t, del1Rewards.IsAllPositive())
+
+		del2Rewards := getRewards(delAddr2, valOpAddr2)
+		require.True(t, del2Rewards.IsAllPositive())
+	}
+	checkInvariants()
+
+	// withdraw delegator 1 rewards
+	{
+		coins, err := k.WithdrawDelegationRewards(ctx, delAddr1, valOpAddr1)
+		require.NoError(t, err)
+		require.True(t, coins.IsAllPositive())
+
+		// withdraw more (no rewards left)
+		coins, err = k.WithdrawDelegationRewards(ctx, delAddr1, valOpAddr1)
+		require.NoError(t, err)
+		require.True(t, coins.IsZero())
+	}
+	checkInvariants()
+
+	// withdraw delegator 2 rewards
+	{
+		_, err := k.WithdrawDelegationRewards(ctx, delAddr2, valOpAddr2)
+		require.Error(t, err)
+
+		// disable auto-lock
+		err = k.DisableLockedRewardsAutoRenewal(ctx, valOpAddr2)
+		require.NoError(t, err)
+
+		// emulate lock stop
+		ctx = ctx.WithBlockTime(unlockTime)
+		k.ProcessAllMatureRewardsUnlockQueueItems(ctx)
+
+		coins, err := k.WithdrawDelegationRewards(ctx, delAddr2, valOpAddr2)
+		require.NoError(t, err)
+		require.True(t, coins.IsAllPositive())
+
+		// withdraw more (no rewards left)
+		coins, err = k.WithdrawDelegationRewards(ctx, delAddr2, valOpAddr2)
+		require.NoError(t, err)
+		require.True(t, coins.IsZero())
+	}
+	checkInvariants()
 }

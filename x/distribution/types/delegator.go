@@ -14,17 +14,20 @@ import (
 type DelegatorStartingInfo struct {
 	// Period at which the delegation should withdraw starting from
 	PreviousPeriod uint64 `json:"previous_period" yaml:"previous_period"`
-	// Amount of staking token delegated
-	Stake sdk.Dec `json:"stake" yaml:"stake"`
+	// Amount of staking bonding tokens delegated
+	BondingStake sdk.Dec `json:"bonding_stake" yaml:"bonding_stake"`
+	// Amount of staking LP tokens delegated
+	LPStake sdk.Dec `json:"lp_stake" yaml:"lp_stake"`
 	// Height at which delegation was created
 	Height uint64 `json:"creation_height" yaml:"creation_height"`
 }
 
 // create a new DelegatorStartingInfo
-func NewDelegatorStartingInfo(previousPeriod uint64, stake sdk.Dec, height uint64) DelegatorStartingInfo {
+func NewDelegatorStartingInfo(previousPeriod uint64, bondingStake, lpStake sdk.Dec, height uint64) DelegatorStartingInfo {
 	return DelegatorStartingInfo{
 		PreviousPeriod: previousPeriod,
-		Stake:          stake,
+		BondingStake:   bondingStake,
+		LPStake:        lpStake,
 		Height:         height,
 	}
 }

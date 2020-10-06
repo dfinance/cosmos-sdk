@@ -100,8 +100,7 @@ func GetLastValidatorPowerKey(operator sdk.ValAddress) []byte {
 // get the power ranking of a validator
 // NOTE the larger values are of higher value
 func getValidatorPowerRank(validator Validator) []byte {
-
-	consensusPower := sdk.TokensToConsensusPower(validator.Tokens)
+	consensusPower := sdk.TokensToConsensusPower(validator.GetBondingTokens())
 	consensusPowerBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(consensusPowerBytes, uint64(consensusPower))
 

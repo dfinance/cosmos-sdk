@@ -43,6 +43,7 @@ var (
 	KeyInfPwrBondedLockedRatio        = types.KeyInfPwrBondedLockedRatio
 	KeyFoundationAllocationRatio      = types.KeyFoundationAllocationRatio
 	KeyAvgBlockTimeWindow             = types.KeyAvgBlockTimeWindow
+	KeyStakingTotalSupplyShift        = types.KeyStakingTotalSupplyShift
 	FoundationAllocationRatioMaxValue = types.FoundationAllocationRatioMaxValue
 )
 

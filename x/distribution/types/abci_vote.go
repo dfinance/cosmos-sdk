@@ -7,6 +7,7 @@ import "github.com/cosmos/cosmos-sdk/x/staking"
 type ABCIVote struct {
 	Validator         staking.ValidatorI
 	DistributionPower int64
+	LPPower           int64
 	SignedLastBlock   bool
 }
 

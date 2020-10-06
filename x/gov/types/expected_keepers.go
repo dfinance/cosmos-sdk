@@ -33,6 +33,9 @@ type StakingKeeper interface {
 		sdk.Context, func(index int64, validator stakingexported.ValidatorI) (stop bool),
 	)
 
+	// LP tokens voting power ratio
+	LPDistrRatio(sdk.Context) sdk.Dec
+
 	TotalBondedTokens(sdk.Context) sdk.Int // total bonded tokens within the validator set
 	IterateDelegations(
 		ctx sdk.Context, delegator sdk.AccAddress,

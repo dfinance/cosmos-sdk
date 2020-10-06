@@ -101,7 +101,7 @@ func SimulateMsgUnjail(ak types.AccountKeeper, k keeper.Keeper, sk stakingkeeper
 		// - self delegation too low
 		if info.Tombstoned ||
 			ctx.BlockHeader().Time.Before(info.JailedUntil) ||
-			validator.TokensFromShares(selfDel.GetShares()).TruncateInt().LT(validator.GetMinSelfDelegation()) {
+			validator.BondingTokensFromShares(selfDel.GetBondingShares()).TruncateInt().LT(validator.GetMinSelfDelegation()) {
 			if res != nil && err == nil {
 				if info.Tombstoned {
 					return simulation.NewOperationMsg(msg, true, ""), nil, errors.New("validator should not have been unjailed if validator tombstoned")
@@ -109,7 +109,7 @@ func SimulateMsgUnjail(ak types.AccountKeeper, k keeper.Keeper, sk stakingkeeper
 				if ctx.BlockHeader().Time.Before(info.JailedUntil) {
 					return simulation.NewOperationMsg(msg, true, ""), nil, errors.New("validator unjailed while validator still in jail period")
 				}
-				if validator.TokensFromShares(selfDel.GetShares()).TruncateInt().LT(validator.GetMinSelfDelegation()) {
+				if validator.BondingTokensFromShares(selfDel.GetBondingShares()).TruncateInt().LT(validator.GetMinSelfDelegation()) {
 					return simulation.NewOperationMsg(msg, true, ""), nil, errors.New("validator unjailed even though self-delegation too low")
 				}
 			}

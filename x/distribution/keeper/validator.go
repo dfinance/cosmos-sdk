@@ -10,11 +10,53 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking/exported"
 )
 
-// GetDistributionPower calculates distribution power based on validator stakingPower and lockedRewards ratio.
-func (k Keeper) GetDistributionPower(ctx sdk.Context, valAddr sdk.ValAddress, stakingPower int64) int64 {
+// GetDistributionPower calculates distribution power based on:
+//   * validator consensus power (bonded tokens);
+//   * validator liquidity providers power (staked LP tokens);
+//   * consPower / lpPower relation coef;
+//   * lockedRewards ratio;
+// Also returns weighted LP power for validator (includes locking ratio).
+func (k Keeper) GetDistributionPower(ctx sdk.Context, valAddr sdk.ValAddress,
+	valConsPower, valLPPower int64, lpRatio sdk.Dec,
+) (weightedDistrPower, weightedLPPower int64) {
+
 	lockedState := k.MustGetValidatorLockedState(ctx, valAddr)
 
-	return lockedState.GetDistributionPower(stakingPower)
+	// combine consPower and lpPower with lpRatio ralation coef
+	// add locked rewards weight to DistrPower
+	weightedDistrPower = valConsPower + sdk.NewDec(valLPPower).Mul(lpRatio).TruncateInt64()
+	weightedDistrPower = lockedState.GetDistributionPower(weightedDistrPower)
+
+	// add locked rewards weight to LPPower
+	weightedLPPower = lockedState.GetDistributionPower(valLPPower)
+
+	return
+}
+
+// GetLockedBondedTokens returns locked and bonded tokens amount.
+func (k Keeper) GetLockedBondedTokens(ctx sdk.Context) sdk.Int {
+	result := sdk.ZeroInt()
+	k.IterateRewardsUnlockQueue(ctx, func(timestamp time.Time, valAddrs []sdk.ValAddress) (stop bool) {
+		for _, valAddr := range valAddrs {
+			val := k.stakingKeeper.Validator(ctx, valAddr)
+			result = result.Add(val.GetBondedTokens())
+		}
+		return false
+	})
+
+	return result
+}
+
+// LockedRatio returns locked bonded tokens to all bonded tokens relation.
+func (k Keeper) LockedRatio(ctx sdk.Context) sdk.Dec {
+	bondedTokens := k.stakingKeeper.TotalBondedTokens(ctx)
+	if bondedTokens.IsZero() {
+		return sdk.ZeroDec()
+	}
+
+	lockedTokens := k.GetLockedBondedTokens(ctx)
+
+	return lockedTokens.ToDec().Quo(bondedTokens.ToDec())
 }
 
 // LockValidatorRewards locks validator rewards.
@@ -122,10 +164,10 @@ func (k Keeper) ProcessAllMatureRewardsUnlockQueueItems(ctx sdk.Context) {
 // initializeValidator initializes rewards for a new validator.
 func (k Keeper) initializeValidator(ctx sdk.Context, val exported.ValidatorI) {
 	// set initial historical rewards (period 0) with reference count of 1
-	k.SetValidatorHistoricalRewards(ctx, val.GetOperator(), 0, types.NewValidatorHistoricalRewards(sdk.DecCoins{}, 1))
+	k.SetValidatorHistoricalRewards(ctx, val.GetOperator(), 0, types.NewValidatorHistoricalRewards(sdk.DecCoins{}, sdk.DecCoins{}, 1))
 
 	// set current rewards (starting at period 1)
-	k.SetValidatorCurrentRewards(ctx, val.GetOperator(), types.NewValidatorCurrentRewards(sdk.DecCoins{}, 1))
+	k.SetValidatorCurrentRewards(ctx, val.GetOperator(), types.NewValidatorCurrentRewards(sdk.DecCoins{}, sdk.DecCoins{}, 1))
 
 	// set accumulated commission
 	k.SetValidatorAccumulatedCommission(ctx, val.GetOperator(), types.InitialValidatorAccumulatedCommission())
@@ -145,34 +187,51 @@ func (k Keeper) incrementValidatorPeriod(ctx sdk.Context, val exported.Validator
 	// fetch current rewards
 	rewards := k.GetValidatorCurrentRewards(ctx, val.GetOperator())
 
-	// calculate current ratio
-	var current sdk.DecCoins
-	if val.GetTokens().IsZero() {
+	// calculate current bonding ratio
+	var currentBonding sdk.DecCoins
+	if val.GetBondingTokens().IsZero() {
 		// can't calculate ratio for zero-token validators
 		// ergo we instead add to the FoundationPool
-		k.AppendToFoundationPool(ctx, rewards.Rewards)
+		k.AppendToFoundationPool(ctx, rewards.BondingRewards)
 
 		outstanding := k.GetValidatorOutstandingRewards(ctx, val.GetOperator())
-		outstanding = outstanding.Sub(rewards.Rewards)
+		outstanding = outstanding.Sub(rewards.BondingRewards)
 		k.SetValidatorOutstandingRewards(ctx, val.GetOperator(), outstanding)
 
-		current = sdk.DecCoins{}
+		currentBonding = sdk.DecCoins{}
 	} else {
 		// note: necessary to truncate so we don't allow withdrawing more rewards than owed
-		current = rewards.Rewards.QuoDecTruncate(val.GetTokens().ToDec())
+		currentBonding = rewards.BondingRewards.QuoDecTruncate(val.GetBondingTokens().ToDec())
+	}
+
+	// calculate current LP ratio
+	var currentLP sdk.DecCoins
+	if val.GetLPTokens().IsZero() {
+		currentLP = sdk.DecCoins{}
+	} else {
+		currentLP = rewards.LPRewards.QuoDecTruncate(val.GetLPTokens().ToDec())
 	}
 
 	// fetch historical rewards for last period
-	historical := k.GetValidatorHistoricalRewards(ctx, val.GetOperator(), rewards.Period-1).CumulativeRewardRatio
+	historicalRewards := k.GetValidatorHistoricalRewards(ctx, val.GetOperator(), rewards.Period-1)
+	historicalBonding := historicalRewards.CumulativeBondingRewardRatio
+	historicalLP := historicalRewards.CumulativeLPRewardRatio
 
 	// decrement reference count
 	k.decrementReferenceCount(ctx, val.GetOperator(), rewards.Period-1)
 
 	// set new historical rewards with reference count of 1
-	k.SetValidatorHistoricalRewards(ctx, val.GetOperator(), rewards.Period, types.NewValidatorHistoricalRewards(historical.Add(current...), 1))
+	k.SetValidatorHistoricalRewards(ctx, val.GetOperator(), rewards.Period,
+		types.NewValidatorHistoricalRewards(
+			historicalBonding.Add(currentBonding...),
+			historicalLP.Add(currentLP...),
+			1),
+	)
 
 	// set current rewards, incrementing period by 1
-	k.SetValidatorCurrentRewards(ctx, val.GetOperator(), types.NewValidatorCurrentRewards(sdk.DecCoins{}, rewards.Period+1))
+	k.SetValidatorCurrentRewards(ctx, val.GetOperator(),
+		types.NewValidatorCurrentRewards(sdk.DecCoins{}, sdk.DecCoins{}, rewards.Period+1),
+	)
 
 	return rewards.Period
 }

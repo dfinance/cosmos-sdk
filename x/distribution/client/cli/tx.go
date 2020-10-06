@@ -52,6 +52,7 @@ func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
 		GetCmdFundPublicTreasuryPool(cdc),
 		GetCmdFoundationPoolWithdraw(cdc),
 		GetChangeFoundationAllocationRatioTxCmd(cdc),
+		GetChangeMintStakingTotalSupplyShiftParamTxCmd(cdc),
 	)...)
 
 	return distTxCmd
@@ -500,6 +501,32 @@ func GetChangeFoundationAllocationRatioTxCmd(cdc *codec.Codec) *cobra.Command {
 
 			// build and sign the transaction, then broadcast to Tendermint
 			msg := types.NewMsgSetFoundationAllocationRatio(cliCtx.GetFromAddress(), ratio)
+			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+		},
+	}
+
+	return cmd
+}
+
+// GetChangeMintStakingTotalSupplyShiftParamTxCmd will create a send tx and sign it with the given key.
+func GetChangeMintStakingTotalSupplyShiftParamTxCmd(cdc *codec.Codec) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "set-mint-stakingtotalsupplyshift-value [value]",
+		Short: "Change mint module StakingTotalSupplyShift param",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := auth.NewTxBuilderFromCLI(inBuf).WithTxEncoder(auth.DefaultTxEncoder(cdc))
+			cliCtx := context.NewCLIContextWithInput(inBuf).WithCodec(cdc)
+
+			// parse value
+			value, ok := sdk.NewIntFromString(args[0])
+			if !ok {
+				return fmt.Errorf("invalid Int value")
+			}
+
+			// build and sign the transaction, then broadcast to Tendermint
+			msg := types.NewMsgSetStakingTotalSupplyShift(cliCtx.GetFromAddress(), value)
 			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}

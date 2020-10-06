@@ -3,12 +3,13 @@ package keeper
 import (
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/x/mint"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/libs/log"
 	dbm "github.com/tendermint/tm-db"
+
+	"github.com/cosmos/cosmos-sdk/x/mint"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store"
@@ -134,6 +135,7 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 		mint.ModuleName:           nil,
 		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
 		staking.BondedPoolName:    {supply.Burner, supply.Staking},
+		staking.LiquidityPoolName: {supply.Staking},
 		types.RewardsBankPoolName: nil,
 	}
 	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bankKeeper, maccPerms)
@@ -143,12 +145,14 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, dist
 	skParams.MinSelfDelegationLvl = sdk.OneInt()
 	sk.SetParams(ctx, skParams)
 
-	mintKeeper := mint.NewKeeper(cdc, keyMint, pk.Subspace(mint.DefaultParamspace), sk, supplyKeeper, auth.FeeCollectorName)
-	mintKeeper.SetParams(ctx, mint.DefaultParams())
-
 	keeper := NewKeeper(cdc, keyDistr, pk.Subspace(types.DefaultParamspace), sk, supplyKeeper, auth.FeeCollectorName, blacklistedAddrs)
 
-	initCoins := sdk.NewCoins(sdk.NewCoin(sk.BondDenom(ctx), initTokens))
+	mintKeeper := mint.NewKeeper(cdc, keyMint, pk.Subspace(mint.DefaultParamspace), sk, keeper, supplyKeeper, auth.FeeCollectorName)
+	mintKeeper.SetParams(ctx, mint.DefaultParams())
+
+	initCoins := sdk.NewCoins(
+		sdk.NewCoin(sk.BondDenom(ctx), initTokens),
+	)
 	totalSupply := sdk.NewCoins(sdk.NewCoin(sk.BondDenom(ctx), initTokens.MulRaw(int64(len(TestAddrs)))))
 	supplyKeeper.SetSupply(ctx, supply.NewSupply(totalSupply))
 

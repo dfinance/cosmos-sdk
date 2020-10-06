@@ -45,7 +45,7 @@ func (suite *KeeperTestSuite) TestHandleDoubleSign() {
 	suite.app.SlashingKeeper.HandleValidatorSignature(ctx, val.Address(), amt.Int64(), true)
 
 	// double sign less than max age
-	oldTokens := suite.app.StakingKeeper.Validator(ctx, operatorAddr).GetTokens()
+	oldTokens := suite.app.StakingKeeper.Validator(ctx, operatorAddr).GetBondingTokens()
 	evidence := types.Equivocation{
 		Height:           0,
 		Time:             time.Unix(0, 0),
@@ -59,14 +59,14 @@ func (suite *KeeperTestSuite) TestHandleDoubleSign() {
 	suite.True(suite.app.SlashingKeeper.IsTombstoned(ctx, sdk.ConsAddress(val.Address())))
 
 	// tokens should be decreased
-	newTokens := suite.app.StakingKeeper.Validator(ctx, operatorAddr).GetTokens()
+	newTokens := suite.app.StakingKeeper.Validator(ctx, operatorAddr).GetBondingTokens()
 	suite.True(newTokens.LT(oldTokens))
 
 	// submit duplicate evidence
 	suite.keeper.HandleDoubleSign(ctx, evidence)
 
 	// tokens should be the same (capped slash)
-	suite.True(suite.app.StakingKeeper.Validator(ctx, operatorAddr).GetTokens().Equal(newTokens))
+	suite.True(suite.app.StakingKeeper.Validator(ctx, operatorAddr).GetBondingTokens().Equal(newTokens))
 
 	// jump to past the unbonding period
 	ctx = ctx.WithBlockTime(time.Unix(1, 0).Add(stakingParams.UnbondingTime))
@@ -78,7 +78,7 @@ func (suite *KeeperTestSuite) TestHandleDoubleSign() {
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 	del, _ := suite.app.StakingKeeper.GetDelegation(ctx, sdk.AccAddress(operatorAddr), operatorAddr)
 	validator, _ := suite.app.StakingKeeper.GetValidator(ctx, operatorAddr)
-	totalBond := validator.TokensFromShares(del.GetShares()).TruncateInt()
+	totalBond := validator.BondingTokensFromShares(del.GetBondingShares()).TruncateInt()
 	msgUnbond := staking.NewMsgUndelegate(sdk.AccAddress(operatorAddr), operatorAddr, sdk.NewCoin(stakingParams.BondDenom, totalBond))
 	res, err = staking.NewHandler(suite.app.StakingKeeper)(ctx, msgUnbond)
 	suite.NoError(err)

@@ -33,3 +33,8 @@ func (k Keeper) GetRewardsBankPoolAccount(ctx sdk.Context) exported.ModuleAccoun
 func (k Keeper) ValidatorByConsAddr(ctx sdk.Context, address sdk.ConsAddress) staking.ValidatorI {
 	return k.stakingKeeper.ValidatorByConsAddr(ctx, address)
 }
+
+// GetValidatorLPDistrRatio returns validator distribution power LP tokens ratio.
+func (k Keeper) GetValidatorLPDistrRatio(ctx sdk.Context) sdk.Dec {
+	return k.stakingKeeper.LPDistrRatio(ctx)
+}

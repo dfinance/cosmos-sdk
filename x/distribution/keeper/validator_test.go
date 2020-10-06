@@ -48,8 +48,8 @@ func TestLockedRewards(t *testing.T) {
 
 	// ensure distribution power is equal
 	{
-		dPower1 := k.GetDistributionPower(ctx, valOpAddr1, 100)
-		dPower2 := k.GetDistributionPower(ctx, valOpAddr2, 100)
+		dPower1, _ := k.GetDistributionPower(ctx, valOpAddr1, 100, 0, sdk.ZeroDec())
+		dPower2, _ := k.GetDistributionPower(ctx, valOpAddr2, 100, 0, sdk.ZeroDec())
 		require.Equal(t, dPower1, dPower2)
 	}
 
@@ -84,8 +84,8 @@ func TestLockedRewards(t *testing.T) {
 
 	// ensure distribution power is different
 	{
-		dPower1 := k.GetDistributionPower(ctx, valOpAddr1, 100)
-		dPower2 := k.GetDistributionPower(ctx, valOpAddr2, 100)
+		dPower1, _ := k.GetDistributionPower(ctx, valOpAddr1, 100, 0, sdk.ZeroDec())
+		dPower2, _ := k.GetDistributionPower(ctx, valOpAddr2, 100, 0, sdk.ZeroDec())
 		require.Greater(t, dPower1, dPower2)
 	}
 
@@ -125,8 +125,8 @@ func TestLockedRewards(t *testing.T) {
 
 	// ensure distribution power is equal again
 	{
-		dPower1 := k.GetDistributionPower(ctx, valOpAddr1, 100)
-		dPower2 := k.GetDistributionPower(ctx, valOpAddr2, 100)
+		dPower1, _ := k.GetDistributionPower(ctx, valOpAddr1, 100, 0, sdk.ZeroDec())
+		dPower2, _ := k.GetDistributionPower(ctx, valOpAddr2, 100, 0, sdk.ZeroDec())
 		require.Equal(t, dPower1, dPower2)
 	}
 }

@@ -118,10 +118,10 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx sdk.Context) (updates []ab
 		switch {
 		case validator.IsUnbonded():
 			validator = k.unbondedToBonded(ctx, validator)
-			amtFromNotBondedToBonded = amtFromNotBondedToBonded.Add(validator.GetTokens())
+			amtFromNotBondedToBonded = amtFromNotBondedToBonded.Add(validator.GetBondingTokens())
 		case validator.IsUnbonding():
 			validator = k.unbondingToBonded(ctx, validator)
-			amtFromNotBondedToBonded = amtFromNotBondedToBonded.Add(validator.GetTokens())
+			amtFromNotBondedToBonded = amtFromNotBondedToBonded.Add(validator.GetBondingTokens())
 		case validator.IsBonded():
 			// no state change
 		default:
@@ -150,10 +150,9 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx sdk.Context) (updates []ab
 
 	noLongerBonded := sortNoLongerBonded(last)
 	for _, valAddrBytes := range noLongerBonded {
-
 		validator := k.mustGetValidator(ctx, sdk.ValAddress(valAddrBytes))
 		validator = k.bondedToUnbonding(ctx, validator)
-		amtFromBondedToNotBonded = amtFromBondedToNotBonded.Add(validator.GetTokens())
+		amtFromBondedToNotBonded = amtFromBondedToNotBonded.Add(validator.GetBondingTokens())
 		k.DeleteLastValidatorPower(ctx, validator.GetOperator())
 		updates = append(updates, validator.ABCIValidatorUpdateZero())
 	}
@@ -289,7 +288,7 @@ func (k Keeper) bondValidator(ctx sdk.Context, validator types.Validator) types.
 	k.DeleteValidatorQueue(ctx, validator)
 
 	// trigger hook
-	k.AfterValidatorBonded(ctx, validator.ConsAddress(), validator.OperatorAddress)
+	k.AfterValidatorBonded(ctx, validator.GetConsAddr(), validator.OperatorAddress)
 
 	return validator
 }
@@ -320,7 +319,7 @@ func (k Keeper) beginUnbondingValidator(ctx sdk.Context, validator types.Validat
 	k.InsertValidatorQueue(ctx, validator)
 
 	// trigger hook
-	k.AfterValidatorBeginUnbonding(ctx, validator.ConsAddress(), validator.OperatorAddress)
+	k.AfterValidatorBeginUnbonding(ctx, validator.GetConsAddr(), validator.OperatorAddress)
 
 	return validator
 }
@@ -341,27 +340,49 @@ func (k Keeper) completeForceUnbondValidator(ctx sdk.Context, validator types.Va
 	delegations := append(state.Delegators, state.Operator)
 
 	for _, delegation := range delegations {
-		completionTime, err := k.Undelegate(ctx, delegation.Address, validator.OperatorAddress, delegation.Shares, true)
-		if err != nil {
-			panic(fmt.Errorf(
-				"force unbond delegation %s for validator %s: %v",
-				delegation.Address, validator.OperatorAddress, err),
-			)
+		var delShares sdk.Dec
+		var delOpType types.DelegationOpType
+		var eventAttrShares string
+
+		undelegateHandler := func(delAddr sdk.AccAddress) {
+			completionTime, err := k.Undelegate(ctx, delAddr, validator.OperatorAddress, delOpType, delShares, true)
+			if err != nil {
+				panic(fmt.Errorf(
+					"force unbond delegation %s (%s) for validator %s: %v",
+					delAddr, delOpType, validator.OperatorAddress, err),
+				)
+			}
+
+			ctx.EventManager().EmitEvents(sdk.Events{
+				sdk.NewEvent(
+					types.EventTypeForceUnbond,
+					sdk.NewAttribute(types.AttributeKeyValidator, validator.OperatorAddress.String()),
+					sdk.NewAttribute(eventAttrShares, delShares.String()),
+					sdk.NewAttribute(types.AttributeKeyCompletionTime, completionTime.Format(time.RFC3339)),
+				),
+				sdk.NewEvent(
+					sdk.EventTypeMessage,
+					sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
+					sdk.NewAttribute(sdk.AttributeKeySender, delAddr.String()),
+				),
+			})
 		}
 
-		ctx.EventManager().EmitEvents(sdk.Events{
-			sdk.NewEvent(
-				types.EventTypeForceUnbond,
-				sdk.NewAttribute(types.AttributeKeyValidator, validator.OperatorAddress.String()),
-				sdk.NewAttribute(sdk.AttributeKeyShare, delegation.Shares.String()),
-				sdk.NewAttribute(types.AttributeKeyCompletionTime, completionTime.Format(time.RFC3339)),
-			),
-			sdk.NewEvent(
-				sdk.EventTypeMessage,
-				sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
-				sdk.NewAttribute(sdk.AttributeKeySender, delegation.Address.String()),
-			),
-		})
+		if delegation.BondingShares.IsPositive() {
+			delShares = delegation.BondingShares
+			delOpType = types.BondingDelOpType
+			eventAttrShares = sdk.AttributeKeyBondingShare
+
+			undelegateHandler(delegation.Address)
+		}
+
+		if delegation.LPShares.IsPositive() {
+			delShares = delegation.LPShares
+			delOpType = types.LiquidityDelOpType
+			eventAttrShares = sdk.AttributeKeyLPShare
+
+			undelegateHandler(delegation.Address)
+		}
 	}
 
 	k.DeleteValidatorStakingState(ctx, validator.OperatorAddress)

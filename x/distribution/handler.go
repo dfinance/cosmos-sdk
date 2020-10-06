@@ -40,6 +40,9 @@ func NewHandler(k keeper.Keeper, mk mint.Keeper) sdk.Handler {
 		case types.MsgDisableLockedRewardsAutoRenewal:
 			return handleMsgDisableLockedRewardsAutoRenewal(ctx, msg, k)
 
+		case types.MsgSetStakingTotalSupplyShift:
+			return handleMsgSetStakingTotalSupplyShift(ctx, msg, k, mk)
+
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unrecognized distribution message type: %T", msg)
 		}
@@ -178,7 +181,6 @@ func handleMsgSetFoundationAllocationRatio(
 			break
 		}
 	}
-
 	if !hasPermission {
 		return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "operation is allowed only for foundation nominee")
 	}
@@ -196,6 +198,30 @@ func handleMsgSetFoundationAllocationRatio(
 
 	params := mk.GetParams(ctx)
 	params.FoundationAllocationRatio = msg.Ratio
+	mk.SetParams(ctx, params)
+
+	return &sdk.Result{}, nil
+}
+
+func handleMsgSetStakingTotalSupplyShift(
+	ctx sdk.Context,
+	msg types.MsgSetStakingTotalSupplyShift,
+	k keeper.Keeper,
+	mk mint.Keeper,
+) (*sdk.Result, error) {
+	hasPermission := false
+	for _, nominee := range k.GetParams(ctx).FoundationNominees {
+		if nominee.Equals(msg.FromAddress) {
+			hasPermission = true
+			break
+		}
+	}
+	if !hasPermission {
+		return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "operation is allowed only for foundation nominee")
+	}
+
+	params := mk.GetParams(ctx)
+	params.StakingTotalSupplyShift = msg.Value
 	mk.SetParams(ctx, params)
 
 	return &sdk.Result{}, nil

@@ -19,7 +19,7 @@ func (k Keeper) Unjail(ctx sdk.Context, validatorAddr sdk.ValAddress) error {
 		return types.ErrMissingSelfDelegation
 	}
 
-	if validator.TokensFromShares(selfDel.GetShares()).TruncateInt().LT(validator.GetMinSelfDelegation()) {
+	if validator.BondingTokensFromShares(selfDel.GetBondingShares()).TruncateInt().LT(validator.GetMinSelfDelegation()) {
 		return types.ErrSelfDelegationTooLowToUnjail
 	}
 
