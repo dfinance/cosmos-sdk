@@ -14,6 +14,7 @@ const (
 	QueryWithdrawAddr                = "withdraw_addr"
 	QueryPool                        = "pool"
 	QueryLockedRewardsState          = "locked_rewards_state"
+	QueryLockedRatio                 = "locked_ratio"
 )
 
 // params for query 'custom/distr/validator_outstanding_rewards'

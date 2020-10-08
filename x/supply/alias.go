@@ -19,7 +19,8 @@ const (
 	Burner       = types.Burner
 	Staking      = types.Staking
 	//
-	QueryTotalSupply = types.QueryTotalSupply
+	QueryTotalSupply   = types.QueryTotalSupply
+	QueryModuleBalance = types.QueryModuleBalance
 )
 
 var (

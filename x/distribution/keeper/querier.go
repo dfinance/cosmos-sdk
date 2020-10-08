@@ -45,6 +45,9 @@ func NewQuerier(k Keeper) sdk.Querier {
 		case types.QueryLockedRewardsState:
 			return queryLockedRewardsState(ctx, path[1:], req, k)
 
+		case types.QueryLockedRatio:
+			return queryLockedRatio(ctx, path[1:], req, k)
+
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unknown query path: %s", path[0])
 		}
@@ -291,4 +294,10 @@ func queryLockedRewardsState(ctx sdk.Context, path []string, req abci.RequestQue
 	}
 
 	return bz, nil
+}
+
+func queryLockedRatio(ctx sdk.Context, path []string, req abci.RequestQuery, k Keeper) ([]byte, error) {
+	ratio := k.LockedRatio(ctx)
+
+	return ratio.MarshalJSON()
 }

@@ -20,6 +20,9 @@ func NewQuerier(k Keeper) sdk.Querier {
 		case types.QuerySupplyOf:
 			return querySupplyOf(ctx, req, k)
 
+		case types.QueryModuleBalance:
+			return queryModuleBalance(ctx, path[1:], k)
+
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unknown %s query endpoint: %s", types.ModuleName, path[0])
 		}
@@ -62,6 +65,26 @@ func querySupplyOf(ctx sdk.Context, req abci.RequestQuery, k Keeper) ([]byte, er
 	supply := k.GetSupply(ctx).GetTotal().AmountOf(params.Denom)
 
 	res, err := supply.MarshalJSON()
+	if err != nil {
+		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
+	}
+
+	return res, nil
+}
+
+func queryModuleBalance(ctx sdk.Context, path []string, k Keeper) ([]byte, error) {
+	if len(path) < 1 {
+		return nil, sdkerrors.Wrapf(sdkerrors.ErrInvalidRequest, "invalid path length: %v", path)
+	}
+	moduleName := path[0]
+
+	macc := k.GetModuleAccount(ctx, moduleName)
+	if macc == nil {
+		return nil, sdkerrors.Wrapf(sdkerrors.ErrInvalidRequest, "module account %s: not found", moduleName)
+	}
+	balance := macc.GetCoins()
+
+	res, err := balance.MarshalJSON()
 	if err != nil {
 		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
 	}

@@ -25,6 +25,7 @@ const (
 	QueryWithdrawAddr                   = types.QueryWithdrawAddr
 	QueryPool                           = types.QueryPool
 	QueryLockedRewardsState             = types.QueryLockedRewardsState
+	QueryLockedRatio                    = types.QueryLockedRatio
 	DefaultParamspace                   = types.DefaultParamspace
 	TypeMsgFundPublicTreasuryPool       = types.TypeMsgFundPublicTreasuryPool
 	ChangeFoundationAllocationRatioTTL  = types.ChangeFoundationAllocationRatioTTL
