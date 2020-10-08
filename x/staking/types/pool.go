@@ -16,11 +16,11 @@ const (
 // Pool - tracking bonded and not-bonded token supply of the bond denomination
 type Pool struct {
 	// Bonding tokens which are not bonded to a validators (unbonded or unbonding)
-	NotBondedTokens sdk.Int `json:"not_bonded_tokens" yaml:"not_bonded_tokens"`
+	NotBondedTokens sdk.Int `json:"not_bonded_tokens" yaml:"not_bonded_tokens" format:"string" type:"integer" swaggertype:"string" format:"integer" example:"500"`
 	// Bonding tokens which are currently bonded to a validators
-	BondedTokens sdk.Int `json:"bonded_tokens" yaml:"bonded_tokens"`
+	BondedTokens sdk.Int `json:"bonded_tokens" yaml:"bonded_tokens" swaggertype:"string" format:"integer" example:"50000"`
 	// Liquidity tokens which are currently bonded to a validators
-	LiquidityTokens sdk.Int `json:"liquidity_tokens" yaml:"liquidity_tokens"`
+	LiquidityTokens sdk.Int `json:"liquidity_tokens" yaml:"liquidity_tokens" swaggertype:"string" format:"integer" example:"10000"`
 }
 
 // NewPool creates a new Pool instance used for queries

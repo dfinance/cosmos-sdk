@@ -219,3 +219,23 @@ devdoc-update:
 	docker pull tendermint/devdoc
 
 .PHONY: devdoc devdoc-clean devdoc-init devdoc-save devdoc-update
+
+### Swagger auto generation
+swagger-ui-deps:
+	@echo "-> Fetching Golang libraries: swag, statik"
+	go get -u github.com/swaggo/swag/cmd/swag
+	go get github.com/g3co/go-swagger-merger
+
+swagger_auto_dir="./client/lcd/swagger-auto"
+swagger-ui-build:
+	@echo "-> Build swagger.yaml (that takes time)"
+	rm -rf $(swagger_auto_dir)
+	ln -s ./types/* ./x/staking/types
+	swag init --dir ./x/staking --output $(swagger_auto_dir)/staking --generalInfo ./module.go
+	swag init --dir ./x/mint --output $(swagger_auto_dir)/mint --generalInfo ./module.go
+
+	@echo "-> Merging swagger files"
+	go-swagger-merger -o $(swagger_auto_dir)/swagger.yaml \
+		./client/lcd/swagger-ui/swagger.yaml \
+		$(swagger_auto_dir)/staking/swagger.yaml \
+		$(swagger_auto_dir)/mint/swagger.yaml

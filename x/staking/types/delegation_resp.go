@@ -13,8 +13,8 @@ import (
 // in addition to shares which is more suitable for client responses.
 type DelegationResponse struct {
 	Delegation
-	BondingBalance sdk.Coin `json:"bonding_balance" yaml:"bonding_balance"`
-	LPBalance      sdk.Coin `json:"lp_balance" yaml:"lp_balance"`
+	BondingBalance sdk.Coin `json:"bonding_balance" yaml:"bonding_balance" swaggertype:"string"`
+	LPBalance      sdk.Coin `json:"lp_balance" yaml:"lp_balance" swaggertype:"string"`
 }
 
 // NewDelegationResp creates a new DelegationResponse instance.
@@ -93,7 +93,7 @@ func NewRedelegationResponse(
 // responses.
 type RedelegationEntryResponse struct {
 	RedelegationEntry
-	Balance sdk.Int `json:"balance" yaml:"balance"`
+	Balance sdk.Int `json:"balance" yaml:"balance" swaggertype:"string" format:"integer"`
 }
 
 // NewRedelegationEntryResponse creates a new RedelegationEntryResponse instance.

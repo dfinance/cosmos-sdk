@@ -72,11 +72,11 @@ type Params struct {
 	// Liquidity coin denomination
 	LPDenom string `json:"lp_denom" yaml:"lp_denom"`
 	// Gov voting and distribution ratio between bonding tokens and liquidity tokens (BTokens + LPDistrRatio * LPTokens)
-	LPDistrRatio sdk.Dec `json:"lp_distr_ratio" yaml:"lp_distr_ratio"`
+	LPDistrRatio sdk.Dec `json:"lp_distr_ratio" yaml:"lp_distr_ratio" swaggertype:"string" format:"number"`
 	// Min self delegation level for validator creation
-	MinSelfDelegationLvl sdk.Int `json:"min_self_delegation_lvl" yaml:"min_self_delegation_lvl"`
+	MinSelfDelegationLvl sdk.Int `json:"min_self_delegation_lvl" yaml:"min_self_delegation_lvl" swaggertype:"string" format:"integer"`
 	// Max delegations per validator is limited by (CurrentSelfDelegation * KeyMaxDelegationsRatio)
-	MaxDelegationsRatio sdk.Dec `json:"max_delegations_ratio" yaml:"max_delegations_ratio"`
+	MaxDelegationsRatio sdk.Dec `json:"max_delegations_ratio" yaml:"max_delegations_ratio" swaggertype:"string" format:"number"`
 	// Time duration of validator.ScheduledToUnbond to be raised up before forced unbonding is done
 	ScheduledUnbondDelayTime time.Duration `json:"scheduled_unbond_delay" yaml:"scheduled_unbond_delay"`
 }

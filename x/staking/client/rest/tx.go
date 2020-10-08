@@ -55,6 +55,19 @@ type (
 	}
 )
 
+// postDelegationsHandlerFn godoc
+// @Tags Staking
+// @Summary Submit delegation
+// @Description Submit delegation
+// @ID stakingPostDelegatorDelegations
+// @Accept  json
+// @Produce json
+// @Param postRequest body DelegateRequest true "DelegateRequest request with signed transaction"
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Success 200 {object} []types.MsgDelegate
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/delegators/{delegatorAddr}/delegations [post]
 func postDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DelegateRequest

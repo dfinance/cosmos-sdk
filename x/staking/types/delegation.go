@@ -37,10 +37,10 @@ func (p DVPair) Equal(p2 DVPair) bool {
 // Delegation target might be either bonding tokens or liquidity tokens.
 // Object is deleted if bonding and liquidity shares are zero.
 type Delegation struct {
-	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address"`
-	BondingShares    sdk.Dec        `json:"bonding_shares" yaml:"bonding_shares"`
-	LPShares         sdk.Dec        `json:"lp_shares" yaml:"lp_shares"`
+	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
+	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address" swaggertype:"string" format:"bech32" example:"walletval13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
+	BondingShares    sdk.Dec        `json:"bonding_shares" yaml:"bonding_shares" swaggertype:"string" format:"number" example:"0.1"`
+	LPShares         sdk.Dec        `json:"lp_shares" yaml:"lp_shares" swaggertype:"string" format:"number" example:"0.5"`
 }
 
 // Equal check equality of two Delegations.
