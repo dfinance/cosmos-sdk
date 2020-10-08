@@ -28,6 +28,17 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 	).Methods("GET")
 }
 
+// queryParamsHandlerFn godoc
+// @Tags Mint
+// @Summary Minting module parameters
+// @Description Minting module parameters
+// @ID mintingGetParams
+// @Accept  json
+// @Produce json
+// @Success 200 {object} types.Params
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /minting/parameters [get]
 func queryParamsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryParameters)
@@ -48,6 +59,17 @@ func queryParamsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
+// queryInflationHandlerFn godoc
+// @Tags Mint
+// @Summary Current minting inflation value
+// @Description Current minting inflation value
+// @ID mintingGetInflation
+// @Accept  json
+// @Produce json
+// @Success 200 {string} Token "inflation in the decimal type"
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /minting/inflation [get]
 func queryInflationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryInflation)
@@ -68,6 +90,17 @@ func queryInflationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
+// queryAnnualProvisionsHandlerFn godoc
+// @Tags Mint
+// @Summary Current minting annual provisions value
+// @Description Current minting annual provisions value
+// @ID mintingGetAnnualProvisions
+// @Accept  json
+// @Produce json
+// @Success 200 {string} Token "Annual Provisions in the decimal type"
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /minting/annual-provisions [get]
 func queryAnnualProvisionsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryAnnualProvisions)

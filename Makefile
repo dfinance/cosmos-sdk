@@ -222,7 +222,7 @@ devdoc-update:
 
 ### Swagger auto generation
 swagger-ui-deps:
-	@echo "-> Fetching Golang libraries: swag, statik"
+	@echo "-> Fetching Golang libraries: swag, swagger-merger"
 	go get -u github.com/swaggo/swag/cmd/swag
 	go get github.com/g3co/go-swagger-merger
 
@@ -230,9 +230,14 @@ swagger_auto_dir="./client/lcd/swagger-auto"
 swagger-ui-build:
 	@echo "-> Build swagger.yaml (that takes time)"
 	rm -rf $(swagger_auto_dir)
-	ln -s ./types/* ./x/staking/types
+
+	cp -r ./types ./x/staking/sdk
 	swag init --dir ./x/staking --output $(swagger_auto_dir)/staking --generalInfo ./module.go
+	rm -rf ./x/staking/sdk
+
+	cp -r ./types ./x/mint/sdk
 	swag init --dir ./x/mint --output $(swagger_auto_dir)/mint --generalInfo ./module.go
+	rm -rf ./x/mint/sdk
 
 	@echo "-> Merging swagger files"
 	go-swagger-merger -o $(swagger_auto_dir)/swagger.yaml \

@@ -248,8 +248,8 @@ func (msg MsgEditValidator) ValidateBasic() error {
 
 // MsgDelegate - struct for bonding transactions
 type MsgDelegate struct {
-	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address"`
+	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
+	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
 	Amount           sdk.Coin       `json:"amount" yaml:"amount"`
 }
 
@@ -297,9 +297,9 @@ func (msg MsgDelegate) ValidateBasic() error {
 
 // MsgBeginRedelegate defines the attributes of a bonding transaction.
 type MsgBeginRedelegate struct {
-	DelegatorAddress    sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	ValidatorSrcAddress sdk.ValAddress `json:"validator_src_address" yaml:"validator_src_address"`
-	ValidatorDstAddress sdk.ValAddress `json:"validator_dst_address" yaml:"validator_dst_address"`
+	DelegatorAddress    sdk.AccAddress `json:"delegator_address" yaml:"delegator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
+	ValidatorSrcAddress sdk.ValAddress `json:"validator_src_address" yaml:"validator_src_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
+	ValidatorDstAddress sdk.ValAddress `json:"validator_dst_address" yaml:"validator_dst_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
 	Amount              sdk.Coin       `json:"amount" yaml:"amount"`
 }
 
@@ -351,8 +351,8 @@ func (msg MsgBeginRedelegate) ValidateBasic() error {
 
 // MsgUndelegate - struct for unbonding transactions
 type MsgUndelegate struct {
-	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address"`
+	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
+	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
 	Amount           sdk.Coin       `json:"amount" yaml:"amount"`
 }
 

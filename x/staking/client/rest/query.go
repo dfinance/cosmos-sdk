@@ -14,10 +14,14 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
+const (
+	first = "/staking/delegators/{delegatorAddr}/delegations"
+)
+
 func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 	// Get all delegations from a delegator
 	r.HandleFunc(
-		"/staking/delegators/{delegatorAddr}/delegations",
+		first,
 		delegatorDelegationsHandlerFn(cliCtx),
 	).Methods("GET")
 
@@ -109,8 +113,8 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 
 // delegatorDelegationsHandlerFn godoc
 // @Tags Staking
-// @Summary Get all delegations from a delegator.
-// @Description Get all delegations from a delegator.
+// @Summary Get all delegations from a delegator
+// @Description Get all delegations from a delegator
 // @ID stakingGetDelegatorDelegations
 // @Accept  json
 // @Produce json
@@ -125,8 +129,8 @@ func delegatorDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // delegatorUnbondingDelegationsHandlerFn godoc
 // @Tags Staking
-// @Summary Get all unbonding delegations from a delegator.
-// @Description Get all unbonding delegations from a delegator.
+// @Summary Get all unbonding delegations from a delegator
+// @Description Get all unbonding delegations from a delegator
 // @ID stakingGetDelegatorUnbondingDelegations
 // @Accept  json
 // @Produce json
@@ -141,14 +145,14 @@ func delegatorUnbondingDelegationsHandlerFn(cliCtx context.CLIContext) http.Hand
 
 // delegatorTxsHandlerFn godoc
 // @Tags Staking
-// @Summary Query all staking txs (msgs) from a delegator.
-// @Description Query all staking txs (msgs) from a delegator.
+// @Summary Query all staking txs (msgs) from a delegator
+// @Description Query all staking txs (msgs) from a delegator
 // @ID stakingGetDelegatorTxs
 // @Accept  json
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
 // @Param type query string false "Unbonding types via space: bond unbond redelegate"
-// @Success 200 {object} SearchTxsResult
+// @Success 200 {object} []types.SearchTxsResult
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/delegators/{delegatorAddr}/txs [get]
@@ -225,8 +229,8 @@ func delegatorTxsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // unbondingDelegationHandlerFn godoc
 // @Tags Staking
-// @Summary Query all unbonding delegations between a delegator and a validator.
-// @Description Query all unbonding delegations between a delegator and a validator.
+// @Summary Query all unbonding delegations between a delegator and a validator
+// @Description Query all unbonding delegations between a delegator and a validator
 // @ID stakingGetUnbondingDelegation
 // @Accept  json
 // @Produce json
@@ -242,8 +246,8 @@ func unbondingDelegationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // redelegationsHandlerFn godoc
 // @Tags Staking
-// @Summary Get all redelegations (filter by query params).
-// @Description Get all redelegations (filter by query params).
+// @Summary Get all redelegations (filter by query params)
+// @Description Get all redelegations (filter by query params)
 // @ID stakingGetRedelegations
 // @Accept  json
 // @Produce json
@@ -313,8 +317,8 @@ func redelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // delegationHandlerFn godoc
 // @Tags Staking
-// @Summary Query the current delegation between a delegator and a validator.
-// @Description Query the current delegation between a delegator and a validator.
+// @Summary Query the current delegation between a delegator and a validator
+// @Description Query the current delegation between a delegator and a validator
 // @ID stakingGetDelegaton
 // @Accept  json
 // @Produce json
@@ -330,8 +334,8 @@ func delegationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // delegatorValidatorsHandlerFn godoc
 // @Tags Staking
-// @Summary Query all validators that a delegator is bonded to.
-// @Description Query all validators that a delegator is bonded to.
+// @Summary Query all validators that a delegator is bonded to
+// @Description Query all validators that a delegator is bonded to
 // @ID stakingGetDelegatorValidators
 // @Accept  json
 // @Produce json
@@ -346,8 +350,8 @@ func delegatorValidatorsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // delegatorValidatorHandlerFn godoc
 // @Tags Staking
-// @Summary Query a validator that a delegator is bonded to.
-// @Description Query a validator that a delegator is bonded to.
+// @Summary Query a validator that a delegator is bonded to
+// @Description Query a validator that a delegator is bonded to
 // @ID stakingGetDelegatorValidator
 // @Accept  json
 // @Produce json
@@ -363,8 +367,8 @@ func delegatorValidatorHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // validatorsHandlerFn godoc
 // @Tags Staking
-// @Summary Get all validator candidates. By default it returns only the bonded validators.
-// @Description Get all validator candidates. By default it returns only the bonded validators.
+// @Summary Get all validator candidates. By default it returns only the bonded validators
+// @Description Get all validator candidates. By default it returns only the bonded validators
 // @ID stakingGetValidators
 // @Accept  json
 // @Produce json
@@ -414,8 +418,8 @@ func validatorsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // validatorHandlerFn godoc
 // @Tags Staking
-// @Summary Query the information from a single validator.
-// @Description Query the information from a single validator.
+// @Summary Query the information from a single validator
+// @Description Query the information from a single validator
 // @ID stakingGetValidator
 // @Accept  json
 // @Produce json
@@ -430,8 +434,8 @@ func validatorHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // validatorDelegationsHandlerFn godoc
 // @Tags Staking
-// @Summary Get the current delegations for the validator.
-// @Description Get the current delegations for the validator.
+// @Summary Get the current delegations for the validator
+// @Description Get the current delegations for the validator
 // @ID stakingGetValidatorDelegations
 // @Accept  json
 // @Produce json
@@ -446,8 +450,8 @@ func validatorDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // validatorUnbondingDelegationsHandlerFn godoc
 // @Tags Staking
-// @Summary Get the current unbonding information for the validator.
-// @Description Get the current unbonding information for the validator.
+// @Summary Get the current unbonding information for the validator
+// @Description Get the current unbonding information for the validator
 // @ID stakingGetValidatorUnbondingDelegation
 // @Accept  json
 // @Produce json
@@ -462,8 +466,8 @@ func validatorUnbondingDelegationsHandlerFn(cliCtx context.CLIContext) http.Hand
 
 // historicalInfoHandlerFn godoc
 // @Tags Staking
-// @Summary Get the historical information.
-// @Description Get the historical information.
+// @Summary Query historical info at a given height
+// @Description Query historical info at a given height
 // @ID stakingGetHistoricalInfo
 // @Accept  json
 // @Produce json
@@ -503,8 +507,8 @@ func historicalInfoHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // poolHandlerFn godoc
 // @Tags Staking
-// @Summary Get the current state of the staking pool.
-// @Description Get the current state of the staking pool.
+// @Summary Get the current state of the staking pool
+// @Description Get the current state of the staking pool
 // @ID stakingGetPool
 // @Accept  json
 // @Produce json
@@ -533,8 +537,8 @@ func poolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 
 // paramsHandlerFn godoc
 // @Tags Staking
-// @Summary Get the current staking parameter values.
-// @Description Get the current staking parameter values.
+// @Summary Get the current staking parameter values
+// @Description Get the current staking parameter values
 // @ID stakingGetParams
 // @Accept  json
 // @Produce json

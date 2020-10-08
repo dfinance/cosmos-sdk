@@ -17,12 +17,12 @@ import (
 //
 // TODO: Make field members private for further safety.
 type Coin struct {
-	Denom string `json:"denom"`
+	Denom string `json:"denom" example:"atom"`
 
 	// To allow the use of unsigned integers (see: #1273) a larger refactor will
 	// need to be made. So we use signed integers for now with safety measures in
 	// place preventing negative values being used.
-	Amount Int `json:"amount"`
+	Amount Int `json:"amount" swaggertype:"string" format:"number" example:"100"`
 }
 
 // NewCoin returns a new coin with a denomination and amount. It will panic if
