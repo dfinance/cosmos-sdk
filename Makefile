@@ -250,3 +250,6 @@ swagger-build: $(modules_dir)/*
 	go-swagger-merger -o $(swagger_auto_dir)/swagger.yaml \
 		./client/lcd/swagger-ui/swagger.yaml \
 		$(swagger_auto_dir)/swagger.yaml
+
+	#cleanup work dir
+	#rm -rf $(swagger_auto_dir)/x

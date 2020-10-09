@@ -37,9 +37,9 @@ type Validator struct {
 	// Validator status (bonded/unbonding/unbonded)
 	Status sdk.BondStatus `json:"status" yaml:"status" swaggertype:"string" example:"bonded"`
 	// Delegated bonding tokens (incl. self-delegation)
-	Bonding ValidatorTokens `json:"bonding" yaml:"bonding" swaggertype:"string" example:"100usdt"`
+	Bonding ValidatorTokens `json:"bonding" yaml:"bonding"`
 	// Delegated liquidity tokens
-	LP ValidatorTokens `json:"lp" yaml:"lp" swaggertype:"string" example:"1000lp"`
+	LP ValidatorTokens `json:"lp" yaml:"lp"`
 	// Description terms for the validator
 	Description Description `json:"description" yaml:"description"`
 	// If unbonding, height at which this validator has begun unbonding

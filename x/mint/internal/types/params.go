@@ -23,21 +23,21 @@ var (
 // mint parameters
 type Params struct {
 	// Type of coin to mint
-	MintDenom string `json:"mint_denom" yaml:"mint_denom"`
+	MintDenom string `json:"mint_denom" yaml:"mint_denom" example:"stake"`
 	// Maximum inflation rate (annual)
-	InflationMax sdk.Dec `json:"inflation_max" yaml:"inflation_max"`
+	InflationMax sdk.Dec `json:"inflation_max" yaml:"inflation_max" swaggertype:"string" format:"number"  example:"0.123"`
 	// Minimum inflation rate (annual)
-	InflationMin sdk.Dec `json:"inflation_min" yaml:"inflation_min"`
+	InflationMin sdk.Dec `json:"inflation_min" yaml:"inflation_min" swaggertype:"string" format:"number"  example:"0.123"`
 	// % of fees burned (per block)
-	FeeBurningRatio sdk.Dec `json:"fee_burning_ratio" yaml:"fee_burning_ratio"`
+	FeeBurningRatio sdk.Dec `json:"fee_burning_ratio" yaml:"fee_burning_ratio" swaggertype:"string" format:"number"  example:"0.123"`
 	// Bonded, locked shoulders relation for inflation power calculation
-	InfPwrBondedLockedRatio sdk.Dec `json:"infpwr_bondedlocked_ratio" yaml:"infpwr_bondedlocked_ratio"`
+	InfPwrBondedLockedRatio sdk.Dec `json:"infpwr_bondedlocked_ratio" yaml:"infpwr_bondedlocked_ratio" swaggertype:"string" format:"number"  example:"0.123"`
 	// Extra Foundation pool allocation inflation ratio
-	FoundationAllocationRatio sdk.Dec `json:"foundation_allocation_ratio" yaml:"foundation_allocation_ratio"`
+	FoundationAllocationRatio sdk.Dec `json:"foundation_allocation_ratio" yaml:"foundation_allocation_ratio" swaggertype:"string" format:"number"  example:"0.123"`
 	// Avg block time filter window size
 	AvgBlockTimeWindow uint16 `json:"avg_block_time_window" yaml:"avg_block_time_window"`
 	// BondedRatio denominator (TotalSupply) shift coefficient
-	StakingTotalSupplyShift sdk.Int `json:"staking_total_supply_shift" yaml:"staking_total_supply_shift"`
+	StakingTotalSupplyShift sdk.Int `json:"staking_total_supply_shift" yaml:"staking_total_supply_shift" swaggertype:"string" format:"integer"  example:"100"`
 }
 
 // ParamTable for minting module.

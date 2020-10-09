@@ -8,9 +8,9 @@ import (
 
 type ValidatorTokens struct {
 	// Total shares issued to a validator's delegators
-	DelegatorShares sdk.Dec `json:"delegator_shares" yaml:"delegator_shares"`
+	DelegatorShares sdk.Dec `json:"delegator_shares" yaml:"delegator_shares" swaggertype:"string" format:"number" example:"0.123"`
 	// Delegated tokens (incl. self-delegation for bonding tokens)
-	Tokens sdk.Int `json:"tokens" yaml:"tokens"`
+	Tokens sdk.Int `json:"tokens" yaml:"tokens" swaggertype:"string" format:"integer" example:"100"`
 }
 
 // TokensFromShares calculates the token worth of provided shares.

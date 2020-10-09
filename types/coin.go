@@ -17,7 +17,7 @@ import (
 //
 // TODO: Make field members private for further safety.
 type Coin struct {
-	Denom string `json:"denom" example:"atom"`
+	Denom string `json:"denom" example:"stake"`
 
 	// To allow the use of unsigned integers (see: #1273) a larger refactor will
 	// need to be made. So we use signed integers for now with safety measures in
