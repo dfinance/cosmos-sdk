@@ -14,14 +14,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
-const (
-	first = "/staking/delegators/{delegatorAddr}/delegations"
-)
-
 func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 	// Get all delegations from a delegator
 	r.HandleFunc(
-		first,
+		"/staking/delegators/{delegatorAddr}/delegations",
 		delegatorDelegationsHandlerFn(cliCtx),
 	).Methods("GET")
 
