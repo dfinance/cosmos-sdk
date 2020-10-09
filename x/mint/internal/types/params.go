@@ -38,7 +38,7 @@ type Params struct {
 	AvgBlockTimeWindow uint16 `json:"avg_block_time_window" yaml:"avg_block_time_window"`
 	// BondedRatio denominator (TotalSupply) shift coefficient
 	StakingTotalSupplyShift sdk.Int `json:"staking_total_supply_shift" yaml:"staking_total_supply_shift" swaggertype:"string" format:"integer"  example:"100"`
-}
+} //@name MintParams
 
 // ParamTable for minting module.
 func ParamKeyTable() params.KeyTable {

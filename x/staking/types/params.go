@@ -68,18 +68,18 @@ type Params struct {
 	// Number of historical entries to persist
 	HistoricalEntries uint16 `json:"historical_entries" yaml:"historical_entries"`
 	// Bondable coin denomination
-	BondDenom string `json:"bond_denom" yaml:"bond_denom"`
+	BondDenom string `json:"bond_denom" yaml:"bond_denom" example:"stake"`
 	// Liquidity coin denomination
-	LPDenom string `json:"lp_denom" yaml:"lp_denom"`
+	LPDenom string `json:"lp_denom" yaml:"lp_denom" example:"liqd"`
 	// Gov voting and distribution ratio between bonding tokens and liquidity tokens (BTokens + LPDistrRatio * LPTokens)
-	LPDistrRatio sdk.Dec `json:"lp_distr_ratio" yaml:"lp_distr_ratio" swaggertype:"string" format:"number"`
+	LPDistrRatio sdk.Dec `json:"lp_distr_ratio" yaml:"lp_distr_ratio" swaggertype:"string" format:"number" example:"0.123"`
 	// Min self delegation level for validator creation
-	MinSelfDelegationLvl sdk.Int `json:"min_self_delegation_lvl" yaml:"min_self_delegation_lvl" swaggertype:"string" format:"integer"`
+	MinSelfDelegationLvl sdk.Int `json:"min_self_delegation_lvl" yaml:"min_self_delegation_lvl" swaggertype:"string" format:"integer" example:"100"`
 	// Max delegations per validator is limited by (CurrentSelfDelegation * KeyMaxDelegationsRatio)
-	MaxDelegationsRatio sdk.Dec `json:"max_delegations_ratio" yaml:"max_delegations_ratio" swaggertype:"string" format:"number"`
+	MaxDelegationsRatio sdk.Dec `json:"max_delegations_ratio" yaml:"max_delegations_ratio" swaggertype:"string" format:"number" example:"0.123"`
 	// Time duration of validator.ScheduledToUnbond to be raised up before forced unbonding is done
 	ScheduledUnbondDelayTime time.Duration `json:"scheduled_unbond_delay" yaml:"scheduled_unbond_delay"`
-}
+} //@name StakingParams
 
 // NewParams creates a new Params instance
 func NewParams(

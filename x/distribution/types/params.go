@@ -38,30 +38,30 @@ var (
 // Params defines the set of distribution parameters.
 type Params struct {
 	// Rewards distribution ratio for ValidatorsPool
-	ValidatorsPoolTax sdk.Dec `json:"validators_pool_tax" yaml:"validators_pool_tax"`
+	ValidatorsPoolTax sdk.Dec `json:"validators_pool_tax" yaml:"validators_pool_tax" swaggertype:"string" format:"number"  example:"0.123"`
 	// Rewards distribution ratio for LiquidityProvidersPool
-	LiquidityProvidersPoolTax sdk.Dec `json:"liquidity_providers_pool_tax" yaml:"liquidity_providers_pool_tax"`
+	LiquidityProvidersPoolTax sdk.Dec `json:"liquidity_providers_pool_tax" yaml:"liquidity_providers_pool_tax" swaggertype:"string" format:"number"  example:"0.123"`
 	// Rewards distribution ratio for PublicTreasuryPool
-	PublicTreasuryPoolTax sdk.Dec `json:"public_treasury_pool_tax" yaml:"public_treasury_pool_tax"`
+	PublicTreasuryPoolTax sdk.Dec `json:"public_treasury_pool_tax" yaml:"public_treasury_pool_tax" swaggertype:"string" format:"number"  example:"0.123"`
 	// Rewards distribution ratio for HARP
-	HARPTax sdk.Dec `json:"harp_tax" yaml:"harp_tax"`
+	HARPTax sdk.Dec `json:"harp_tax" yaml:"harp_tax" swaggertype:"string" format:"number"  example:"0.123"`
 
 	// PublicTreasuryPool max amount limit
-	PublicTreasuryPoolCapacity sdk.Int `json:"public_treasury_pool_capacity"`
+	PublicTreasuryPoolCapacity sdk.Int `json:"public_treasury_pool_capacity" swaggertype:"string" format:"integer" example:"100"`
 
 	// Block proposer base reward ratio
-	BaseProposerReward sdk.Dec `json:"base_proposer_reward" yaml:"base_proposer_reward"`
+	BaseProposerReward sdk.Dec `json:"base_proposer_reward" yaml:"base_proposer_reward" swaggertype:"string" format:"number" example:"0.123"`
 	// Block proposer bonus reward ratio
-	BonusProposerReward sdk.Dec `json:"bonus_proposer_reward" yaml:"bonus_proposer_reward"`
+	BonusProposerReward sdk.Dec `json:"bonus_proposer_reward" yaml:"bonus_proposer_reward" swaggertype:"string" format:"number" example:"0.123"`
 	// Validator distribution power calculation coefficient
-	LockedRatio sdk.Dec `json:"locked_ratio" yaml:"locked_ratio"`
+	LockedRatio sdk.Dec `json:"locked_ratio" yaml:"locked_ratio" swaggertype:"string" format:"number" example:"0.123"`
 	// Rewards lock duration
 	LockedDuration time.Duration `json:"locked_dur" yaml:"locked_dur"`
 
 	//
 	WithdrawAddrEnabled bool             `json:"withdraw_addr_enabled" yaml:"withdraw_addr_enabled"`
-	FoundationNominees  []sdk.AccAddress `json:"foundation_nominees" yaml:"foundation_nominees"`
-}
+	FoundationNominees  []sdk.AccAddress `json:"foundation_nominees" yaml:"foundation_nominees" swaggertype:"array,string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
+} //@name DistributionParams
 
 // ParamKeyTable returns the parameter key table.
 func ParamKeyTable() params.KeyTable {

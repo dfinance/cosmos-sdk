@@ -273,6 +273,61 @@ definitions:
       proposal_id:
         type: string
     type: object
+  DistributionParams:
+    properties:
+      base_proposer_reward:
+        description: Block proposer base reward ratio
+        example: "0.123"
+        format: number
+        type: string
+      bonus_proposer_reward:
+        description: Block proposer bonus reward ratio
+        example: "0.123"
+        format: number
+        type: string
+      foundation_nominees:
+        example:
+        - wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h
+        format: bech32
+        items:
+          type: string
+        type: array
+      harp_tax:
+        description: Rewards distribution ratio for HARP
+        example: "0.123"
+        format: number
+        type: string
+      liquidity_providers_pool_tax:
+        description: Rewards distribution ratio for LiquidityProvidersPool
+        example: "0.123"
+        format: number
+        type: string
+      locked_dur:
+        description: Rewards lock duration
+        type: string
+      locked_ratio:
+        description: Validator distribution power calculation coefficient
+        example: "0.123"
+        format: number
+        type: string
+      public_treasury_pool_capacity:
+        description: PublicTreasuryPool max amount limit
+        example: "100"
+        format: integer
+        type: string
+      public_treasury_pool_tax:
+        description: Rewards distribution ratio for PublicTreasuryPool
+        example: "0.123"
+        format: number
+        type: string
+      validators_pool_tax:
+        description: Rewards distribution ratio for ValidatorsPool
+        example: "0.123"
+        format: number
+        type: string
+      withdraw_addr_enabled:
+        type: boolean
+    type: object
   Hash:
     example: EE5F3404034C524501629B56E0DDC38FAD651F04
     type: string
@@ -281,6 +336,46 @@ definitions:
       key:
         type: string
       value:
+        type: string
+    type: object
+  MintParams:
+    properties:
+      avg_block_time_window:
+        description: Avg block time filter window size
+        type: integer
+      fee_burning_ratio:
+        description: '% of fees burned (per block)'
+        example: "0.123"
+        format: number
+        type: string
+      foundation_allocation_ratio:
+        description: Extra Foundation pool allocation inflation ratio
+        example: "0.123"
+        format: number
+        type: string
+      inflation_max:
+        description: Maximum inflation rate (annual)
+        example: "0.123"
+        format: number
+        type: string
+      inflation_min:
+        description: Minimum inflation rate (annual)
+        example: "0.123"
+        format: number
+        type: string
+      infpwr_bondedlocked_ratio:
+        description: Bonded, locked shoulders relation for inflation power calculation
+        example: "0.123"
+        format: number
+        type: string
+      mint_denom:
+        description: Type of coin to mint
+        example: stake
+        type: string
+      staking_total_supply_shift:
+        description: BondedRatio denominator (TotalSupply) shift coefficient
+        example: "100"
+        format: integer
         type: string
     type: object
   Msg:
@@ -370,6 +465,47 @@ definitions:
       missed_blocks_counter:
         type: string
       start_height:
+        type: string
+    type: object
+  StakingParams:
+    properties:
+      bond_denom:
+        description: Bondable coin denomination
+        example: stake
+        type: string
+      historical_entries:
+        description: Number of historical entries to persist
+        type: integer
+      lp_denom:
+        description: Liquidity coin denomination
+        example: liqd
+        type: string
+      lp_distr_ratio:
+        description: Gov voting and distribution ratio between bonding tokens and liquidity tokens (BTokens + LPDistrRatio * LPTokens)
+        example: "0.123"
+        format: number
+        type: string
+      max_delegations_ratio:
+        description: Max delegations per validator is limited by (CurrentSelfDelegation * KeyMaxDelegationsRatio)
+        example: "0.123"
+        format: number
+        type: string
+      max_entries:
+        description: Max entries for either unbonding delegation or redelegation (per pair/trio)
+        type: integer
+      max_validators:
+        description: Maximum number of validators (max uint16 = 65535)
+        type: integer
+      min_self_delegation_lvl:
+        description: Min self delegation level for validator creation
+        example: "100"
+        format: integer
+        type: string
+      scheduled_unbond_delay:
+        description: Time duration of validator.ScheduledToUnbond to be raised up before forced unbonding is done
+        type: string
+      unbonding_time:
+        description: Time duration of unbonding
         type: string
     type: object
   StdTx:
@@ -615,10 +751,6 @@ definitions:
       voter:
         type: string
     type: object
-  auth.StdFee:
-    $ref: '#/definitions/types.StdFee'
-  auth.StdSignature:
-    $ref: '#/definitions/types.StdSignature'
   rest.BaseReq:
     properties:
       account_number:
@@ -710,7 +842,7 @@ definitions:
   rest.TxBeginRedelegate:
     properties:
       fee:
-        $ref: '#/definitions/auth.StdFee'
+        $ref: '#/definitions/types.StdFee'
         type: object
       memo:
         type: string
@@ -720,13 +852,13 @@ definitions:
         type: array
       signatures:
         items:
-          $ref: '#/definitions/auth.StdSignature'
+          $ref: '#/definitions/types.StdSignature'
         type: array
     type: object
   rest.TxFundPublicTreasuryPool:
     properties:
       fee:
-        $ref: '#/definitions/auth.StdFee'
+        $ref: '#/definitions/types.StdFee'
         type: object
       memo:
         type: string
@@ -736,13 +868,13 @@ definitions:
         type: array
       signatures:
         items:
-          $ref: '#/definitions/auth.StdSignature'
+          $ref: '#/definitions/types.StdSignature'
         type: array
     type: object
   rest.TxSetWithdrawAddress:
     properties:
       fee:
-        $ref: '#/definitions/auth.StdFee'
+        $ref: '#/definitions/types.StdFee'
         type: object
       memo:
         type: string
@@ -752,13 +884,13 @@ definitions:
         type: array
       signatures:
         items:
-          $ref: '#/definitions/auth.StdSignature'
+          $ref: '#/definitions/types.StdSignature'
         type: array
     type: object
   rest.TxUndelegate:
     properties:
       fee:
-        $ref: '#/definitions/auth.StdFee'
+        $ref: '#/definitions/types.StdFee'
         type: object
       memo:
         type: string
@@ -768,13 +900,13 @@ definitions:
         type: array
       signatures:
         items:
-          $ref: '#/definitions/auth.StdSignature'
+          $ref: '#/definitions/types.StdSignature'
         type: array
     type: object
   rest.TxWithdrawDelegatorReward:
     properties:
       fee:
-        $ref: '#/definitions/auth.StdFee'
+        $ref: '#/definitions/types.StdFee'
         type: object
       memo:
         type: string
@@ -784,7 +916,7 @@ definitions:
         type: array
       signatures:
         items:
-          $ref: '#/definitions/auth.StdSignature'
+          $ref: '#/definitions/types.StdSignature'
         type: array
     type: object
   rest.UndelegateRequest:
@@ -1068,19 +1200,6 @@ definitions:
       validator_address:
         $ref: '#/definitions/types.ValAddress'
         type: object
-    type: object
-  types.Params:
-    properties:
-      max_memo_characters:
-        type: integer
-      sig_verify_cost_ed25519:
-        type: integer
-      sig_verify_cost_secp256k1:
-        type: integer
-      tx_sig_limit:
-        type: integer
-      tx_size_cost_per_byte:
-        type: integer
     type: object
   types.Pool:
     properties:
@@ -1766,7 +1885,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Params'
+            $ref: '#/definitions/DistributionParams'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -2494,7 +2613,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Params'
+            $ref: '#/definitions/MintParams'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3065,7 +3184,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Params'
+            $ref: '#/definitions/StakingParams'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
