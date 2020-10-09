@@ -111,7 +111,7 @@ func postDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Produce json
 // @Param postRequest body RedelegateRequest true "RedelegateRequest request with signed transaction"
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
-// @Success 200 {object} []types.MsgBeginRedelegate
+// @Success 200 {object} []TxBeginRedelegate
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/delegators/{delegatorAddr}/redelegations [post]
@@ -158,7 +158,7 @@ func postRedelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Produce json
 // @Param postRequest body UndelegateRequest true "RedelegateRequest request with signed transaction"
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
-// @Success 200 {object} []types.MsgUndelegate
+// @Success 200 {object} []TxUndelegate
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/delegators/{delegatorAddr}/unbonding_delegations [post]
