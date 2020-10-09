@@ -243,6 +243,7 @@ type (
 	QueryHistoricalInfoParams = types.QueryHistoricalInfoParams
 	Validator                 = types.Validator
 	Validators                = types.Validators
+	ValidatorStakingState     = types.ValidatorStakingState
 	Description               = types.Description
 	DelegationI               = exported.DelegationI
 	ValidatorI                = exported.ValidatorI

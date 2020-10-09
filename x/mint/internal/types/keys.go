@@ -33,4 +33,5 @@ const (
 	QueryAnnualProvisions       = "annual_provisions"
 	QueryBlocksPerYear          = "blocks_per_year"
 	QueryNextAnnualParamsUpdate = "next_annual_params_update"
+	QueryMinterExtended         = "minter_extended"
 )

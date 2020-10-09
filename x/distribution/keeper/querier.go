@@ -2,13 +2,16 @@ package keeper
 
 import (
 	"encoding/json"
+	"strings"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
+	"github.com/cosmos/cosmos-sdk/x/staking"
 	"github.com/cosmos/cosmos-sdk/x/staking/exported"
 )
 
@@ -47,6 +50,12 @@ func NewQuerier(k Keeper) sdk.Querier {
 
 		case types.QueryLockedRatio:
 			return queryLockedRatio(ctx, path[1:], req, k)
+
+		case types.QueryValidatorExtended:
+			return queryValidatorExtended(ctx, path[1:], req, k)
+
+		case types.QueryValidatorsExtended:
+			return queryValidatorsExtended(ctx, path[1:], req, k)
 
 		default:
 			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "unknown query path: %s", path[0])
@@ -300,4 +309,97 @@ func queryLockedRatio(ctx sdk.Context, path []string, req abci.RequestQuery, k K
 	ratio := k.LockedRatio(ctx)
 
 	return ratio.MarshalJSON()
+}
+
+func queryValidatorExtended(ctx sdk.Context, path []string, req abci.RequestQuery, k Keeper) ([]byte, error) {
+	var params types.QueryValidatorParams
+	err := k.cdc.UnmarshalJSON(req.Data, &params)
+	if err != nil {
+		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONUnmarshal, err.Error())
+	}
+
+	// fetch staking data
+	validator, found := k.stakingKeeper.GetValidator(ctx, params.ValidatorAddr)
+	if !found {
+		return nil, types.ErrNoValidatorExists
+	}
+	stakingState := k.stakingKeeper.GetValidatorStakingState(ctx, params.ValidatorAddr)
+	maxDelegationsRatio := k.stakingKeeper.MaxDelegationsRatio(ctx)
+
+	// fetch distribution data
+	lpRatio := k.GetValidatorLPDistrRatio(ctx)
+	lockedState, found := k.GetValidatorLockedState(ctx, params.ValidatorAddr)
+	if !found {
+		return nil, sdkerrors.Wrapf(types.ErrInternal, "locked state not found for validator: %s", params.ValidatorAddr)
+	}
+	distrPower, lpPower := k.GetDistributionPower(ctx, validator.GetOperator(), validator.GetConsensusPower(), validator.LPPower(), lpRatio)
+
+	// build response
+	resp, err := types.NewValidatorResp(validator, stakingState, lockedState, maxDelegationsRatio, distrPower, lpPower)
+	if err != nil {
+		return nil, err
+	}
+
+	bz, err := codec.MarshalJSONIndent(k.cdc, resp)
+	if err != nil {
+		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
+	}
+
+	return bz, nil
+}
+
+func queryValidatorsExtended(ctx sdk.Context, path []string, req abci.RequestQuery, k Keeper) ([]byte, error) {
+	var params types.QueryValidatorsParams
+	err := k.cdc.UnmarshalJSON(req.Data, &params)
+	if err != nil {
+		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONUnmarshal, err.Error())
+	}
+
+	// fetch common staking data
+	validators := k.stakingKeeper.GetAllValidators(ctx)
+	maxDelegationsRatio := k.stakingKeeper.MaxDelegationsRatio(ctx)
+
+	// fetch common distribution data
+	lpRatio := k.GetValidatorLPDistrRatio(ctx)
+
+	// filter and paginate validators
+	filteredVals := make([]staking.Validator, 0, len(validators))
+	for _, val := range validators {
+		if strings.EqualFold(val.GetStatus().String(), params.Status) {
+			filteredVals = append(filteredVals, val)
+		}
+	}
+	start, end := client.Paginate(len(filteredVals), params.Page, params.Limit, 50)
+	if start < 0 || end < 0 {
+		filteredVals = []staking.Validator{}
+	} else {
+		filteredVals = filteredVals[start:end]
+	}
+
+	// build response fetching additional data
+	resp := make([]types.ValidatorResp, 0, len(filteredVals))
+	for _, val := range filteredVals {
+		// fetch
+		lockedState, found := k.GetValidatorLockedState(ctx, val.OperatorAddress)
+		if !found {
+			return nil, sdkerrors.Wrapf(types.ErrInternal, "locked state not found for validator: %s", val.OperatorAddress)
+		}
+		stakingState := k.stakingKeeper.GetValidatorStakingState(ctx, val.OperatorAddress)
+		distrPower, lpPower := k.GetDistributionPower(ctx, val.GetOperator(), val.GetConsensusPower(), val.LPPower(), lpRatio)
+
+		// build
+		valExtended, err := types.NewValidatorResp(val, stakingState, lockedState, maxDelegationsRatio, distrPower, lpPower)
+		if err != nil {
+			return nil, err
+		}
+
+		resp = append(resp, valExtended)
+	}
+
+	bz, err := codec.MarshalJSONIndent(k.cdc, resp)
+	if err != nil {
+		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
+	}
+
+	return bz, nil
 }

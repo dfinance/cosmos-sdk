@@ -15,20 +15,28 @@ type AccountKeeper interface {
 
 // StakingKeeper expected staking keeper (noalias)
 type StakingKeeper interface {
-	// iterate through validators by operator address, execute func for each validator
+	// Iterate through validators by operator address, execute func for each validator
 	IterateValidators(sdk.Context,
 		func(index int64, validator stakingexported.ValidatorI) (stop bool))
 
-	// iterate through bonded validators by operator address, execute func for each validator
+	// Iterate through bonded validators by operator address, execute func for each validator
 	IterateBondedValidatorsByPower(sdk.Context,
 		func(index int64, validator stakingexported.ValidatorI) (stop bool))
 
-	// iterate through the consensus validator set of the last block by operator address, execute func for each validator
+	// Iterate through the consensus validator set of the last block by operator address, execute func for each validator
 	IterateLastValidators(sdk.Context,
 		func(index int64, validator stakingexported.ValidatorI) (stop bool))
 
-	Validator(sdk.Context, sdk.ValAddress) stakingexported.ValidatorI            // get a particular validator by operator address
-	ValidatorByConsAddr(sdk.Context, sdk.ConsAddress) stakingexported.ValidatorI // get a particular validator by consensus address
+	// Get a particular validator by operator address
+	Validator(sdk.Context, sdk.ValAddress) stakingexported.ValidatorI
+	// Get a particular validator by consensus address
+	ValidatorByConsAddr(sdk.Context, sdk.ConsAddress) stakingexported.ValidatorI
+	// Get a particular validator by operator address (direct call)
+	GetValidator(ctx sdk.Context, addr sdk.ValAddress) (staking.Validator, bool)
+	// Get all validators
+	GetAllValidators(ctx sdk.Context) []staking.Validator
+	// Get a particular validator delegations state
+	GetValidatorStakingState(ctx sdk.Context, addr sdk.ValAddress) staking.ValidatorStakingState
 
 	// slash the validator and delegators of the validator, specifying offence height, offence power, and slash fraction
 	Slash(sdk.Context, sdk.ConsAddress, int64, int64, sdk.Dec)
@@ -45,7 +53,10 @@ type StakingKeeper interface {
 	// LPDistrRatio coefficient
 	LPDistrRatio(sdk.Context) sdk.Dec
 
-	// staking BondedPool current supply
+	// MaxDelegationsRatio coefficient
+	MaxDelegationsRatio(ctx sdk.Context) sdk.Dec
+
+	// Staking BondedPool current supply
 	TotalBondedTokens(sdk.Context) sdk.Int
 
 	IterateDelegations(ctx sdk.Context, delegator sdk.AccAddress,

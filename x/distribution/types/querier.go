@@ -15,6 +15,8 @@ const (
 	QueryPool                        = "pool"
 	QueryLockedRewardsState          = "locked_rewards_state"
 	QueryLockedRatio                 = "locked_ratio"
+	QueryValidatorExtended           = "validator_extended"
+	QueryValidatorsExtended          = "validators_extended"
 )
 
 // params for query 'custom/distr/validator_outstanding_rewards'
@@ -101,4 +103,25 @@ type QueryLockedRewardsStateParams struct {
 // NewQueryLockedRewardsStateParams creates a new instance of QueryLockedRewardsStateParams.
 func NewQueryLockedRewardsStateParams(validatorAddress sdk.ValAddress) QueryLockedRewardsStateParams {
 	return QueryLockedRewardsStateParams{ValidatorAddress: validatorAddress}
+}
+
+// params for query 'custom/distr/validator_extended'
+type QueryValidatorParams struct {
+	ValidatorAddr sdk.ValAddress
+}
+
+func NewQueryValidatorParams(validatorAddr sdk.ValAddress) QueryValidatorParams {
+	return QueryValidatorParams{
+		ValidatorAddr: validatorAddr,
+	}
+}
+
+// params for query 'custom/distr/validators_extended'
+type QueryValidatorsParams struct {
+	Page, Limit int
+	Status      string
+}
+
+func NewQueryValidatorsParams(page, limit int, status string) QueryValidatorsParams {
+	return QueryValidatorsParams{page, limit, status}
 }

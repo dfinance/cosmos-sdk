@@ -31,6 +31,7 @@ func GetQueryCmd(cdc *codec.Codec) *cobra.Command {
 			GetCmdQueryAnnualProvisions(cdc),
 			GetCmdQueryBlocksPerYear(cdc),
 			GetCmdQueryNextAnnualParamsUpdate(cdc),
+			GetCmdQueryExtendedMinter(cdc),
 		)...,
 	)
 
@@ -161,6 +162,31 @@ func GetCmdQueryNextAnnualParamsUpdate(cdc *codec.Codec) *cobra.Command {
 			}
 
 			return cliCtx.PrintOutput(ts)
+		},
+	}
+}
+
+// GetCmdQueryExtendedMinter implements a command to return the extended minter state.
+func GetCmdQueryExtendedMinter(cdc *codec.Codec) *cobra.Command {
+	return &cobra.Command{
+		Use:   "extended-minter",
+		Short: "Query the extended minter info",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cliCtx := context.NewCLIContext().WithCodec(cdc)
+
+			route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryMinterExtended)
+			res, _, err := cliCtx.QueryWithData(route, nil)
+			if err != nil {
+				return err
+			}
+
+			var mintInfo types.MintInfo
+			if err := cdc.UnmarshalJSON(res, &mintInfo); err != nil {
+				return err
+			}
+
+			return cliCtx.PrintOutput(mintInfo)
 		},
 	}
 }
