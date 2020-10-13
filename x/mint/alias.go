@@ -54,5 +54,5 @@ type (
 	Minter         = types.Minter
 	Params         = types.Params
 	BlockDurFilter = types.BlockDurFilter
-	MintInfo       = types.MintInfo
+	MinterExtended = types.MintInfo
 )
