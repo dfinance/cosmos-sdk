@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/context"
@@ -15,6 +16,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/distribution/client/common"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
+)
+
+const (
+	FlagStatus = "status"
 )
 
 // GetQueryCmd returns the cli query commands for this module
@@ -34,6 +39,8 @@ func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		GetCmdQueryValidatorSlashes(queryRoute, cdc),
 		GetCmdQueryDelegatorRewards(queryRoute, cdc),
 		GetCmdQueryPool(queryRoute, cdc),
+		GetCmdQueryValidatorExtended(queryRoute, cdc),
+		GetCmdQueryValidatorsExtended(queryRoute, cdc),
 	)...)
 
 	return distQueryCmd
@@ -287,4 +294,99 @@ $ %s query distribution pool PublicTreasuryPool
 			return cliCtx.PrintOutput(result)
 		},
 	}
+}
+
+// GetCmdQueryValidatorExtended implements the validatorExtended query command.
+func GetCmdQueryValidatorExtended(queryRoute string, cdc *codec.Codec) *cobra.Command {
+	return &cobra.Command{
+		Use:   "validator [validator-addr]",
+		Short: "Query a validator with extended info",
+		Long: strings.TrimSpace(
+			fmt.Sprintf(`Query extended details about an individual validator.
+
+Example:
+$ %s query distribution validator cosmosvaloper1gghjut3ccd8ay0zduzj64hwre2fxs9ldmqhffj
+`,
+				version.ClientName,
+			),
+		),
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cliCtx := context.NewCLIContext().WithCodec(cdc)
+
+			addr, err := sdk.ValAddressFromBech32(args[0])
+			if err != nil {
+				return err
+			}
+
+			params := types.NewQueryValidatorParams(addr)
+			bz, err := cdc.MarshalJSON(params)
+			if err != nil {
+				return fmt.Errorf("failed to marshal params: %w", err)
+			}
+
+			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryValidatorExtended), bz)
+			if err != nil {
+				return err
+			}
+
+			if len(res) == 0 {
+				return fmt.Errorf("no validator found with address %s", addr)
+			}
+
+			var result types.ValidatorResp
+			cdc.MustUnmarshalJSON(res, &result)
+			return cliCtx.PrintOutput(result)
+		},
+	}
+}
+
+// GetCmdQueryValidatorsExtended implements the query all validatorExtended objects command.
+func GetCmdQueryValidatorsExtended(queryRoute string, cdc *codec.Codec) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "validators",
+		Short: "Query for all validators with extended info",
+		Args:  cobra.NoArgs,
+		Long: strings.TrimSpace(
+			fmt.Sprintf(`Query extended details about all validators on a network.
+
+Example:
+$ %s query distribution validators --status=Unbonded --page=1 --limit=50
+`,
+				version.ClientName,
+			),
+		),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cliCtx := context.NewCLIContext().WithCodec(cdc)
+
+			statusFilter := viper.GetString(FlagStatus)
+			if statusFilter == "" {
+				statusFilter = sdk.BondStatusBonded
+			}
+
+			params := types.NewQueryValidatorsParams(
+				viper.GetInt(flags.FlagPage),
+				viper.GetInt(flags.FlagLimit),
+				statusFilter,
+			)
+			bz, err := cdc.MarshalJSON(params)
+			if err != nil {
+				return fmt.Errorf("failed to marshal params: %w", err)
+			}
+
+			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryValidatorsExtended), bz)
+			if err != nil {
+				return err
+			}
+
+			var result []types.ValidatorResp
+			cdc.MustUnmarshalJSON(res, &result)
+			return cliCtx.PrintOutput(result)
+		},
+	}
+	cmd.Flags().String(FlagStatus, "", "(optional) filter validators by validator status, status: Bonded/Unbonding/Unbonded")
+	cmd.Flags().Int(flags.FlagPage, 1, "(optional) query a specific page of paginated results")
+	cmd.Flags().Int(flags.FlagLimit, 50, "(optional) query number of results returned per page")
+
+	return cmd
 }

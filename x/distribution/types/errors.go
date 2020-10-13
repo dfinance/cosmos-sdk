@@ -6,6 +6,7 @@ import (
 
 // x/distribution module sentinel errors
 var (
+	ErrInternal                       = sdkerrors.Register(ModuleName, 0, "internal error")
 	ErrEmptyDelegatorAddr             = sdkerrors.Register(ModuleName, 1, "delegator address is empty")
 	ErrEmptyWithdrawAddr              = sdkerrors.Register(ModuleName, 2, "withdraw address is empty")
 	ErrEmptyValidatorAddr             = sdkerrors.Register(ModuleName, 3, "validator address is empty")

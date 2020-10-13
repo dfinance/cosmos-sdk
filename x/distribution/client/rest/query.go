@@ -63,6 +63,15 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute st
 		poolHandler(cliCtx, queryRoute),
 	).Methods("GET")
 
+	r.HandleFunc(
+		"/distribution/validator_extended/{validatorAddr}",
+		queryValidatorExtended(cliCtx, queryRoute),
+	).Methods("GET")
+
+	r.HandleFunc(
+		"/distribution/validators_extended",
+		queryValidatorsExtended(cliCtx, queryRoute),
+	).Methods("GET")
 }
 
 // delegatorRewardsHandlerFn godoc
@@ -412,4 +421,76 @@ func checkResponseQueryDelegationRewards(
 	}
 
 	return res, height, true
+}
+
+func queryValidatorExtended(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		bech32validatorAddr := vars["validatorAddr"]
+
+		validatorAddr, err := sdk.ValAddressFromBech32(bech32validatorAddr)
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
+		if !ok {
+			return
+		}
+
+		params := types.NewQueryValidatorParams(validatorAddr)
+		bz, err := cliCtx.Codec.MarshalJSON(params)
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		queryPath := fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryValidatorExtended)
+		res, height, err := cliCtx.QueryWithData(queryPath, bz)
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		cliCtx = cliCtx.WithHeight(height)
+		rest.PostProcessResponse(w, cliCtx, res)
+	}
+}
+
+func queryValidatorsExtended(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, page, limit, err := rest.ParseHTTPArgsWithLimit(r, 50)
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
+		if !ok {
+			return
+		}
+
+		status := r.FormValue("status")
+		if status == "" {
+			status = sdk.BondStatusBonded
+		}
+
+		params := types.NewQueryValidatorsParams(page, limit, status)
+		bz, err := cliCtx.Codec.MarshalJSON(params)
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		queryPath := fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryValidatorsExtended)
+		res, height, err := cliCtx.QueryWithData(queryPath, bz)
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		cliCtx = cliCtx.WithHeight(height)
+		rest.PostProcessResponse(w, cliCtx, res)
+	}
 }

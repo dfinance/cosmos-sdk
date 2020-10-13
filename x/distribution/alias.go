@@ -26,6 +26,8 @@ const (
 	QueryPool                           = types.QueryPool
 	QueryLockedRewardsState             = types.QueryLockedRewardsState
 	QueryLockedRatio                    = types.QueryLockedRatio
+	QueryValidatorExtended              = types.QueryValidatorExtended
+	QueryValidatorsExtended             = types.QueryValidatorsExtended
 	DefaultParamspace                   = types.DefaultParamspace
 	TypeMsgFundPublicTreasuryPool       = types.TypeMsgFundPublicTreasuryPool
 	ChangeFoundationAllocationRatioTTL  = types.ChangeFoundationAllocationRatioTTL
@@ -185,4 +187,5 @@ type (
 	ValidatorOutstandingRewards            = types.ValidatorOutstandingRewards
 	ABCIVote                               = types.ABCIVote
 	ABCIVotes                              = types.ABCIVotes
+	ValidatorResp                          = types.ValidatorResp
 )

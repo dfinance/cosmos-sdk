@@ -16,6 +16,7 @@ const (
 	QueryInflation        = types.QueryInflation
 	QueryAnnualProvisions = types.QueryAnnualProvisions
 	QueryBlocksPerYear    = types.QueryBlocksPerYear
+	QueryMinterExtended   = types.QueryMinterExtended
 )
 
 var (
@@ -53,4 +54,5 @@ type (
 	Minter         = types.Minter
 	Params         = types.Params
 	BlockDurFilter = types.BlockDurFilter
+	MintInfo       = types.MintInfo
 )
