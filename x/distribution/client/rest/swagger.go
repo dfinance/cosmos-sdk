@@ -8,30 +8,53 @@ import (
 
 //nolint:deadcode,unused
 type (
-	SwaggerValidatorDistInfo struct {
-		OperatorAddress     sdk.AccAddress `json:"operator_address" yaml:"operator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
-		ValidatorCommission sdk.DecCoins   `json:"validator_commission"`
-		SelfBondRewards     sdk.DecCoins   `json:"self_bond_rewards"`
-	}
-
 	TxWithdrawDelegatorReward struct {
-		Msgs       []types.MsgWithdrawDelegatorReward `json:"msg" yaml:"msg"`
-		Fee        auth.StdFee                        `json:"fee" yaml:"fee"`
-		Signatures []auth.StdSignature                `json:"signatures" yaml:"signatures"`
-		Memo       string                             `json:"memo" yaml:"memo"`
+		Msgs       []types.MsgWithdrawDelegatorReward `json:"msg"`
+		Fee        auth.StdFee                        `json:"fee"`
+		Signatures []auth.StdSignature                `json:"signatures"`
+		Memo       string                             `json:"memo"`
 	}
 
 	TxSetWithdrawAddress struct {
-		Msgs       []types.MsgSetWithdrawAddress `json:"msg" yaml:"msg"`
-		Fee        auth.StdFee                   `json:"fee" yaml:"fee"`
-		Signatures []auth.StdSignature           `json:"signatures" yaml:"signatures"`
-		Memo       string                        `json:"memo" yaml:"memo"`
+		Msgs       []types.MsgSetWithdrawAddress `json:"msg"`
+		Fee        auth.StdFee                   `json:"fee"`
+		Signatures []auth.StdSignature           `json:"signatures"`
+		Memo       string                        `json:"memo"`
 	}
 
 	TxFundPublicTreasuryPool struct {
-		Msgs       []types.MsgFundPublicTreasuryPool `json:"msg" yaml:"msg"`
-		Fee        auth.StdFee                       `json:"fee" yaml:"fee"`
-		Signatures []auth.StdSignature               `json:"signatures" yaml:"signatures"`
-		Memo       string                            `json:"memo" yaml:"memo"`
+		Msgs       []types.MsgFundPublicTreasuryPool `json:"msg"`
+		Fee        auth.StdFee                       `json:"fee"`
+		Signatures []auth.StdSignature               `json:"signatures"`
+		Memo       string                            `json:"memo"`
+	}
+
+	QuerySwaggerValidatorDistInfoResp struct {
+		Height int64 `json:"height"`
+		Result struct {
+			OperatorAddress     sdk.AccAddress `json:"operator_address" yaml:"operator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
+			ValidatorCommission sdk.DecCoins   `json:"validator_commission"`
+			SelfBondRewards     sdk.DecCoins   `json:"self_bond_rewards"`
+		} `json:"result"`
+	}
+
+	QueryDelegationDelegatorRewardsResp struct {
+		Height int64                             `json:"height"`
+		Result []types.DelegationDelegatorReward `json:"result"`
+	}
+
+	QueryDecCoinsResp struct {
+		Height int64         `json:"height"`
+		Result []sdk.DecCoin `json:"result"`
+	}
+
+	QueryAddressResp struct {
+		Height int64  `json:"height"`
+		Result string `json:"result" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
+	}
+
+	QueryParamsResp struct {
+		Height int64        `json:"height"`
+		Result types.Params `json:"result"`
 	}
 )

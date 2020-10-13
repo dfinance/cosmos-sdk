@@ -35,7 +35,7 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 // @ID mintingGetParams
 // @Accept  json
 // @Produce json
-// @Success 200 {object} types.Params
+// @Success 200 {object} QueryParamsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /minting/parameters [get]
@@ -66,7 +66,7 @@ func queryParamsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @ID mintingGetInflation
 // @Accept  json
 // @Produce json
-// @Success 200 {string} Token "inflation in the decimal type"
+// @Success 200 {object} QueryDecResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /minting/inflation [get]
@@ -97,7 +97,7 @@ func queryInflationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @ID mintingGetAnnualProvisions
 // @Accept  json
 // @Produce json
-// @Success 200 {string} Token "Annual Provisions in the decimal type"
+// @Success 200 {object} QueryDecResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /minting/annual-provisions [get]

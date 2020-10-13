@@ -802,6 +802,144 @@ definitions:
       error:
         type: string
     type: object
+  rest.QueryAddressResp:
+    properties:
+      height:
+        type: integer
+      result:
+        example: wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h
+        format: bech32
+        type: string
+    type: object
+  rest.QueryDecCoinsResp:
+    properties:
+      height:
+        type: integer
+      result:
+        items:
+          $ref: '#/definitions/types.DecCoin'
+        type: array
+    type: object
+  rest.QueryDecResp:
+    properties:
+      height:
+        type: integer
+      result:
+        example: "0.123"
+        format: number
+        type: string
+    type: object
+  rest.QueryDelegationDelegatorRewardsResp:
+    properties:
+      height:
+        type: integer
+      result:
+        items:
+          $ref: '#/definitions/types.DelegationDelegatorReward'
+        type: array
+    type: object
+  rest.QueryDelegationResp:
+    properties:
+      height:
+        type: integer
+      result:
+        $ref: '#/definitions/types.Delegation'
+        type: object
+    type: object
+  rest.QueryDelegationsResp:
+    properties:
+      height:
+        type: integer
+      result:
+        items:
+          $ref: '#/definitions/types.DelegationResponse'
+        type: array
+    type: object
+  rest.QueryHistoricalInfoResp:
+    properties:
+      height:
+        type: integer
+      result:
+        $ref: '#/definitions/types.HistoricalInfo'
+        type: object
+    type: object
+  rest.QueryParamsResp:
+    properties:
+      height:
+        type: integer
+      result:
+        $ref: '#/definitions/StakingParams'
+        type: object
+    type: object
+  rest.QueryPoolResp:
+    properties:
+      height:
+        type: integer
+      result:
+        $ref: '#/definitions/types.Pool'
+        type: object
+    type: object
+  rest.QueryRedelegationsResp:
+    properties:
+      height:
+        type: integer
+      result:
+        items:
+          $ref: '#/definitions/types.RedelegationResponse'
+        type: array
+    type: object
+  rest.QuerySwaggerValidatorDistInfoResp:
+    properties:
+      height:
+        type: integer
+      result:
+        properties:
+          operator_address:
+            example: wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h
+            format: bech32
+            type: string
+          self_bond_rewards:
+            $ref: '#/definitions/types.DecCoins'
+            type: object
+          validator_commission:
+            $ref: '#/definitions/types.DecCoins'
+            type: object
+        type: object
+    type: object
+  rest.QueryUnbondingDelegationResp:
+    properties:
+      height:
+        type: integer
+      result:
+        $ref: '#/definitions/types.UnbondingDelegation'
+        type: object
+    type: object
+  rest.QueryUnbondingDelegationsResp:
+    properties:
+      height:
+        type: integer
+      result:
+        items:
+          $ref: '#/definitions/types.UnbondingDelegation'
+        type: array
+    type: object
+  rest.QueryValidatorResp:
+    properties:
+      height:
+        type: integer
+      result:
+        $ref: '#/definitions/types.Validator'
+        type: object
+    type: object
+  rest.QueryValidatorsResp:
+    properties:
+      height:
+        type: integer
+      result:
+        items:
+          $ref: '#/definitions/types.Validator'
+        type: array
+    type: object
   rest.RedelegateRequest:
     properties:
       amount:
@@ -825,19 +963,6 @@ definitions:
         example: wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h
         format: bech32
         type: string
-    type: object
-  rest.SwaggerValidatorDistInfo:
-    properties:
-      operator_address:
-        example: wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h
-        format: bech32
-        type: string
-      self_bond_rewards:
-        $ref: '#/definitions/types.DecCoins'
-        type: object
-      validator_commission:
-        $ref: '#/definitions/types.DecCoins'
-        type: object
     type: object
   rest.TxBeginRedelegate:
     properties:
@@ -1216,7 +1341,7 @@ definitions:
       not_bonded_tokens:
         description: Bonding tokens which are not bonded to a validators (unbonded or unbonding)
         example: "500"
-        format: string
+        format: integer
         type: string
     type: object
   types.RedelegationEntry:
@@ -1681,9 +1806,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.DelegationDelegatorReward'
-            type: array
+            $ref: '#/definitions/rest.QueryDelegationDelegatorRewardsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -1744,15 +1867,18 @@ paths:
         name: delegatorAddr
         required: true
         type: string
+      - description: Bech32 OperatorAddress of validator
+        in: path
+        name: validatorAddr
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.DecCoin'
-            type: array
+            $ref: '#/definitions/rest.QueryDecCoinsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -1822,9 +1948,9 @@ paths:
       - application/json
       responses:
         "200":
-          description: Bech32 AccAddress of the rewards withdrawal address
+          description: OK
           schema:
-            type: string
+            $ref: '#/definitions/rest.QueryAddressResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -1885,7 +2011,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DistributionParams'
+            $ref: '#/definitions/rest.QueryParamsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -1915,7 +2041,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.DecCoins'
+            $ref: '#/definitions/rest.QueryDecCoinsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -1932,7 +2058,7 @@ paths:
       consumes:
       - application/json
       description: Fund the public treasury pool
-      operationId: distributionPostWithdrawValidatorRewards
+      operationId: distributionPostFundPublicTreasuryPool
       parameters:
       - description: FundPublicTreasuryPoolReq request with signed transaction
         in: body
@@ -1978,7 +2104,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.SwaggerValidatorDistInfo'
+            $ref: '#/definitions/rest.QuerySwaggerValidatorDistInfoResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -2008,7 +2134,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.DecCoins'
+            $ref: '#/definitions/rest.QueryDecCoinsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -2038,7 +2164,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.DecCoins'
+            $ref: '#/definitions/rest.QueryDecCoinsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -2563,9 +2689,9 @@ paths:
       - application/json
       responses:
         "200":
-          description: Annual Provisions in the decimal type
+          description: OK
           schema:
-            type: string
+            $ref: '#/definitions/rest.QueryDecResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -2587,9 +2713,9 @@ paths:
       - application/json
       responses:
         "200":
-          description: inflation in the decimal type
+          description: OK
           schema:
-            type: string
+            $ref: '#/definitions/rest.QueryDecResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -2613,7 +2739,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/MintParams'
+            $ref: '#/definitions/rest.QueryParamsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -2811,9 +2937,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.DelegationResponse'
-            type: array
+            $ref: '#/definitions/rest.QueryDelegationsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -2885,7 +3009,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Delegation'
+            $ref: '#/definitions/rest.QueryDelegationResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -2989,9 +3113,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.UnbondingDelegation'
-            type: array
+            $ref: '#/definitions/rest.QueryUnbondingDelegationsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3063,7 +3185,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.UnbondingDelegation'
+            $ref: '#/definitions/rest.QueryUnbondingDelegationResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3093,9 +3215,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.Validator'
-            type: array
+            $ref: '#/definitions/rest.QueryValidatorsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3130,7 +3250,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Validator'
+            $ref: '#/definitions/rest.QueryValidatorResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3160,7 +3280,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.HistoricalInfo'
+            $ref: '#/definitions/rest.QueryHistoricalInfoResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3184,7 +3304,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/StakingParams'
+            $ref: '#/definitions/rest.QueryParamsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3208,7 +3328,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Pool'
+            $ref: '#/definitions/rest.QueryPoolResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3245,9 +3365,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.RedelegationResponse'
-            type: array
+            $ref: '#/definitions/rest.QueryRedelegationsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3284,9 +3402,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.Validator'
-            type: array
+            $ref: '#/definitions/rest.QueryValidatorsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3316,7 +3432,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Validator'
+            $ref: '#/definitions/rest.QueryValidatorResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3346,9 +3462,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.DelegationResponse'
-            type: array
+            $ref: '#/definitions/rest.QueryDelegationsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3378,9 +3492,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.UnbondingDelegation'
-            type: array
+            $ref: '#/definitions/rest.QueryUnbondingDelegationsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:

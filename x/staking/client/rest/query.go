@@ -115,7 +115,7 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 // @Accept  json
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
-// @Success 200 {object} []types.DelegationResponse
+// @Success 200 {object} QueryDelegationsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/delegators/{delegatorAddr}/delegations [get]
@@ -131,7 +131,7 @@ func delegatorDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Accept  json
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
-// @Success 200 {object} []types.UnbondingDelegation
+// @Success 200 {object} QueryUnbondingDelegationsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/delegators/{delegatorAddr}/unbonding_delegations [get]
@@ -232,7 +232,7 @@ func delegatorTxsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
 // @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
-// @Success 200 {object} types.UnbondingDelegation
+// @Success 200 {object} QueryUnbondingDelegationResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/delegators/{delegatorAddr}/unbonding_delegations/{validatorAddr} [get]
@@ -250,7 +250,7 @@ func unbondingDelegationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Param delegator query string false "Bech32 AccAddress of Delegator"
 // @Param validator_from query string false "Bech32 AccAddress of SrcValidator"
 // @Param validator_to query string false "Bech32 AccAddress of DstValidator"
-// @Success 200 {object} []types.RedelegationResponse
+// @Success 200 {object} QueryRedelegationsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/redelegations [get]
@@ -320,7 +320,7 @@ func redelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
 // @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
-// @Success 200 {object} types.Delegation
+// @Success 200 {object} QueryDelegationResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/delegators/{delegatorAddr}/delegations/{validatorAddr} [get]
@@ -336,7 +336,7 @@ func delegationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Accept  json
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
-// @Success 200 {object} []types.Validator
+// @Success 200 {object} QueryValidatorsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/delegators/{delegatorAddr}/validators [get]
@@ -353,7 +353,7 @@ func delegatorValidatorsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
 // @Param validatorAddr path string true "Bech32 ValAddress of Delegator"
-// @Success 200 {object} types.Validator
+// @Success 200 {object} QueryValidatorResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/delegators/{delegatorAddr}/validators/{validatorAddr} [get]
@@ -371,7 +371,7 @@ func delegatorValidatorHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Param status query string false "The validator bond status. Must be either 'bonded', 'unbonded', or 'unbonding'"
 // @Param page query string false "The page number"
 // @Param limit query string false "The maximum number of items per page"
-// @Success 200 {object} []types.Validator
+// @Success 200 {object} QueryValidatorsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/validators [get]
@@ -420,7 +420,7 @@ func validatorsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Accept  json
 // @Produce json
 // @Param validatorAddr path string true "Bech32 ValAddress"
-// @Success 200 {object} types.Validator
+// @Success 200 {object} QueryValidatorResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/validators/{validatorAddr} [get]
@@ -436,7 +436,7 @@ func validatorHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Accept  json
 // @Produce json
 // @Param validatorAddr path string true "Bech32 ValAddress"
-// @Success 200 {object} []types.DelegationResponse
+// @Success 200 {object} QueryDelegationsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/validators/{validatorAddr}/delegations [get]
@@ -452,7 +452,7 @@ func validatorDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @Accept  json
 // @Produce json
 // @Param validatorAddr path string true "Bech32 ValAddress"
-// @Success 200 {object} []types.UnbondingDelegation
+// @Success 200 {object} QueryUnbondingDelegationsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/validators/{validatorAddr}/unbonding_delegations [get]
@@ -468,7 +468,7 @@ func validatorUnbondingDelegationsHandlerFn(cliCtx context.CLIContext) http.Hand
 // @Accept  json
 // @Produce json
 // @Param height path string true "block height"
-// @Success 200 {object} types.HistoricalInfo
+// @Success 200 {object} QueryHistoricalInfoResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/historical_info/{height} [get]
@@ -508,7 +508,7 @@ func historicalInfoHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @ID stakingGetPool
 // @Accept  json
 // @Produce json
-// @Success 200 {object} types.Pool
+// @Success 200 {object} QueryPoolResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/pool [get]
@@ -538,7 +538,7 @@ func poolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 // @ID stakingGetParams
 // @Accept  json
 // @Produce json
-// @Success 200 {object} types.Params
+// @Success 200 {object} QueryParamsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /staking/parameters [get]

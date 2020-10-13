@@ -241,7 +241,7 @@ func withdrawValidatorRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerFu
 // @Tags Distribution
 // @Summary Fund the public treasury pool
 // @Description Fund the public treasury pool
-// @ID distributionPostWithdrawValidatorRewards
+// @ID distributionPostFundPublicTreasuryPool
 // @Accept  json
 // @Produce json
 // @Param postRequest body fundPublicTreasuryPoolReq true "FundPublicTreasuryPoolReq request with signed transaction"

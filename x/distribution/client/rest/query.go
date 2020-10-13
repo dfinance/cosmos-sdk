@@ -73,7 +73,7 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute st
 // @Accept  json
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
-// @Success 200 {object} []types.DelegationDelegatorReward
+// @Success 200 {object} QueryDelegationDelegatorRewardsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/delegators/{delegatorAddr}/rewards [get]
@@ -116,7 +116,8 @@ func delegatorRewardsHandlerFn(cliCtx context.CLIContext, queryRoute string) htt
 // @Accept  json
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
-// @Success 200 {object} []types.DecCoin
+// @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
+// @Success 200 {object} QueryDecCoinsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/delegators/{delegatorAddr}/rewards/{validatorAddr} [get]
@@ -149,7 +150,7 @@ func delegationRewardsHandlerFn(cliCtx context.CLIContext, queryRoute string) ht
 // @Accept  json
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
-// @Success 200 {string} Token "Bech32 AccAddress of the rewards withdrawal address"
+// @Success 200 {object} QueryAddressResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/delegators/{delegatorAddr}/withdraw_address [get]
@@ -203,7 +204,7 @@ func NewValidatorDistInfo(operatorAddr sdk.AccAddress, rewards sdk.DecCoins,
 // @Accept  json
 // @Produce json
 // @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
-// @Success 200 {object} SwaggerValidatorDistInfo
+// @Success 200 {object} QuerySwaggerValidatorDistInfoResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/validators/{validatorAddr} [get]
@@ -264,7 +265,7 @@ func validatorInfoHandlerFn(cliCtx context.CLIContext, queryRoute string) http.H
 // @Accept  json
 // @Produce json
 // @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
-// @Success 200 {object} types.DecCoins
+// @Success 200 {object} QueryDecCoinsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/validators/{validatorAddr}/rewards [get]
@@ -299,7 +300,7 @@ func validatorRewardsHandlerFn(cliCtx context.CLIContext, queryRoute string) htt
 // @ID distributionGetParams
 // @Accept  json
 // @Produce json
-// @Success 200 {object} types.Params
+// @Success 200 {object} QueryParamsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/parameters [get]
@@ -330,7 +331,7 @@ func paramsHandlerFn(cliCtx context.CLIContext, queryRoute string) http.HandlerF
 // @Accept  json
 // @Produce json
 // @Param poolName path string true "PoolName: LiquidityProvidersPool, FoundationPool, PublicTreasuryPool, HARP"
-// @Success 200 {object} types.DecCoins
+// @Success 200 {object} QueryDecCoinsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/pool/{poolName} [get]
@@ -372,7 +373,7 @@ func poolHandler(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc 
 // @Accept  json
 // @Produce json
 // @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
-// @Success 200 {object} types.DecCoins
+// @Success 200 {object} QueryDecCoinsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/validators/{validatorAddr}/outstanding_rewards [get]
