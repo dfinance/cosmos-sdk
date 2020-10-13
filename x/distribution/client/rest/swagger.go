@@ -57,4 +57,14 @@ type (
 		Height int64        `json:"height"`
 		Result types.Params `json:"result"`
 	}
+
+	QueryExtendedValidatorResp struct {
+		Height int64               `json:"height"`
+		Result types.ValidatorResp `json:"result"`
+	}
+
+	QueryExtendedValidatorsResp struct {
+		Height int64                 `json:"height"`
+		Result []types.ValidatorResp `json:"result"`
+	}
 )

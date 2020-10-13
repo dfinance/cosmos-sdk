@@ -1,7 +1,7 @@
 package rest
 
 import (
-	"github.com/cosmos/cosmos-sdk/x/distribution/types"
+	"github.com/cosmos/cosmos-sdk/x/mint/internal/types"
 )
 
 //nolint:deadcode,unused
@@ -14,5 +14,10 @@ type (
 	QueryParamsResp struct {
 		Height int64        `json:"height"`
 		Result types.Params `json:"result"`
+	}
+
+	QueryMinterExtendedResp struct {
+		Height int64          `json:"height"`
+		Result types.MintInfo `json:"result"`
 	}
 )

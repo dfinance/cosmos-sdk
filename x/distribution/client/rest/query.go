@@ -65,12 +65,12 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute st
 
 	r.HandleFunc(
 		"/distribution/validator_extended/{validatorAddr}",
-		queryValidatorExtended(cliCtx, queryRoute),
+		validatorExtendedHandlerFn(cliCtx, queryRoute),
 	).Methods("GET")
 
 	r.HandleFunc(
 		"/distribution/validators_extended",
-		queryValidatorsExtended(cliCtx, queryRoute),
+		validatorsExtendedHandlerFn(cliCtx, queryRoute),
 	).Methods("GET")
 }
 
@@ -423,7 +423,19 @@ func checkResponseQueryDelegationRewards(
 	return res, height, true
 }
 
-func queryValidatorExtended(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
+// validatorExtendedHandlerFn godoc
+// @Tags Distribution
+// @Summary Query the extended information from a single validator
+// @Description Query the extended information from a single validator containing distribution params
+// @ID distributionValidatorExtended
+// @Accept  json
+// @Produce json
+// @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
+// @Success 200 {object} QueryExtendedValidatorResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /distribution/validator_extended/{validatorAddr} [get]
+func validatorExtendedHandlerFn(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		bech32validatorAddr := vars["validatorAddr"]
@@ -458,7 +470,21 @@ func queryValidatorExtended(cliCtx context.CLIContext, queryRoute string) http.H
 	}
 }
 
-func queryValidatorsExtended(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
+// validatorыExtendedHandlerFn godoc
+// @Tags Distribution
+// @Summary Query the extended information from multiple validators
+// @Description Query the extended information from multiple validators containing distribution params
+// @ID distributionValidatorsExtended
+// @Accept  json
+// @Produce json
+// @Param status query string false "The validator bond status. Must be either 'bonded', 'unbonded', or 'unbonding'"
+// @Param page query string false "The page number"
+// @Param limit query string false "The maximum number of items per page"
+// @Success 200 {object} QueryExtendedValidatorsResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /distribution/validators_extended [get]
+func validatorsExtendedHandlerFn(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, page, limit, err := rest.ParseHTTPArgsWithLimit(r, 50)
 		if err != nil {

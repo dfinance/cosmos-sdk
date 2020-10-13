@@ -26,6 +26,11 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 		"/minting/annual-provisions",
 		queryAnnualProvisionsHandlerFn(cliCtx),
 	).Methods("GET")
+
+	r.HandleFunc(
+		"/minting/minter-extended",
+		queryMinterExtendedHandlerFn(cliCtx),
+	).Methods("GET")
 }
 
 // queryParamsHandlerFn godoc
@@ -104,6 +109,37 @@ func queryInflationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 func queryAnnualProvisionsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryAnnualProvisions)
+
+		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
+		if !ok {
+			return
+		}
+
+		res, height, err := cliCtx.QueryWithData(route, nil)
+		if err != nil {
+			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		cliCtx = cliCtx.WithHeight(height)
+		rest.PostProcessResponse(w, cliCtx, res)
+	}
+}
+
+// queryMinterExtendedHandlerFn godoc
+// @Tags Mint
+// @Summary Current minting extended state
+// @Description Current minting extended state
+// @ID mintingGetExtendedState
+// @Accept  json
+// @Produce json
+// @Success 200 {object} QueryMinterExtendedResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /minting/minter-extended [get]
+func queryMinterExtendedHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryMinterExtended)
 
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
 		if !ok {
