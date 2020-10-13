@@ -13,8 +13,8 @@ import (
 
 // DecCoin defines a coin which can have additional decimal points
 type DecCoin struct {
-	Denom  string `json:"denom"`
-	Amount Dec    `json:"amount"`
+	Denom  string `json:"denom" example:"stake"`
+	Amount Dec    `json:"amount" swaggertype:"string" format:"number" example:"100"`
 }
 
 // NewDecCoin creates a new DecCoin instance from an Int.

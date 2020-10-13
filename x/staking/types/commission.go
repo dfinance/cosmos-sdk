@@ -17,9 +17,9 @@ type (
 	// CommissionRates defines the initial commission rates to be used for creating a
 	// validator.
 	CommissionRates struct {
-		Rate          sdk.Dec `json:"rate" yaml:"rate"`                       // the commission rate charged to delegators, as a fraction
-		MaxRate       sdk.Dec `json:"max_rate" yaml:"max_rate"`               // maximum commission rate which validator can ever charge, as a fraction
-		MaxChangeRate sdk.Dec `json:"max_change_rate" yaml:"max_change_rate"` // maximum daily increase of the validator commission, as a fraction
+		Rate          sdk.Dec `json:"rate" yaml:"rate" swaggertype:"string" format:"number" example:"0.1"`                       // the commission rate charged to delegators, as a fraction
+		MaxRate       sdk.Dec `json:"max_rate" yaml:"max_rate" swaggertype:"string" format:"number" example:"0.3"`               // maximum commission rate which validator can ever charge, as a fraction
+		MaxChangeRate sdk.Dec `json:"max_change_rate" yaml:"max_change_rate" swaggertype:"string" format:"number" example:"0.5"` // maximum daily increase of the validator commission, as a fraction
 	}
 )
 

@@ -12,9 +12,9 @@ import (
 
 // UnbondingDelegation stores all of a single delegator's unbonding bonds for a single validator in an time-ordered list.
 type UnbondingDelegation struct {
-	DelegatorAddress sdk.AccAddress             `json:"delegator_address" yaml:"delegator_address"` // delegator
-	ValidatorAddress sdk.ValAddress             `json:"validator_address" yaml:"validator_address"` // validator unbonding from operator addr
-	Entries          []UnbondingDelegationEntry `json:"entries" yaml:"entries"`                     // unbonding delegation entries
+	DelegatorAddress sdk.AccAddress             `json:"delegator_address" yaml:"delegator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"` // delegator
+	ValidatorAddress sdk.ValAddress             `json:"validator_address" yaml:"validator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"` // validator unbonding from operator addr
+	Entries          []UnbondingDelegationEntry `json:"entries" yaml:"entries"`                                                                                                                  // unbonding delegation entries
 }
 
 // UnbondingDelegationEntry - entry to an UnbondingDelegation.
@@ -25,11 +25,11 @@ type UnbondingDelegationEntry struct {
 	// Time at which the unbonding delegation will complete
 	CompletionTime time.Time `json:"completion_time" yaml:"completion_time"`
 	// Operation type
-	OpType DelegationOpType `json:"op_type" yaml:"op_type"`
+	OpType DelegationOpType `json:"op_type" yaml:"op_type" swaggertype:"string" example:"bonding"`
 	// Tokens initially scheduled to receive at completion
-	InitialBalance sdk.Int `json:"initial_balance" yaml:"initial_balance"`
+	InitialBalance sdk.Int `json:"initial_balance" yaml:"initial_balance" swaggertype:"string" format:"integer" example:"1000"`
 	// Tokens to receive at completion
-	Balance sdk.Int `json:"balance" yaml:"balance"`
+	Balance sdk.Int `json:"balance" yaml:"balance" swaggertype:"string" format:"integer" example:"1000"`
 }
 
 // IsMature - is the current entry mature.

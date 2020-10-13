@@ -36,10 +36,10 @@ func (t DVVTriplet) Equal(t2 DVVTriplet) bool {
 // Redelegation contains the list of a particular delegator's redelegating bonds from a particular source validator
 // to a particular destination validator.
 type Redelegation struct {
-	DelegatorAddress    sdk.AccAddress      `json:"delegator_address" yaml:"delegator_address"`         // delegator
-	ValidatorSrcAddress sdk.ValAddress      `json:"validator_src_address" yaml:"validator_src_address"` // validator redelegation source operator addr
-	ValidatorDstAddress sdk.ValAddress      `json:"validator_dst_address" yaml:"validator_dst_address"` // validator redelegation destination operator addr
-	Entries             []RedelegationEntry `json:"entries" yaml:"entries"`                             // redelegation entries
+	DelegatorAddress    sdk.AccAddress      `json:"delegator_address" yaml:"delegator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`            // delegator
+	ValidatorSrcAddress sdk.ValAddress      `json:"validator_src_address" yaml:"validator_src_address" swaggertype:"string" format:"bech32" example:"walletval13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"` // validator redelegation source operator addr
+	ValidatorDstAddress sdk.ValAddress      `json:"validator_dst_address" yaml:"validator_dst_address" swaggertype:"string" format:"bech32" example:"walletval13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"` // validator redelegation destination operator addr
+	Entries             []RedelegationEntry `json:"entries" yaml:"entries"`                                                                                                                             // redelegation entries
 }
 
 // RedelegationEntry - entry to a Redelegation.
@@ -50,11 +50,11 @@ type RedelegationEntry struct {
 	// Time at which the redelegation will complete
 	CompletionTime time.Time `json:"completion_time" yaml:"completion_time"`
 	// Operation type
-	OpType DelegationOpType `json:"op_type" yaml:"op_type"`
+	OpType DelegationOpType `json:"op_type" yaml:"op_type" swaggertype:"string" example:"bonding"`
 	// Initial balance when redelegation started
-	InitialBalance sdk.Int `json:"initial_balance" yaml:"initial_balance"`
+	InitialBalance sdk.Int `json:"initial_balance" yaml:"initial_balance" swaggertype:"string" format:"integer" example:"100"`
 	// Amount of destination-validator shares created by redelegation
-	SharesDst sdk.Dec `json:"shares_dst" yaml:"shares_dst"`
+	SharesDst sdk.Dec `json:"shares_dst" yaml:"shares_dst" swaggertype:"string" format:"number" example:"0.1"`
 }
 
 // IsMature - is the current entry mature.

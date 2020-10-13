@@ -63,7 +63,19 @@ type (
 	}
 )
 
-// Withdraw delegator rewards
+// withdrawDelegatorRewardsHandlerFn godoc
+// @Tags Distribution
+// @Summary Withdraw all the delegator's delegation rewards
+// @Description Withdraw all the delegator's delegation rewards
+// @ID distributionPostWithdrawDelegatorRewards
+// @Accept  json
+// @Produce json
+// @Param postRequest body withdrawRewardsReq true "WithdrawRewardsReq request with signed transaction"
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Success 200 {object} []TxWithdrawDelegatorReward
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /distribution/delegators/{delegatorAddr}/rewards [post]
 func withdrawDelegatorRewardsHandlerFn(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req withdrawRewardsReq
@@ -92,7 +104,20 @@ func withdrawDelegatorRewardsHandlerFn(cliCtx context.CLIContext, queryRoute str
 	}
 }
 
-// Withdraw delegation rewards
+// withdrawDelegationRewardsHandlerFn godoc
+// @Tags Distribution
+// @Summary Withdraw a delegation reward
+// @Description Withdraw a delegator's delegation reward from a single validator
+// @ID distributionPostWithdrawDelegationRewards
+// @Accept  json
+// @Produce json
+// @Param postRequest body withdrawRewardsReq true "WithdrawRewardsReq request with signed transaction"
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
+// @Success 200 {object} []TxWithdrawDelegatorReward
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /distribution/delegators/{delegatorAddr}/rewards/{validatorAddr} [post]
 func withdrawDelegationRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req withdrawRewardsReq
@@ -127,7 +152,19 @@ func withdrawDelegationRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerF
 	}
 }
 
-// Replace the rewards withdrawal address
+// setDelegatorWithdrawalAddrHandlerFn godoc
+// @Tags Distribution
+// @Summary Withdraw a delegation reward
+// @Description Withdraw a delegator's delegation reward from a single validator
+// @ID distributionPostSetDelegatorWithdrawalAddr
+// @Accept  json
+// @Produce json
+// @Param postRequest body setWithdrawalAddrReq true "SetWithdrawalAddrReq request with signed transaction"
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Success 200 {object} []TxSetWithdrawAddress
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /distribution/delegators/{delegatorAddr}/withdraw_address [post]
 func setDelegatorWithdrawalAddrHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req setWithdrawalAddrReq
@@ -157,7 +194,19 @@ func setDelegatorWithdrawalAddrHandlerFn(cliCtx context.CLIContext) http.Handler
 	}
 }
 
-// Withdraw validator rewards and commission
+// withdrawValidatorRewardsHandlerFn godoc
+// @Tags Distribution
+// @Summary Withdraw the validator's rewards
+// @Description Withdraw the validator's self-delegation and commissions rewards
+// @ID distributionPostWithdrawValidatorRewards
+// @Accept  json
+// @Produce json
+// @Param postRequest body withdrawRewardsReq true "WithdrawRewardsReq request with signed transaction"
+// @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
+// @Success 200 {object} []types.StdTx
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /distribution/validators/{validatorAddr}/rewards [post]
 func withdrawValidatorRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req withdrawRewardsReq
@@ -188,6 +237,18 @@ func withdrawValidatorRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerFu
 	}
 }
 
+// withdrawValidatorRewardsHandlerFn godoc
+// @Tags Distribution
+// @Summary Fund the public treasury pool
+// @Description Fund the public treasury pool
+// @ID distributionPostFundPublicTreasuryPool
+// @Accept  json
+// @Produce json
+// @Param postRequest body fundPublicTreasuryPoolReq true "FundPublicTreasuryPoolReq request with signed transaction"
+// @Success 200 {object} []TxFundPublicTreasuryPool
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /distribution/public_treasury_pool [post]
 func fundPublicTreasuryPoolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req fundPublicTreasuryPoolReq

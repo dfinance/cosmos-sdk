@@ -27,15 +27,15 @@ var _ exported.ValidatorI = Validator{}
 // bonded shares multiplied by exchange rate.
 type Validator struct {
 	// Address of the validator's operator; bech encoded in JSON
-	OperatorAddress sdk.ValAddress `json:"operator_address" yaml:"operator_address"`
+	OperatorAddress sdk.ValAddress `json:"operator_address" yaml:"operator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
 	// Consensus public key of the validator; bech encoded in JSON
-	ConsPubKey crypto.PubKey `json:"consensus_pubkey" yaml:"consensus_pubkey"`
+	ConsPubKey crypto.PubKey `json:"consensus_pubkey" yaml:"consensus_pubkey" swaggertype:"string"`
 	// Has the validator been jailed from bonded status?
 	Jailed bool `json:"jailed" yaml:"jailed"`
 	// Has the validator been scheduled to force unbond due to low SelfStake amount compared to TotalDelegationsAmount
 	ScheduledToUnbond bool `json:"scheduled_to_unbond" yaml:"scheduled_to_unbond"`
 	// Validator status (bonded/unbonding/unbonded)
-	Status sdk.BondStatus `json:"status" yaml:"status"`
+	Status sdk.BondStatus `json:"status" yaml:"status" swaggertype:"string" example:"bonded"`
 	// Delegated bonding tokens (incl. self-delegation)
 	Bonding ValidatorTokens `json:"bonding" yaml:"bonding"`
 	// Delegated liquidity tokens
@@ -53,7 +53,7 @@ type Validator struct {
 	// Commission parameters
 	Commission Commission `json:"commission" yaml:"commission"`
 	// Validator's self declared minimum self delegation
-	MinSelfDelegation sdk.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
+	MinSelfDelegation sdk.Int `json:"min_self_delegation" yaml:"min_self_delegation" swaggertype:"string" format:"integer" example:"1000"`
 }
 
 // TestEquivalent checks equality of vital fields of two validators.

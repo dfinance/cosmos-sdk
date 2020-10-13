@@ -107,17 +107,51 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 
 }
 
-// HTTP request handler to query a delegator delegations
+// delegatorDelegationsHandlerFn godoc
+// @Tags Staking
+// @Summary Get all delegations from a delegator
+// @Description Get all delegations from a delegator
+// @ID stakingGetDelegatorDelegations
+// @Accept  json
+// @Produce json
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Success 200 {object} QueryDelegationsResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/delegators/{delegatorAddr}/delegations [get]
 func delegatorDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return queryDelegator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryDelegatorDelegations))
 }
 
-// HTTP request handler to query a delegator unbonding delegations
+// delegatorUnbondingDelegationsHandlerFn godoc
+// @Tags Staking
+// @Summary Get all unbonding delegations from a delegator
+// @Description Get all unbonding delegations from a delegator
+// @ID stakingGetDelegatorUnbondingDelegations
+// @Accept  json
+// @Produce json
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Success 200 {object} QueryUnbondingDelegationsResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/delegators/{delegatorAddr}/unbonding_delegations [get]
 func delegatorUnbondingDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
-	return queryDelegator(cliCtx, "custom/staking/delegatorUnbondingDelegations")
+	return queryDelegator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryDelegatorUnbondingDelegations))
 }
 
-// HTTP request handler to query all staking txs (msgs) from a delegator
+// delegatorTxsHandlerFn godoc
+// @Tags Staking
+// @Summary Query all staking txs (msgs) from a delegator
+// @Description Query all staking txs (msgs) from a delegator
+// @ID stakingGetDelegatorTxs
+// @Accept  json
+// @Produce json
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Param type query string false "Unbonding types via space: bond unbond redelegate"
+// @Success 200 {object} []types.SearchTxsResult
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/delegators/{delegatorAddr}/txs [get]
 func delegatorTxsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var typesQuerySlice []string
@@ -189,12 +223,37 @@ func delegatorTxsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-// HTTP request handler to query an unbonding-delegation
+// unbondingDelegationHandlerFn godoc
+// @Tags Staking
+// @Summary Query all unbonding delegations between a delegator and a validator
+// @Description Query all unbonding delegations between a delegator and a validator
+// @ID stakingGetUnbondingDelegation
+// @Accept  json
+// @Produce json
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
+// @Success 200 {object} QueryUnbondingDelegationResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/delegators/{delegatorAddr}/unbonding_delegations/{validatorAddr} [get]
 func unbondingDelegationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
-	return queryBonds(cliCtx, "custom/staking/unbondingDelegation")
+	return queryBonds(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryUnbondingDelegation))
 }
 
-// HTTP request handler to query redelegations
+// redelegationsHandlerFn godoc
+// @Tags Staking
+// @Summary Get all redelegations (filter by query params)
+// @Description Get all redelegations (filter by query params)
+// @ID stakingGetRedelegations
+// @Accept  json
+// @Produce json
+// @Param delegator query string false "Bech32 AccAddress of Delegator"
+// @Param validator_from query string false "Bech32 AccAddress of SrcValidator"
+// @Param validator_to query string false "Bech32 AccAddress of DstValidator"
+// @Success 200 {object} QueryRedelegationsResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/redelegations [get]
 func redelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var params types.QueryRedelegationParams
@@ -252,22 +311,70 @@ func redelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-// HTTP request handler to query a delegation
+// delegationHandlerFn godoc
+// @Tags Staking
+// @Summary Query the current delegation between a delegator and a validator
+// @Description Query the current delegation between a delegator and a validator
+// @ID stakingGetDelegaton
+// @Accept  json
+// @Produce json
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
+// @Success 200 {object} QueryDelegationResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/delegators/{delegatorAddr}/delegations/{validatorAddr} [get]
 func delegationHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return queryBonds(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryDelegation))
 }
 
-// HTTP request handler to query all delegator bonded validators
+// delegatorValidatorsHandlerFn godoc
+// @Tags Staking
+// @Summary Query all validators that a delegator is bonded to
+// @Description Query all validators that a delegator is bonded to
+// @ID stakingGetDelegatorValidators
+// @Accept  json
+// @Produce json
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Success 200 {object} QueryValidatorsResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/delegators/{delegatorAddr}/validators [get]
 func delegatorValidatorsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
-	return queryDelegator(cliCtx, "custom/staking/delegatorValidators")
+	return queryDelegator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryDelegatorValidators))
 }
 
-// HTTP request handler to get information from a currently bonded validator
+// delegatorValidatorHandlerFn godoc
+// @Tags Staking
+// @Summary Query a validator that a delegator is bonded to
+// @Description Query a validator that a delegator is bonded to
+// @ID stakingGetDelegatorValidator
+// @Accept  json
+// @Produce json
+// @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
+// @Param validatorAddr path string true "Bech32 ValAddress of Delegator"
+// @Success 200 {object} QueryValidatorResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/delegators/{delegatorAddr}/validators/{validatorAddr} [get]
 func delegatorValidatorHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
-	return queryBonds(cliCtx, "custom/staking/delegatorValidator")
+	return queryDelegator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryDelegatorValidator))
 }
 
-// HTTP request handler to query list of validators
+// validatorsHandlerFn godoc
+// @Tags Staking
+// @Summary Get all validator candidates. By default it returns only the bonded validators
+// @Description Get all validator candidates. By default it returns only the bonded validators
+// @ID stakingGetValidators
+// @Accept  json
+// @Produce json
+// @Param status query string false "The validator bond status. Must be either 'bonded', 'unbonded', or 'unbonding'"
+// @Param page query string false "The page number"
+// @Param limit query string false "The maximum number of items per page"
+// @Success 200 {object} QueryValidatorsResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/validators [get]
 func validatorsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, page, limit, err := rest.ParseHTTPArgsWithLimit(r, 0)
@@ -305,22 +412,66 @@ func validatorsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-// HTTP request handler to query the validator information from a given validator address
+// validatorHandlerFn godoc
+// @Tags Staking
+// @Summary Query the information from a single validator
+// @Description Query the information from a single validator
+// @ID stakingGetValidator
+// @Accept  json
+// @Produce json
+// @Param validatorAddr path string true "Bech32 ValAddress"
+// @Success 200 {object} QueryValidatorResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/validators/{validatorAddr} [get]
 func validatorHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
-	return queryValidator(cliCtx, "custom/staking/validator")
+	return queryValidator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryValidator))
 }
 
-// HTTP request handler to query all unbonding delegations from a validator
+// validatorDelegationsHandlerFn godoc
+// @Tags Staking
+// @Summary Get the current delegations for the validator
+// @Description Get the current delegations for the validator
+// @ID stakingGetValidatorDelegations
+// @Accept  json
+// @Produce json
+// @Param validatorAddr path string true "Bech32 ValAddress"
+// @Success 200 {object} QueryDelegationsResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/validators/{validatorAddr}/delegations [get]
 func validatorDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return queryValidator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryValidatorDelegations))
 }
 
-// HTTP request handler to query all unbonding delegations from a validator
+// validatorUnbondingDelegationsHandlerFn godoc
+// @Tags Staking
+// @Summary Get the current unbonding information for the validator
+// @Description Get the current unbonding information for the validator
+// @ID stakingGetValidatorUnbondingDelegation
+// @Accept  json
+// @Produce json
+// @Param validatorAddr path string true "Bech32 ValAddress"
+// @Success 200 {object} QueryUnbondingDelegationsResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/validators/{validatorAddr}/unbonding_delegations [get]
 func validatorUnbondingDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
-	return queryValidator(cliCtx, "custom/staking/validatorUnbondingDelegations")
+	return queryValidator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryValidatorUnbondingDelegations))
 }
 
-// HTTP request handler to query historical info at a given height
+// historicalInfoHandlerFn godoc
+// @Tags Staking
+// @Summary Query historical info at a given height
+// @Description Query historical info at a given height
+// @ID stakingGetHistoricalInfo
+// @Accept  json
+// @Produce json
+// @Param height path string true "block height"
+// @Success 200 {object} QueryHistoricalInfoResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/historical_info/{height} [get]
 func historicalInfoHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
@@ -350,7 +501,17 @@ func historicalInfoHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-// HTTP request handler to query the pool information
+// poolHandlerFn godoc
+// @Tags Staking
+// @Summary Get the current state of the staking pool
+// @Description Get the current state of the staking pool
+// @ID stakingGetPool
+// @Accept  json
+// @Produce json
+// @Success 200 {object} QueryPoolResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/pool [get]
 func poolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
@@ -358,7 +519,8 @@ func poolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		res, height, err := cliCtx.QueryWithData("custom/staking/pool", nil)
+		route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryPool)
+		res, height, err := cliCtx.QueryWithData(route, nil)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -369,7 +531,17 @@ func poolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-// HTTP request handler to query the staking params values
+// paramsHandlerFn godoc
+// @Tags Staking
+// @Summary Get the current staking parameter values
+// @Description Get the current staking parameter values
+// @ID stakingGetParams
+// @Accept  json
+// @Produce json
+// @Success 200 {object} QueryParamsResp
+// @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
+// @Failure 500 {object} rest.ErrorResponse "Returned on server error"
+// @Router /staking/parameters [get]
 func paramsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
@@ -377,7 +549,8 @@ func paramsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		res, height, err := cliCtx.QueryWithData("custom/staking/parameters", nil)
+		route := fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryParameters)
+		res, height, err := cliCtx.QueryWithData(route, nil)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return

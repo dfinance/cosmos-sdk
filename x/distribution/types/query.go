@@ -36,7 +36,7 @@ func (res QueryDelegatorTotalRewardsResponse) String() string {
 // DelegationDelegatorReward defines the properties
 // of a delegator's delegation reward.
 type DelegationDelegatorReward struct {
-	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address"`
+	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
 	Reward           sdk.DecCoins   `json:"reward" yaml:"reward"`
 }
 
