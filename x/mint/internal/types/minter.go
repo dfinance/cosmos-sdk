@@ -96,14 +96,16 @@ func (m Minter) NextInflationPower(params Params, bondedRatio, lockedRatio sdk.D
 	// function f(u)
 	bondedShoulder := func() sdk.Dec {
 		if bondedRatio.LT(shoulderPoint) {
-			// 0 <= BondedRatio < 0.8: 1 - BondedRatio / 0.8
-			return sdk.OneDec().Sub(bondedRatio.Quo(shoulderPoint))
+			// 0 <= BondedRatio < 0.8: 1 - BondedRatio / 1.6
+			baseDec := sdk.NewDecWithPrec(16, 1)
+			return sdk.OneDec().Sub(bondedRatio.Quo(baseDec))
 		} else if bondedRatio.Equal(shoulderPoint) {
-			// 0.8: 0.0
-			return sdk.ZeroDec()
+			// 0.8: 0.5
+			return sdk.NewDecWithPrec(5, 1)
 		}
-		// 0.8 < BondedRatio <= 1: 3 * (BondedRatio - 0.8)
-		return sdk.NewDecWithPrec(3, 0).Mul(bondedRatio.Sub(shoulderPoint))
+		// 0.8 < BondedRatio <= 1: 2.5 - 2.5 * BondedRatio
+		baseDec := sdk.NewDecWithPrec(25, 1)
+		return baseDec.Sub(baseDec.Mul(bondedRatio))
 	}
 
 	// function g(u)
@@ -111,7 +113,7 @@ func (m Minter) NextInflationPower(params Params, bondedRatio, lockedRatio sdk.D
 		if lockedRatio.LT(shoulderPoint) {
 			// 0 <= LockedRatio < 0.8: LockedRatio / 0.8
 			return lockedRatio.Quo(shoulderPoint)
-		} else if bondedRatio.Equal(shoulderPoint) {
+		} else if lockedRatio.Equal(shoulderPoint) {
 			// 0.8: 1.0
 			return sdk.OneDec()
 		}
@@ -120,8 +122,9 @@ func (m Minter) NextInflationPower(params Params, bondedRatio, lockedRatio sdk.D
 	}
 
 	// InflationPower = InfPwrBondedLockedRatio * BondedShoulder + (1 - InfPwrBondedLockedRatio) * LockedShoulder
-	infPowerBonded := bondedLockedRatio.Mul(bondedShoulder())
-	infPowerLocked := sdk.OneDec().Sub(bondedLockedRatio).Mul(lockedShoulder())
+	f, g := bondedShoulder(), lockedShoulder()
+	infPowerBonded := bondedLockedRatio.Mul(f)
+	infPowerLocked := sdk.OneDec().Sub(bondedLockedRatio).Mul(g)
 	infPower := infPowerBonded.Add(infPowerLocked)
 
 	// sanity check (TODO: remove later)

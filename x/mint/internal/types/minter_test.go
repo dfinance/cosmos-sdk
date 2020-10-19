@@ -53,66 +53,6 @@ func TestNextMinMaxInflation(t *testing.T) {
 	}
 }
 
-func TestNextInflationPower(t *testing.T) {
-	minter := DefaultInitialMinter()
-	params := DefaultParams()
-
-	tests := []struct {
-		bondedLockedRatio, inBondedRatio, inLockedRatio sdk.Dec
-		outPwr                                          sdk.Dec
-	}{
-		// no bonded shoulder
-		{
-			sdk.NewDecWithPrec(4, 1),
-			sdk.NewDecWithPrec(8, 1),
-			sdk.NewDecWithPrec(8, 1),
-			sdk.NewDecWithPrec(6, 1),
-		},
-		// no locked shoulder
-		{
-			sdk.NewDecWithPrec(4, 1),
-			sdk.NewDecWithPrec(1, 0),
-			sdk.ZeroDec(),
-			sdk.NewDecWithPrec(24, 2),
-		},
-		// mixed #1 (bonded < 0.8, locked < 0.8)
-		{
-			sdk.NewDecWithPrec(4, 1),
-			sdk.NewDecWithPrec(6, 1),
-			sdk.NewDecWithPrec(4, 1),
-			sdk.NewDecWithPrec(4, 1),
-		},
-		// mixed #2 (bonded > 0.8, locked > 0.8)
-		{
-			sdk.NewDecWithPrec(4, 1),
-			sdk.NewDecWithPrec(9, 1),
-			sdk.NewDecWithPrec(85, 2),
-			sdk.NewDecWithPrec(63, 2),
-		},
-		// mixed #3 (bonded < 0.8, locked > 0.8)
-		{
-			sdk.NewDecWithPrec(4, 1),
-			sdk.NewDecWithPrec(2, 1),
-			sdk.NewDecWithPrec(85, 2),
-			sdk.NewDecWithPrec(81, 2),
-		},
-		// mixed #4 (bonded > 0.8, locked < 0.8)
-		{
-			sdk.NewDecWithPrec(4, 1),
-			sdk.NewDecWithPrec(95, 2),
-			sdk.NewDecWithPrec(1, 1),
-			sdk.NewDecWithPrec(255, 3),
-		},
-	}
-
-	for i, tc := range tests {
-		params.InfPwrBondedLockedRatio = tc.bondedLockedRatio
-
-		pwr := minter.NextInflationPower(params, tc.inBondedRatio, tc.inLockedRatio)
-		require.True(t, pwr.Equal(tc.outPwr), "Test [%d]: diff: %s", i, pwr.Sub(tc.outPwr))
-	}
-}
-
 func TestNextInflationRate(t *testing.T) {
 	minter := DefaultInitialMinter()
 	params := DefaultParams()
@@ -252,5 +192,215 @@ func TestBlockProvision(t *testing.T) {
 		expCoin := sdk.NewCoin(params.MintDenom, sdk.NewInt(tc.outCoinAmt))
 		outCoin := minter.BlockProvision(params)
 		require.True(t, expCoin.IsEqual(outCoin), "Test [%d]", i)
+	}
+}
+
+func TestNextInflationPower(t *testing.T) {
+	// init base
+	params := DefaultParams()
+	minter := DefaultInitialMinter()
+	params.InflationMin = sdk.NewDecWithPrec(1765, 4)
+	params.InflationMax = sdk.NewDecWithPrec(5, 1)
+	params.InfPwrBondedLockedRatio = sdk.NewDecWithPrec(4, 1)
+
+	// test cases (surface sourced from MatLAB)
+	testCases := []struct {
+		BondedRatio  sdk.Dec
+		LockedRatio  sdk.Dec
+		ExpInflation sdk.Dec
+	}{
+		// Bonded: 0.0
+		{
+			BondedRatio:  sdk.NewDecWithPrec(0, 0),
+			LockedRatio:  sdk.ZeroDec(),
+			ExpInflation: sdk.NewDecWithPrec(305900, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(0, 0),
+			LockedRatio:  sdk.NewDecWithPrec(2, 1),
+			ExpInflation: sdk.NewDecWithPrec(354425, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(0, 0),
+			LockedRatio:  sdk.NewDecWithPrec(4, 1),
+			ExpInflation: sdk.NewDecWithPrec(402950, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(0, 0),
+			LockedRatio:  sdk.NewDecWithPrec(6, 1),
+			ExpInflation: sdk.NewDecWithPrec(451475, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(0, 0),
+			LockedRatio:  sdk.NewDecWithPrec(8, 1),
+			ExpInflation: sdk.NewDecWithPrec(500000, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(0, 0),
+			LockedRatio:  sdk.NewDecWithPrec(1, 0),
+			ExpInflation: sdk.NewDecWithPrec(383540, 6),
+		},
+		// Bonded: 0.2
+		{
+			BondedRatio:  sdk.NewDecWithPrec(2, 1),
+			LockedRatio:  sdk.NewDecWithPrec(0, 0),
+			ExpInflation: sdk.NewDecWithPrec(289725, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(2, 1),
+			LockedRatio:  sdk.NewDecWithPrec(2, 1),
+			ExpInflation: sdk.NewDecWithPrec(338250, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(2, 1),
+			LockedRatio:  sdk.NewDecWithPrec(4, 1),
+			ExpInflation: sdk.NewDecWithPrec(386775, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(2, 1),
+			LockedRatio:  sdk.NewDecWithPrec(6, 1),
+			ExpInflation: sdk.NewDecWithPrec(435300, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(2, 1),
+			LockedRatio:  sdk.NewDecWithPrec(8, 1),
+			ExpInflation: sdk.NewDecWithPrec(483825, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(2, 1),
+			LockedRatio:  sdk.NewDecWithPrec(1, 0),
+			ExpInflation: sdk.NewDecWithPrec(367365, 6),
+		},
+		// Bonded: 0.4
+		{
+			BondedRatio:  sdk.NewDecWithPrec(4, 1),
+			LockedRatio:  sdk.NewDecWithPrec(0, 0),
+			ExpInflation: sdk.NewDecWithPrec(273550, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(4, 1),
+			LockedRatio:  sdk.NewDecWithPrec(2, 1),
+			ExpInflation: sdk.NewDecWithPrec(322075, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(4, 1),
+			LockedRatio:  sdk.NewDecWithPrec(4, 1),
+			ExpInflation: sdk.NewDecWithPrec(370600, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(4, 1),
+			LockedRatio:  sdk.NewDecWithPrec(6, 1),
+			ExpInflation: sdk.NewDecWithPrec(419125, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(4, 1),
+			LockedRatio:  sdk.NewDecWithPrec(8, 1),
+			ExpInflation: sdk.NewDecWithPrec(467650, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(4, 1),
+			LockedRatio:  sdk.NewDecWithPrec(1, 0),
+			ExpInflation: sdk.NewDecWithPrec(351190, 6),
+		},
+		// Bonded: 0.6
+		{
+			BondedRatio:  sdk.NewDecWithPrec(6, 1),
+			LockedRatio:  sdk.NewDecWithPrec(0, 0),
+			ExpInflation: sdk.NewDecWithPrec(257375, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(6, 1),
+			LockedRatio:  sdk.NewDecWithPrec(2, 1),
+			ExpInflation: sdk.NewDecWithPrec(305900, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(6, 1),
+			LockedRatio:  sdk.NewDecWithPrec(4, 1),
+			ExpInflation: sdk.NewDecWithPrec(354425, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(6, 1),
+			LockedRatio:  sdk.NewDecWithPrec(6, 1),
+			ExpInflation: sdk.NewDecWithPrec(402950, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(6, 1),
+			LockedRatio:  sdk.NewDecWithPrec(8, 1),
+			ExpInflation: sdk.NewDecWithPrec(451475, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(6, 1),
+			LockedRatio:  sdk.NewDecWithPrec(1, 0),
+			ExpInflation: sdk.NewDecWithPrec(335015, 6),
+		},
+		// Bonded: 0.8
+		{
+			BondedRatio:  sdk.NewDecWithPrec(8, 1),
+			LockedRatio:  sdk.NewDecWithPrec(0, 0),
+			ExpInflation: sdk.NewDecWithPrec(241200, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(8, 1),
+			LockedRatio:  sdk.NewDecWithPrec(2, 1),
+			ExpInflation: sdk.NewDecWithPrec(289725, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(8, 1),
+			LockedRatio:  sdk.NewDecWithPrec(4, 1),
+			ExpInflation: sdk.NewDecWithPrec(338250, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(8, 1),
+			LockedRatio:  sdk.NewDecWithPrec(6, 1),
+			ExpInflation: sdk.NewDecWithPrec(386775, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(8, 1),
+			LockedRatio:  sdk.NewDecWithPrec(8, 1),
+			ExpInflation: sdk.NewDecWithPrec(435300, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(8, 1),
+			LockedRatio:  sdk.NewDecWithPrec(1, 0),
+			ExpInflation: sdk.NewDecWithPrec(318840, 6),
+		},
+		// Bonded: 1.0
+		{
+			BondedRatio:  sdk.NewDecWithPrec(1, 0),
+			LockedRatio:  sdk.NewDecWithPrec(0, 0),
+			ExpInflation: sdk.NewDecWithPrec(176500, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(1, 0),
+			LockedRatio:  sdk.NewDecWithPrec(2, 1),
+			ExpInflation: sdk.NewDecWithPrec(225025, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(1, 0),
+			LockedRatio:  sdk.NewDecWithPrec(4, 1),
+			ExpInflation: sdk.NewDecWithPrec(273550, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(1, 0),
+			LockedRatio:  sdk.NewDecWithPrec(6, 1),
+			ExpInflation: sdk.NewDecWithPrec(322075, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(1, 0),
+			LockedRatio:  sdk.NewDecWithPrec(8, 1),
+			ExpInflation: sdk.NewDecWithPrec(370600, 6),
+		},
+		{
+			BondedRatio:  sdk.NewDecWithPrec(1, 0),
+			LockedRatio:  sdk.NewDecWithPrec(1, 0),
+			ExpInflation: sdk.NewDecWithPrec(254140, 6),
+		},
+	}
+
+	for i, testCase := range testCases {
+		inflationPwr := minter.NextInflationPower(params, testCase.BondedRatio, testCase.LockedRatio)
+		inflationCapped := minter.NextInflationRate(params, inflationPwr)
+
+		require.True(t, testCase.ExpInflation.Equal(inflationCapped), "%d: BondedRatio / LockedRatio (%s / %s): expected / received: %s / %s", i, testCase.BondedRatio, testCase.LockedRatio, testCase.ExpInflation, inflationCapped)
 	}
 }
