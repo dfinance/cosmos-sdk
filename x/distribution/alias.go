@@ -103,6 +103,7 @@ var (
 	NewQueryDelegationRewardsParams            = types.NewQueryDelegationRewardsParams
 	NewQueryDelegatorParams                    = types.NewQueryDelegatorParams
 	NewQueryDelegatorWithdrawAddrParams        = types.NewQueryDelegatorWithdrawAddrParams
+	NewQueryDelegationRewardsResponse          = types.NewQueryDelegationRewardsResponse
 	NewQueryDelegatorTotalRewardsResponse      = types.NewQueryDelegatorTotalRewardsResponse
 	NewDelegationDelegatorReward               = types.NewDelegationDelegatorReward
 	NewValidatorHistoricalRewards              = types.NewValidatorHistoricalRewards
@@ -175,6 +176,7 @@ type (
 	QueryDelegationRewardsParams           = types.QueryDelegationRewardsParams
 	QueryDelegatorParams                   = types.QueryDelegatorParams
 	QueryDelegatorWithdrawAddrParams       = types.QueryDelegatorWithdrawAddrParams
+	QueryDelegationRewardsResponse         = types.QueryDelegationRewardsResponse
 	QueryDelegatorTotalRewardsResponse     = types.QueryDelegatorTotalRewardsResponse
 	QueryLockedRewardsStateParams          = types.QueryLockedRewardsStateParams
 	QueryLockedRewardsStateResponse        = types.QueryLockedRewardsStateResponse

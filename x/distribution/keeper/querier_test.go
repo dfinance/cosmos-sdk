@@ -66,7 +66,7 @@ func getQueriedValidatorSlashes(t *testing.T, ctx sdk.Context, cdc *codec.Codec,
 	return
 }
 
-func getQueriedDelegationRewards(t *testing.T, ctx sdk.Context, cdc *codec.Codec, querier sdk.Querier, delegatorAddr sdk.AccAddress, validatorAddr sdk.ValAddress) (rewards sdk.DecCoins) {
+func getQueriedDelegationRewards(t *testing.T, ctx sdk.Context, cdc *codec.Codec, querier sdk.Querier, delegatorAddr sdk.AccAddress, validatorAddr sdk.ValAddress) (response types.QueryDelegationRewardsResponse) {
 	query := abci.RequestQuery{
 		Path: strings.Join([]string{custom, types.QuerierRoute, types.QueryDelegationRewards}, "/"),
 		Data: cdc.MustMarshalJSON(types.NewQueryDelegationRewardsParams(delegatorAddr, validatorAddr)),
@@ -74,7 +74,7 @@ func getQueriedDelegationRewards(t *testing.T, ctx sdk.Context, cdc *codec.Codec
 
 	bz, err := querier(ctx, []string{types.QueryDelegationRewards}, query)
 	require.Nil(t, err)
-	require.Nil(t, cdc.UnmarshalJSON(bz, &rewards))
+	require.Nil(t, cdc.UnmarshalJSON(bz, &response))
 
 	return
 }
@@ -174,13 +174,18 @@ func TestQueries(t *testing.T) {
 
 	val := sk.Validator(ctx, valOpAddr1)
 	rewards := getQueriedDelegationRewards(t, ctx, cdc, querier, sdk.AccAddress(valOpAddr1), valOpAddr1)
-	require.True(t, rewards.IsZero())
+	require.True(t, rewards.Rewards.Reward.IsZero())
+	require.True(t, rewards.Total.IsZero())
 	initial := int64(10)
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 	tokens := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial)}}
 	keeper.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 	rewards = getQueriedDelegationRewards(t, ctx, cdc, querier, sdk.AccAddress(valOpAddr1), valOpAddr1)
-	require.Equal(t, sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial / 2)}}, rewards)
+	expRewardsCoins := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial / 2)}}
+	require.Equal(t,
+		types.NewQueryDelegationRewardsResponse(types.NewDelegationDelegatorReward(valOpAddr1, expRewardsCoins), expRewardsCoins),
+		rewards,
+	)
 
 	// test delegator's total rewards query
 	delRewards = getQueriedDelegatorTotalRewards(t, ctx, cdc, querier, sdk.AccAddress(valOpAddr1))

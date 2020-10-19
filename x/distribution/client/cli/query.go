@@ -231,7 +231,7 @@ $ %s query distribution rewards cosmos1gghjut3ccd8ay0zduzj64hwre2fxs9ld75ru9p co
 					return err
 				}
 
-				var result sdk.DecCoins
+				var result types.QueryDelegationRewardsResponse
 				if err = cdc.UnmarshalJSON(resp, &result); err != nil {
 					return fmt.Errorf("failed to unmarshal response: %w", err)
 				}

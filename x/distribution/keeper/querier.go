@@ -157,13 +157,17 @@ func queryDelegationRewards(ctx sdk.Context, _ []string, req abci.RequestQuery, 
 		return nil, types.ErrNoDelegationExists
 	}
 
+	// get main rewards and bank accumulated rewards
 	endingPeriod := k.incrementValidatorPeriod(ctx, val)
 	rewards := k.calculateDelegationTotalRewards(ctx, val, del, endingPeriod)
 	if rewards == nil {
 		rewards = sdk.DecCoins{}
 	}
+	total := k.addAccumulatedBankRewards(ctx, del.GetDelegatorAddr(), rewards)
 
-	bz, err := codec.MarshalJSONIndent(k.cdc, rewards)
+	// build response
+	resp := types.NewQueryDelegationRewardsResponse(types.NewDelegationDelegatorReward(params.ValidatorAddress, rewards), total)
+	bz, err := json.Marshal(resp)
 	if err != nil {
 		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
 	}
@@ -184,6 +188,7 @@ func queryDelegatorTotalRewards(ctx sdk.Context, _ []string, req abci.RequestQue
 	total := sdk.DecCoins{}
 	var delRewards []types.DelegationDelegatorReward
 
+	// iterate over delegations and calculate total bonding and LP rewards
 	k.stakingKeeper.IterateDelegations(
 		ctx, params.DelegatorAddress,
 		func(_ int64, del exported.DelegationI) (stop bool) {
@@ -198,9 +203,12 @@ func queryDelegatorTotalRewards(ctx sdk.Context, _ []string, req abci.RequestQue
 		},
 	)
 
-	totalRewards := types.NewQueryDelegatorTotalRewardsResponse(delRewards, total)
+	// include bank accumulated rewards
+	total = k.addAccumulatedBankRewards(ctx, params.DelegatorAddress, total)
 
-	bz, err := json.Marshal(totalRewards)
+	// build response
+	resp := types.NewQueryDelegatorTotalRewardsResponse(delRewards, total)
+	bz, err := json.Marshal(resp)
 	if err != nil {
 		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
 	}

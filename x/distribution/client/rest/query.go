@@ -82,7 +82,7 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute st
 // @Accept  json
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
-// @Success 200 {object} QueryDelegationDelegatorRewardsResp
+// @Success 200 {object} QueryDelegatorRewardsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/delegators/{delegatorAddr}/rewards [get]
@@ -126,7 +126,7 @@ func delegatorRewardsHandlerFn(cliCtx context.CLIContext, queryRoute string) htt
 // @Produce json
 // @Param delegatorAddr path string true "Bech32 AccAddress of Delegator"
 // @Param validatorAddr path string true "Bech32 OperatorAddress of validator"
-// @Success 200 {object} QueryDecCoinsResp
+// @Success 200 {object} QueryDelegationRewardsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /distribution/delegators/{delegatorAddr}/rewards/{validatorAddr} [get]

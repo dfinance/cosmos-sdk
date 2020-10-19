@@ -171,14 +171,22 @@ func (k Keeper) calculateDelegationRewards(ctx sdk.Context, val exported.Validat
 	return bondingRewards, lpRewards
 }
 
-// calculateDelegationTotalRewards sums current validator delegator rewards and stored RewardsBank coins.
+// calculateDelegationTotalRewards sums current validator delegator rewards (bonding and LP).
 func (k Keeper) calculateDelegationTotalRewards(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI, endingPeriod uint64) (rewards sdk.DecCoins) {
 	// calculate rewards from the main pool
 	curBondingDecCoins, curLPDecCoins := k.calculateDelegationRewards(ctx, val, del, endingPeriod)
-	// get accumulated coins from the RewardsBankPool
-	bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+	// sum bonding and LP rewards
+	totalDecCoins := curBondingDecCoins.Add(curLPDecCoins...)
 
-	totalDecCoins := curBondingDecCoins.Add(curLPDecCoins...).Add(sdk.NewDecCoinsFromCoins(bankCoins...)...)
+	return totalDecCoins
+}
+
+// addAccumulatedBankRewards adds accumulated bank rewards for a specific delegator.
+func (k Keeper) addAccumulatedBankRewards(ctx sdk.Context, delAddr sdk.AccAddress, rewards sdk.DecCoins) sdk.DecCoins {
+	// get accumulated coins from the RewardsBankPool
+	bankCoins := k.GetDelegatorRewardsBankCoins(ctx, delAddr)
+	// sum with input
+	totalDecCoins := rewards.Add(sdk.NewDecCoinsFromCoins(bankCoins...)...)
 
 	return totalDecCoins
 }
