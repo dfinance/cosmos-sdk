@@ -38,9 +38,14 @@ type (
 		} `json:"result"`
 	}
 
-	QueryDelegationDelegatorRewardsResp struct {
-		Height int64                             `json:"height"`
-		Result []types.DelegationDelegatorReward `json:"result"`
+	QueryDelegatorRewardsResp struct {
+		Height int64                                    `json:"height"`
+		Result types.QueryDelegatorTotalRewardsResponse `json:"result"`
+	}
+
+	QueryDelegationRewardsResp struct {
+		Height int64                                `json:"height"`
+		Result types.QueryDelegationRewardsResponse `json:"result"`
 	}
 
 	QueryDecCoinsResp struct {

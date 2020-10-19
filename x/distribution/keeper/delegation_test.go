@@ -751,6 +751,7 @@ func TestRewardsBank(t *testing.T) {
 		cacheCtx, _ := ctx.CacheContext()
 		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
 		curTotalRewards := k.calculateDelegationTotalRewards(cacheCtx, val, del, endingPeriod)
+		curTotalRewards = k.addAccumulatedBankRewards(ctx, del.GetDelegatorAddr(), curTotalRewards)
 		require.True(t, curTotalRewards.IsEqual(prevTotalRewards))
 
 		// current total rewards should be equal to current bankCoins (as current validator delegator rewards are empty)
@@ -983,6 +984,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 
 		endingPeriod := k.incrementValidatorPeriod(ctxCache, val)
 		rewards := k.calculateDelegationTotalRewards(ctxCache, val, del, endingPeriod)
+		rewards = k.addAccumulatedBankRewards(ctxCache, del.GetDelegatorAddr(), rewards)
 		if rewards == nil {
 			return sdk.DecCoins{}
 		}
