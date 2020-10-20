@@ -9,11 +9,15 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/cosmos/go-bip39 v0.0.0-20180819234021-555e2067c45d
 	github.com/cosmos/ledger-cosmos-go v0.11.1
+	github.com/g3co/go-swagger-merger v0.0.0-20200916115803-70f050d0cb09 // indirect
+	github.com/go-openapi/spec v0.19.10 // indirect
+	github.com/go-openapi/swag v0.19.10 // indirect
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.3.1-0.20190508161146-9fa652df1129
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mattn/go-isatty v0.0.12
 	github.com/pelletier/go-toml v1.6.0
 	github.com/pkg/errors v0.9.1
@@ -24,13 +28,16 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.3
 	github.com/stretchr/testify v1.6.1
+	github.com/swaggo/swag v1.6.7 // indirect
 	github.com/tendermint/btcd v0.1.1
 	github.com/tendermint/crypto v0.0.0-20191022145703-50d29ede1e15
 	github.com/tendermint/go-amino v0.15.1
 	github.com/tendermint/iavl v0.14.0
 	github.com/tendermint/tendermint v0.33.7
 	github.com/tendermint/tm-db v0.5.1
-	golang.org/x/tools v0.0.0-20200103221440-774c71fcf114
+	github.com/urfave/cli/v2 v2.2.0 // indirect
+	golang.org/x/net v0.0.0-20201020065357-d65d470038a5 // indirect
+	golang.org/x/tools v0.0.0-20201019175715-b894a3290fff
 	google.golang.org/grpc v1.30.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0
 )

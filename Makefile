@@ -223,7 +223,7 @@ devdoc-update:
 ### Swagger auto generation
 swagger-ui-deps:
 	@echo "-> Fetching Golang libraries: swag, swagger-merger"
-	go get -u github.com/swaggo/swag/cmd/swag
+	go get -u github.com/swaggo/swag/cmd/swag@v1.6.7
 	go get github.com/g3co/go-swagger-merger
 
 swagger_auto_dir="./client/lcd/swagger-auto"
