@@ -493,6 +493,11 @@ definitions:
       max_entries:
         description: Max entries for either unbonding delegation or redelegation (per pair/trio)
         type: integer
+      max_self_delegation_lvl:
+        description: Max self delegation level for self-delegation increment
+        example: "100"
+        format: integer
+        type: string
       max_validators:
         description: Maximum number of validators (max uint16 = 65535)
         type: integer
@@ -1223,8 +1228,13 @@ definitions:
     type: object
   types.DelegationDelegatorReward:
     properties:
-      reward:
+      current:
         $ref: '#/definitions/types.DecCoins'
+        description: Current period reward amount
+        type: object
+      total:
+        $ref: '#/definitions/types.DecCoins'
+        description: Sum of current period reward amount and stored in rewards bank amount
         type: object
       validator_address:
         example: wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h
@@ -1418,15 +1428,9 @@ definitions:
     type: object
   types.QueryDelegationRewardsResponse:
     properties:
-      rewards:
+      reward:
         $ref: '#/definitions/types.DelegationDelegatorReward'
         description: Current rewards for a specific validator
-        type: object
-      total:
-        $ref: '#/definitions/types.DecCoins'
-        description: |-
-          All validators rewards accumulated on delegation modification events (shares change, undelegation, redelegation)
-          This truncated Int value would be transferred to the delegator account on withdraw_delegator_reward Tx
         type: object
     type: object
   types.QueryDelegatorTotalRewardsResponse:
