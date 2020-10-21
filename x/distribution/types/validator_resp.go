@@ -74,7 +74,7 @@ func NewValidatorResp(
 		return ValidatorResp{}, err
 	}
 
-	var selfStake sdk.Int
+	selfStake := sdk.ZeroInt()
 	if !stakingState.Operator.BondingShares.IsZero() {
 		selfStake = validator.BondingTokensFromShares(stakingState.Operator.BondingShares).TruncateInt()
 	}
