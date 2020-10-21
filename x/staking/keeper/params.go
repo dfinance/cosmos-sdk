@@ -68,12 +68,19 @@ func (k Keeper) MinSelfDelegationLvl(ctx sdk.Context) (res sdk.Int) {
 	return
 }
 
+// MaxSelfDelegationLvl - max self-delegation level for validator
+func (k Keeper) MaxSelfDelegationLvl(ctx sdk.Context) (res sdk.Int) {
+	k.paramstore.Get(ctx, types.KeyMaxSelfDelegationLvl, &res)
+	return
+}
+
 // MaxDelegationsRatio - max delegations ratio (MaxDelegationsAmount = SelfDelegation * MaxDelegationsRatio)
 func (k Keeper) MaxDelegationsRatio(ctx sdk.Context) (res sdk.Dec) {
 	k.paramstore.Get(ctx, types.KeyMaxDelegationsRatio, &res)
 	return
 }
 
+// ScheduledUnbondDelay - force unbond scheduler delay
 func (k Keeper) ScheduledUnbondDelay(ctx sdk.Context) (res time.Duration) {
 	k.paramstore.Get(ctx, types.KeyScheduledUnbondDelayTime, &res)
 	return
@@ -90,6 +97,7 @@ func (k Keeper) GetParams(ctx sdk.Context) types.Params {
 		k.LPDenom(ctx),
 		k.LPDistrRatio(ctx),
 		k.MinSelfDelegationLvl(ctx),
+		k.MaxSelfDelegationLvl(ctx),
 		k.MaxDelegationsRatio(ctx),
 		k.ScheduledUnbondDelay(ctx),
 	)

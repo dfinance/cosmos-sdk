@@ -205,8 +205,19 @@ func (k Keeper) Delegate(
 		delegation.BondingShares, delegation.LPShares,
 	)
 
-	// Check if max delegations overflow occurs after this delegation
 	valSelfStaked, valTotalStaked := valStakingState.GetSelfAndTotalStakes(validator)
+
+	// Check if self-delegation is higher that the limit
+	maxSelfDelegation := k.MaxSelfDelegationLvl(ctx)
+	if valSelfStaked.GT(maxSelfDelegation) {
+		return sdk.Dec{}, sdkerrors.Wrapf(
+			types.ErrMaxSelfDelegationLimit,
+			"validator %s self-delegation %s > %s",
+			validator.OperatorAddress, valSelfStaked, maxSelfDelegation,
+		)
+	}
+
+	// Check if max delegations overflow occurs after this delegation
 	overflow, valStakeLimit := k.HasValidatorDelegationsOverflow(ctx, valSelfStaked, valTotalStaked)
 	if overflow {
 		return sdk.Dec{}, sdkerrors.Wrapf(

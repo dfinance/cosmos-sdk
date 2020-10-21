@@ -59,6 +59,7 @@ func RandomizedGenState(simState *module.SimulationState) {
 		sdk.DefaultLiquidityDenom,
 		sdk.NewDecWithPrec(1, 0),
 		sdk.NewInt(types.DefaultMinSelfDelegationLvl),
+		sdk.NewInt(types.DefaultMaxSelfDelegationLvl),
 		sdk.NewDecWithPrec(1000, types.DefaultMaxDelegationsRatioPrecision),
 		types.DefaultScheduledUnbondTime,
 	)

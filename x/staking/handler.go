@@ -51,21 +51,26 @@ func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k k
 	if _, found := k.GetValidator(ctx, msg.ValidatorAddress); found {
 		return nil, ErrValidatorOwnerExists
 	}
-
 	if _, found := k.GetValidatorByConsAddr(ctx, sdk.GetConsAddress(msg.PubKey)); found {
 		return nil, ErrValidatorPubKeyExists
 	}
 
+	// check self-delegation denom
 	if msg.Value.Denom != k.BondDenom(ctx) {
 		return nil, ErrBadDenom
 	}
 
+	// check validator description
 	if _, err := msg.Description.EnsureLength(); err != nil {
 		return nil, err
 	}
 
+	// check min self-delegation range
 	if minValue := k.MinSelfDelegationLvl(ctx); msg.MinSelfDelegation.LT(minValue) {
 		return nil, sdkerrors.Wrapf(ErrInvalidMinSelfDelegation, "should be GTE to %s (%s)", minValue.String(), msg.MinSelfDelegation.String())
+	}
+	if maxValue := k.MaxSelfDelegationLvl(ctx); msg.MinSelfDelegation.GT(maxValue) {
+		return nil, sdkerrors.Wrapf(ErrInvalidMinSelfDelegation, "should be LTE to %s (%s)", maxValue.String(), msg.MinSelfDelegation.String())
 	}
 
 	if ctx.ConsensusParams() != nil {

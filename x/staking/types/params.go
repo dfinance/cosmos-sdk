@@ -32,6 +32,10 @@ const (
 	// Default validator.MinSelfDelegation level
 	DefaultMinSelfDelegationLvl = 10000
 
+	// Default max self-delegation level
+	// Value is set high for tests to pass, should be defined by the client app
+	DefaultMaxSelfDelegationLvl = 1000000000000
+
 	// Default max delegations ratio (10.0)
 	DefaultMaxDelegationsRatioBase      = 10
 	DefaultMaxDelegationsRatioPrecision = 0
@@ -51,6 +55,7 @@ var (
 	KeyLPDistrRatio             = []byte("LPDistrRatio")
 	KeyHistoricalEntries        = []byte("HistoricalEntries")
 	KeyMinSelfDelegationLvl     = []byte("MinSelfDelegationLvl")
+	KeyMaxSelfDelegationLvl     = []byte("MaxSelfDelegationLvl")
 	KeyMaxDelegationsRatio      = []byte("MaxDelegationsRatio")
 	KeyScheduledUnbondDelayTime = []byte("ScheduledUnbondDelayTime")
 )
@@ -75,6 +80,8 @@ type Params struct {
 	LPDistrRatio sdk.Dec `json:"lp_distr_ratio" yaml:"lp_distr_ratio" swaggertype:"string" format:"number" example:"0.123"`
 	// Min self delegation level for validator creation
 	MinSelfDelegationLvl sdk.Int `json:"min_self_delegation_lvl" yaml:"min_self_delegation_lvl" swaggertype:"string" format:"integer" example:"100"`
+	// Max self delegation level for self-delegation increment
+	MaxSelfDelegationLvl sdk.Int `json:"max_self_delegation_lvl" yaml:"max_self_delegation_lvl" swaggertype:"string" format:"integer" example:"100"`
 	// Max delegations per validator is limited by (CurrentSelfDelegation * KeyMaxDelegationsRatio)
 	MaxDelegationsRatio sdk.Dec `json:"max_delegations_ratio" yaml:"max_delegations_ratio" swaggertype:"string" format:"number" example:"0.123"`
 	// Time duration of validator.ScheduledToUnbond to be raised up before forced unbonding is done
@@ -87,7 +94,7 @@ func NewParams(
 	maxValidators, maxEntries, historicalEntries uint16,
 	bondDenom, lpDenom string,
 	lpDistrRatio sdk.Dec,
-	minSelfDelegationLvl sdk.Int,
+	minSelfDelegationLvl sdk.Int, maxSelfDelegationLvl sdk.Int,
 	maxDelegationsRatio sdk.Dec,
 	scheduledUnbondDelay time.Duration,
 ) Params {
@@ -101,6 +108,7 @@ func NewParams(
 		LPDenom:                  lpDenom,
 		LPDistrRatio:             lpDistrRatio,
 		MinSelfDelegationLvl:     minSelfDelegationLvl,
+		MaxSelfDelegationLvl:     maxSelfDelegationLvl,
 		MaxDelegationsRatio:      maxDelegationsRatio,
 		ScheduledUnbondDelayTime: scheduledUnbondDelay,
 	}
@@ -117,6 +125,7 @@ func (p *Params) ParamSetPairs() params.ParamSetPairs {
 		params.NewParamSetPair(KeyLPDenom, &p.LPDenom, validateLPDenom),
 		params.NewParamSetPair(KeyLPDistrRatio, &p.LPDistrRatio, validateLPDistrRatio),
 		params.NewParamSetPair(KeyMinSelfDelegationLvl, &p.MinSelfDelegationLvl, validateMinSelfDelegationLvl),
+		params.NewParamSetPair(KeyMaxSelfDelegationLvl, &p.MaxSelfDelegationLvl, validateMaxSelfDelegationLvl),
 		params.NewParamSetPair(KeyMaxDelegationsRatio, &p.MaxDelegationsRatio, validateMaxDelegationsRatio),
 		params.NewParamSetPair(KeyScheduledUnbondDelayTime, &p.ScheduledUnbondDelayTime, validateScheduledUnbondDelayTime),
 	}
@@ -141,6 +150,7 @@ func DefaultParams() Params {
 		sdk.DefaultLiquidityDenom,
 		sdk.NewDecWithPrec(1, 0),
 		sdk.NewInt(DefaultMinSelfDelegationLvl),
+		sdk.NewInt(DefaultMaxSelfDelegationLvl),
 		sdk.NewDecWithPrec(DefaultMaxDelegationsRatioBase, DefaultMaxDelegationsRatioPrecision),
 		DefaultScheduledUnbondTime,
 	)
@@ -157,12 +167,14 @@ func (p Params) String() string {
   Liquidity Coin Denom:   %s
   LP Tokens Distr Ratio:  %s
   Min SelfDelegation lvl: %s
+  Max SelfDelegation lvl: %s
   Max Delegations Ratio:  %s
   Scheduled Unbond Delay: %s
 `,
 		p.UnbondingTime, p.MaxValidators, p.MaxEntries, p.HistoricalEntries,
 		p.BondDenom, p.LPDenom, p.LPDistrRatio,
-		p.MinSelfDelegationLvl, p.MaxDelegationsRatio, p.ScheduledUnbondDelayTime,
+		p.MinSelfDelegationLvl, p.MaxSelfDelegationLvl,
+		p.MaxDelegationsRatio, p.ScheduledUnbondDelayTime,
 	)
 }
 
@@ -207,11 +219,18 @@ func (p Params) Validate() error {
 	if err := validateMinSelfDelegationLvl(p.MinSelfDelegationLvl); err != nil {
 		return err
 	}
+	if err := validateMaxSelfDelegationLvl(p.MaxSelfDelegationLvl); err != nil {
+		return err
+	}
 	if err := validateMaxDelegationsRatio(p.MaxDelegationsRatio); err != nil {
 		return err
 	}
 	if err := validateScheduledUnbondDelayTime(p.ScheduledUnbondDelayTime); err != nil {
 		return err
+	}
+
+	if p.MaxSelfDelegationLvl.LT(p.MinSelfDelegationLvl) {
+		return fmt.Errorf("max self-delegation level < min: %s < %s", p.MaxSelfDelegationLvl, p.MinSelfDelegationLvl)
 	}
 
 	return nil
@@ -314,6 +333,21 @@ func validateLPDenom(i interface{}) error {
 
 func validateMinSelfDelegationLvl(i interface{}) error {
 	const paramName = "min self-delegation level"
+
+	v, ok := i.(sdk.Int)
+	if !ok {
+		return fmt.Errorf("%s: invalid parameter type: %T", paramName, i)
+	}
+
+	if v.LTE(sdk.ZeroInt()) {
+		return fmt.Errorf("%s: must be GT than zero: %s", paramName, v.String())
+	}
+
+	return nil
+}
+
+func validateMaxSelfDelegationLvl(i interface{}) error {
+	const paramName = "max self-delegation level"
 
 	v, ok := i.(sdk.Int)
 	if !ok {

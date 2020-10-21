@@ -3069,3 +3069,107 @@ func TestLPDelegationMixed(t *testing.T) {
 		require.True(t, delCurBalance.IsEqual(delInitBalance))
 	}
 }
+
+// Test min/max self-delegation limits.
+func TestMinMaxSelfDelegation(t *testing.T) {
+	initPower := int64(100000)
+	ctx, _, keeper, sk := keep.CreateTestInput(t, false, initPower)
+
+	// fix non-bonded pool supply
+	nbPoolAcc := sk.GetModuleAccount(ctx, types.NotBondedPoolName)
+	nbPoolAcc.SetCoins(sdk.Coins{})
+	sk.SetModuleAccount(ctx, nbPoolAcc)
+
+	// lower the max self-delegation limit
+	params := keeper.GetParams(ctx)
+	params.MaxSelfDelegationLvl = params.MinSelfDelegationLvl.MulRaw(10)
+	keeper.SetParams(ctx, params)
+
+	valOpAddr := keep.Addrs[0]
+	valAddr, valPubKey := sdk.ValAddress(valOpAddr), keep.PKs[0]
+
+	selfDelLimitMin, selfDelLimitMax := keeper.MinSelfDelegationLvl(ctx), keeper.MaxSelfDelegationLvl(ctx)
+
+	// check creating validator with validator.MinSelfDelegation < MIN
+	{
+		cacheCtx, _ := ctx.CacheContext()
+		selfStakeAmt := sdk.TokensFromConsensusPower(10)
+		valSelfDel := selfDelLimitMin.Sub(sdk.OneInt())
+
+		msg := types.NewMsgCreateValidator(
+			valAddr, valPubKey,
+			sdk.NewCoin(sdk.DefaultBondDenom, selfStakeAmt),
+			Description{}, commissionRates,
+			valSelfDel,
+		)
+		_, err := handleMsgCreateValidator(cacheCtx, msg, keeper)
+		require.Error(t, err)
+		require.True(t, types.ErrInvalidMinSelfDelegation.Is(err))
+	}
+
+	// check creating validator with validator.MinSelfDelegation > MAX
+	{
+		cacheCtx, _ := ctx.CacheContext()
+		selfStakeAmt := sdk.TokensFromConsensusPower(10)
+		valSelfDel := selfDelLimitMax.Add(sdk.OneInt())
+
+		msg := types.NewMsgCreateValidator(
+			valAddr, valPubKey,
+			sdk.NewCoin(sdk.DefaultBondDenom, selfStakeAmt),
+			Description{}, commissionRates,
+			valSelfDel,
+		)
+		_, err := handleMsgCreateValidator(cacheCtx, msg, keeper)
+		require.Error(t, err)
+		require.True(t, types.ErrInvalidMinSelfDelegation.Is(err))
+	}
+
+	// check creating validator with correct validator.MinSelfDelegation, but delegation lvl < MIN
+	// test is skipped as this is covered by msg.ValidateBasic()
+
+	// check creating validator with correct validator.MinSelfDelegation, but delegation lvl > MAX
+	{
+		cacheCtx, _ := ctx.CacheContext()
+		selfStakeAmt := selfDelLimitMax.AddRaw(1)
+		valSelfDel := selfDelLimitMin
+
+		msg := types.NewMsgCreateValidator(
+			valAddr, valPubKey,
+			sdk.NewCoin(sdk.DefaultBondDenom, selfStakeAmt),
+			Description{}, commissionRates,
+			valSelfDel,
+		)
+		_, err := handleMsgCreateValidator(cacheCtx, msg, keeper)
+		require.Error(t, err)
+		require.True(t, types.ErrMaxSelfDelegationLimit.Is(err))
+	}
+
+	// create validator with maxed out validator.MinSelfDelegation and delegation lvl
+	{
+		selfStakeAmt := selfDelLimitMax
+		valSelfDel := selfDelLimitMax
+
+		msg := types.NewMsgCreateValidator(
+			valAddr, valPubKey,
+			sdk.NewCoin(sdk.DefaultBondDenom, selfStakeAmt),
+			Description{}, commissionRates,
+			valSelfDel,
+		)
+		res, err := handleMsgCreateValidator(ctx, msg, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	}
+
+	// check raising self-delegation above the MAX
+	{
+		cacheCtx, _ := ctx.CacheContext()
+
+		msg := types.NewMsgDelegate(
+			valOpAddr, valAddr,
+			sdk.NewCoin(sdk.DefaultBondDenom, sdk.OneInt()),
+		)
+		_, err := handleMsgDelegate(cacheCtx, msg, keeper)
+		require.Error(t, err)
+		require.True(t, types.ErrMaxSelfDelegationLimit.Is(err))
+	}
+}
