@@ -29,7 +29,7 @@ var (
 	ErrCommissionGTMaxChangeRate       = sdkerrors.Register(ModuleName, 15, "commission cannot be changed more than max change rate")
 	ErrSelfDelegationBelowMinimum      = sdkerrors.Register(ModuleName, 16, "validator's self delegation must be greater than their minimum self delegation")
 	ErrMinSelfDelegationInvalid        = sdkerrors.Register(ModuleName, 17, "minimum self delegation must be a positive integer")
-	ErrMinSelfDelegationDecreased      = sdkerrors.Register(ModuleName, 18, "minimum self delegation cannot be decrease")
+	ErrMinSelfDelegationDecreased      = sdkerrors.Register(ModuleName, 18, "minimum self delegation cannot be decreased")
 	ErrEmptyDelegatorAddr              = sdkerrors.Register(ModuleName, 19, "empty delegator address")
 	ErrBadDenom                        = sdkerrors.Register(ModuleName, 20, "invalid coin denomination")
 	ErrBadDelegationAddr               = sdkerrors.Register(ModuleName, 21, "invalid address for (address, validator) tuple")

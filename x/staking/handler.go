@@ -165,6 +165,9 @@ func handleMsgEditValidator(ctx sdk.Context, msg types.MsgEditValidator, k keepe
 		if msg.MinSelfDelegation.GT(validator.GetBondedTokens()) {
 			return nil, ErrSelfDelegationBelowMinimum
 		}
+		if msg.MinSelfDelegation.GT(k.MaxSelfDelegationLvl(ctx)) {
+			return nil, ErrMinSelfDelegationInvalid
+		}
 
 		validator.MinSelfDelegation = *msg.MinSelfDelegation
 	}
