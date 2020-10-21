@@ -60,7 +60,8 @@ type ValidatorLockedRewardsRecord struct {
 
 // used for import / export via genesis json
 type RewardsBankPoolRecord struct {
-	AccAddress sdk.AccAddress `json:"acc_address" yaml:"acc_address"`
+	DelAddress sdk.AccAddress `json:"del_address" yaml:"del_address"`
+	ValAddress sdk.ValAddress `json:"val_address" yaml:"val_address"`
 	Coins      sdk.Coins      `json:"coins" yaml:"coins"`
 }
 

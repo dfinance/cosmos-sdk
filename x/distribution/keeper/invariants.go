@@ -184,7 +184,7 @@ func ModuleAccountInvariant(k Keeper) sdk.Invariant {
 func RewardsBankPoolInvariant(k Keeper) sdk.Invariant {
 	return func(ctx sdk.Context) (string, bool) {
 		expectedCoins := sdk.NewCoins()
-		k.IterateDelegatorRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, coins sdk.Coins) (stop bool) {
+		k.IterateRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, valAddr sdk.ValAddress, coins sdk.Coins) (stop bool) {
 			expectedCoins = expectedCoins.Add(coins...)
 			return false
 		})

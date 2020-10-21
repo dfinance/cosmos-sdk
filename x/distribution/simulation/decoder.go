@@ -66,11 +66,12 @@ func DecodeStore(cdc *codec.Codec, kvA, kvB tmkv.Pair) string {
 	case bytes.Equal(kvA.Key[:1], types.DelegatorRewardsBankCoinsPrefix):
 		var coinsA, coinsB sdk.Coins
 		var delAddrA, delAddrB sdk.AccAddress
+		var valAddrA, valAddrB sdk.ValAddress
 		cdc.MustUnmarshalBinaryLengthPrefixed(kvA.Value, &coinsA)
 		cdc.MustUnmarshalBinaryLengthPrefixed(kvB.Value, &coinsB)
-		delAddrA = types.GetDelegatorRewardsBankCoinsAddress(kvA.Key)
-		delAddrB = types.GetDelegatorRewardsBankCoinsAddress(kvB.Key)
-		return fmt.Sprintf("%s: %v\n%s: %v", delAddrA, coinsA, delAddrB, coinsB)
+		delAddrA, valAddrA = types.GetDelegatorRewardsBankCoinsAddress(kvA.Key)
+		delAddrB, valAddrB = types.GetDelegatorRewardsBankCoinsAddress(kvB.Key)
+		return fmt.Sprintf("%s-%s: %v\n%s-%s: %v", delAddrA, valAddrA, coinsA, delAddrB, valAddrB, coinsB)
 
 	case bytes.Equal(kvA.Key[:1], types.RewardsUnlockQueueKey):
 		var tsA, tsB time.Time

@@ -182,9 +182,9 @@ func (k Keeper) calculateDelegationTotalRewards(ctx sdk.Context, val exported.Va
 }
 
 // addAccumulatedBankRewards adds accumulated bank rewards for a specific delegator.
-func (k Keeper) addAccumulatedBankRewards(ctx sdk.Context, delAddr sdk.AccAddress, rewards sdk.DecCoins) sdk.DecCoins {
+func (k Keeper) addAccumulatedBankRewards(ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress, rewards sdk.DecCoins) sdk.DecCoins {
 	// get accumulated coins from the RewardsBankPool
-	bankCoins := k.GetDelegatorRewardsBankCoins(ctx, delAddr)
+	bankCoins := k.GetDelegatorRewardsBankCoins(ctx, delAddr, valAddr)
 	// sum with input
 	totalDecCoins := rewards.Add(sdk.NewDecCoinsFromCoins(bankCoins...)...)
 
@@ -244,9 +244,9 @@ func (k Keeper) transferDelegationRewardsToRewardsBankPool(ctx sdk.Context, val 
 
 	// add coins to RewardsBankPool module account and update RewardsBankPool delegator coins
 	if !curCoins.IsZero() {
-		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr(), val.GetOperator())
 		bankCoins = bankCoins.Add(curCoins...)
-		k.SetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr(), bankCoins)
+		k.SetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr(), val.GetOperator(), bankCoins)
 
 		err := k.supplyKeeper.SendCoinsFromModuleToModule(ctx, types.ModuleName, types.RewardsBankPoolName, curCoins)
 		if err != nil {
@@ -259,24 +259,34 @@ func (k Keeper) transferDelegationRewardsToRewardsBankPool(ctx sdk.Context, val 
 
 // transferDelegationTotalRewardsToAccount transfers sum of current validator delegator rewards
 // and stored RewardsBank coins to user account.
-func (k Keeper) transferDelegationTotalRewardsToAccount(ctx sdk.Context, val exported.ValidatorI, del exported.DelegationI) (sdk.Coins, error) {
-	withdrawAddr := k.GetDelegatorWithdrawAddr(ctx, del.GetDelegatorAddr())
+func (k Keeper) transferDelegationTotalRewardsToAccount(ctx sdk.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress) (sdk.Coins, bool, error) {
+	withdrawAddr := k.GetDelegatorWithdrawAddr(ctx, delAddr)
 
-	// withdraw from the main pool
-	curCoins, err := k.withdrawDelegationRewards(ctx, val, del)
-	if err != nil {
-		return nil, fmt.Errorf("withdrawDelegationRewards: %w", err)
+	// get validator and delegation
+	// validator might not exist if it was deleted
+	val := k.stakingKeeper.Validator(ctx, valAddr)
+	// delegation might not exist if for ex. it was fully redelegated
+	del := k.stakingKeeper.Delegation(ctx, delAddr, valAddr)
+
+	// withdraw from the main pool if delegation exists
+	curCoins := sdk.NewCoins()
+	if val != nil && del != nil {
+		coins, err := k.withdrawDelegationRewards(ctx, val, del)
+		if err != nil {
+			return nil, false, fmt.Errorf("withdrawDelegationRewards: %w", err)
+		}
+		curCoins = coins
 	}
 
 	// get accumulated coins from the RewardsBankPool
-	bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
-	k.DeleteDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+	bankCoins := k.GetDelegatorRewardsBankCoins(ctx, delAddr, valAddr)
+	k.DeleteDelegatorRewardsBankCoins(ctx, delAddr, valAddr)
 
 	// add coins to user account from the main pool
 	if !curCoins.IsZero() {
 		err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, withdrawAddr, curCoins)
 		if err != nil {
-			return nil, fmt.Errorf("supplyKeeper.SendCoinsFromModuleToAccount (Distribution macc): %w", err)
+			return nil, false, fmt.Errorf("supplyKeeper.SendCoinsFromModuleToAccount (Distribution macc): %w", err)
 		}
 	}
 
@@ -284,11 +294,11 @@ func (k Keeper) transferDelegationTotalRewardsToAccount(ctx sdk.Context, val exp
 	if !bankCoins.IsZero() {
 		err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.RewardsBankPoolName, withdrawAddr, bankCoins)
 		if err != nil {
-			return nil, fmt.Errorf("supplyKeeper.SendCoinsFromModuleToAccount (RewardsBankPool macc): %w", err)
+			return nil, false, fmt.Errorf("supplyKeeper.SendCoinsFromModuleToAccount (RewardsBankPool macc): %w", err)
 		}
 	}
 
 	totalCoins := curCoins.Add(bankCoins...)
 
-	return totalCoins, nil
+	return totalCoins, del != nil, nil
 }

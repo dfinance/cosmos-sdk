@@ -174,8 +174,8 @@ func TestQueries(t *testing.T) {
 
 	val := sk.Validator(ctx, valOpAddr1)
 	rewards := getQueriedDelegationRewards(t, ctx, cdc, querier, sdk.AccAddress(valOpAddr1), valOpAddr1)
-	require.True(t, rewards.Rewards.Reward.IsZero())
-	require.True(t, rewards.Total.IsZero())
+	require.True(t, rewards.Reward.Current.IsZero())
+	require.True(t, rewards.Reward.Total.IsZero())
 	initial := int64(10)
 	ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 	tokens := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial)}}
@@ -183,16 +183,19 @@ func TestQueries(t *testing.T) {
 	rewards = getQueriedDelegationRewards(t, ctx, cdc, querier, sdk.AccAddress(valOpAddr1), valOpAddr1)
 	expRewardsCoins := sdk.DecCoins{{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(initial / 2)}}
 	require.Equal(t,
-		types.NewQueryDelegationRewardsResponse(types.NewDelegationDelegatorReward(valOpAddr1, expRewardsCoins), expRewardsCoins),
+		types.NewQueryDelegationRewardsResponse(types.NewDelegationDelegatorReward(valOpAddr1, expRewardsCoins, expRewardsCoins)),
 		rewards,
 	)
 
 	// test delegator's total rewards query
 	delRewards = getQueriedDelegatorTotalRewards(t, ctx, cdc, querier, sdk.AccAddress(valOpAddr1))
-	expectedDelReward := types.NewDelegationDelegatorReward(valOpAddr1,
-		sdk.DecCoins{sdk.NewInt64DecCoin("stake", 5)})
+	expectedDelReward := types.NewDelegationDelegatorReward(
+		valOpAddr1,
+		sdk.DecCoins{sdk.NewInt64DecCoin("stake", 5)},
+		sdk.DecCoins{sdk.NewInt64DecCoin("stake", 5)},
+	)
 	wantDelRewards := types.NewQueryDelegatorTotalRewardsResponse(
-		[]types.DelegationDelegatorReward{expectedDelReward}, expectedDelReward.Reward)
+		[]types.DelegationDelegatorReward{expectedDelReward}, expectedDelReward.Total)
 	require.Equal(t, wantDelRewards, delRewards)
 
 	// currently all pools hold nothing so we should return null

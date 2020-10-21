@@ -147,26 +147,26 @@ func queryDelegationRewards(ctx sdk.Context, _ []string, req abci.RequestQuery, 
 	// cache-wrap context as to not persist state changes during querying
 	ctx, _ = ctx.CacheContext()
 
+	// get validator and delegation
+	// one or both of them might not exist, but we still might have same rewards in the rewards bank
 	val := k.stakingKeeper.Validator(ctx, params.ValidatorAddress)
-	if val == nil {
-		return nil, sdkerrors.Wrap(types.ErrNoValidatorExists, params.ValidatorAddress.String())
-	}
-
 	del := k.stakingKeeper.Delegation(ctx, params.DelegatorAddress, params.ValidatorAddress)
-	if del == nil {
-		return nil, types.ErrNoDelegationExists
+
+	// get current rewards
+	currentRewards := sdk.DecCoins{}
+	if val != nil && del != nil {
+		// delegation might not exist for delegator, but bank rewards might be accumulated
+		endingPeriod := k.incrementValidatorPeriod(ctx, val)
+		if rewards := k.calculateDelegationTotalRewards(ctx, val, del, endingPeriod); rewards != nil {
+			currentRewards = rewards
+		}
 	}
 
-	// get main rewards and bank accumulated rewards
-	endingPeriod := k.incrementValidatorPeriod(ctx, val)
-	rewards := k.calculateDelegationTotalRewards(ctx, val, del, endingPeriod)
-	if rewards == nil {
-		rewards = sdk.DecCoins{}
-	}
-	total := k.addAccumulatedBankRewards(ctx, del.GetDelegatorAddr(), rewards)
+	// get accumulated bank rewards
+	totalRewards := k.addAccumulatedBankRewards(ctx, params.DelegatorAddress, params.ValidatorAddress, currentRewards)
 
 	// build response
-	resp := types.NewQueryDelegationRewardsResponse(types.NewDelegationDelegatorReward(params.ValidatorAddress, rewards), total)
+	resp := types.NewQueryDelegationRewardsResponse(types.NewDelegationDelegatorReward(params.ValidatorAddress, currentRewards, totalRewards))
 	bz, err := json.Marshal(resp)
 	if err != nil {
 		return nil, sdkerrors.Wrap(sdkerrors.ErrJSONMarshal, err.Error())
@@ -188,23 +188,51 @@ func queryDelegatorTotalRewards(ctx sdk.Context, _ []string, req abci.RequestQue
 	total := sdk.DecCoins{}
 	var delRewards []types.DelegationDelegatorReward
 
-	// iterate over delegations and calculate total bonding and LP rewards
+	// iterate over existing delegations and calculate total bonding and LP rewards
 	k.stakingKeeper.IterateDelegations(
 		ctx, params.DelegatorAddress,
 		func(_ int64, del exported.DelegationI) (stop bool) {
 			valAddr := del.GetValidatorAddr()
 			val := k.stakingKeeper.Validator(ctx, valAddr)
 			endingPeriod := k.incrementValidatorPeriod(ctx, val)
-			delReward := k.calculateDelegationTotalRewards(ctx, val, del, endingPeriod)
+			delCurrentRewards := k.calculateDelegationTotalRewards(ctx, val, del, endingPeriod)
+			delTotalRewards := k.addAccumulatedBankRewards(ctx, params.DelegatorAddress, valAddr, delCurrentRewards)
 
-			delRewards = append(delRewards, types.NewDelegationDelegatorReward(valAddr, delReward))
-			total = total.Add(delReward...)
+			delRewards = append(delRewards,
+				types.NewDelegationDelegatorReward(
+					valAddr,
+					delCurrentRewards,
+					delTotalRewards,
+				),
+			)
+			total = total.Add(delTotalRewards...)
 			return false
 		},
 	)
 
-	// include bank accumulated rewards
-	total = k.addAccumulatedBankRewards(ctx, params.DelegatorAddress, total)
+	// iterate over accumulated bank rewards and add missing validator entries if delegation no longer exists
+	k.IterateDelegatorRewardsBankCoins(
+		ctx, params.DelegatorAddress,
+		func(valAddr sdk.ValAddress, coins sdk.Coins) (stop bool) {
+			// check if bank entry was handled earlier
+			for _, delReward := range delRewards {
+				if delReward.ValidatorAddress.Equals(valAddr) {
+					continue
+				}
+			}
+			// add a reward entry with empty current rewards and accumulated total rewards
+			decCoins := sdk.NewDecCoinsFromCoins(coins...)
+			delRewards = append(delRewards,
+				types.NewDelegationDelegatorReward(
+					valAddr,
+					sdk.DecCoins{},
+					decCoins,
+				),
+			)
+			total = total.Add(decCoins...)
+			return false
+		},
+	)
 
 	// build response
 	resp := types.NewQueryDelegatorTotalRewardsResponse(delRewards, total)

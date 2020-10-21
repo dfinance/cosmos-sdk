@@ -83,14 +83,16 @@ func GetDelegatorWithdrawInfoAddress(key []byte) (delAddr sdk.AccAddress) {
 func GetDelegatorStartingInfoAddresses(key []byte) (valAddr sdk.ValAddress, delAddr sdk.AccAddress) {
 	addr := key[1 : 1+sdk.AddrLen]
 	if len(addr) != sdk.AddrLen {
-		panic("unexpected key length")
+		panic("unexpected key length (valAddr)")
 	}
 	valAddr = sdk.ValAddress(addr)
+
 	addr = key[1+sdk.AddrLen:]
 	if len(addr) != sdk.AddrLen {
-		panic("unexpected key length")
+		panic("unexpected key length (delAddr)")
 	}
 	delAddr = sdk.AccAddress(addr)
+
 	return
 }
 
@@ -207,22 +209,34 @@ func GetValidatorLockedRewardsStateKey(v sdk.ValAddress) []byte {
 
 // parses validator address from the ValidatorLockedRewardsStateKey
 func ParseValidatorLockedRewardsStateKey(key []byte) (valAddr sdk.ValAddress) {
-	return key[1:]
-}
-
-// gets the key for delegator's RewardsBankPool coins.
-func GetDelegatorRewardsBankCoinsKey(delAddr sdk.AccAddress) []byte {
-	return append(DelegatorRewardsBankCoinsPrefix, delAddr.Bytes()...)
-}
-
-// gets the delegator address from a DelegatorRewardsBankCoins key.
-func GetDelegatorRewardsBankCoinsAddress(key []byte) (delAddr sdk.AccAddress) {
 	addr := key[1:]
 	if len(addr) != sdk.AddrLen {
 		panic("unexpected key length")
 	}
 
-	return sdk.AccAddress(addr)
+	return sdk.ValAddress(addr)
+}
+
+// gets the key for delegator's RewardsBankPool coins.
+func GetDelegatorRewardsBankCoinsKey(delAddr sdk.AccAddress, valAddr sdk.ValAddress) []byte {
+	return append(append(DelegatorRewardsBankCoinsPrefix, delAddr.Bytes()...), valAddr.Bytes()...)
+}
+
+// gets the delegator address from a DelegatorRewardsBankCoins key.
+func GetDelegatorRewardsBankCoinsAddress(key []byte) (delAddr sdk.AccAddress, valAddr sdk.ValAddress) {
+	addr := key[1 : 1+sdk.AddrLen]
+	if len(addr) != sdk.AddrLen {
+		panic("unexpected key length (delAddr)")
+	}
+	delAddr = sdk.AccAddress(addr)
+
+	addr = key[1+sdk.AddrLen:]
+	if len(addr) != sdk.AddrLen {
+		panic("unexpected key length (valAddr)")
+	}
+	valAddr = sdk.ValAddress(addr)
+
+	return
 }
 
 // gets the prefix for all scheduled reward unlocks

@@ -236,19 +236,20 @@ func (v Validator) RemoveDelShares(delOpType DelegationOpType, delShares sdk.Dec
 }
 
 // nolint - for ValidatorI
-func (v Validator) IsJailed() bool                { return v.Jailed }
-func (v Validator) GetMoniker() string            { return v.Description.Moniker }
-func (v Validator) GetStatus() sdk.BondStatus     { return v.Status }
-func (v Validator) IsBonded() bool                { return v.GetStatus().Equal(sdk.Bonded) }
-func (v Validator) IsUnbonded() bool              { return v.GetStatus().Equal(sdk.Unbonded) }
-func (v Validator) IsUnbonding() bool             { return v.GetStatus().Equal(sdk.Unbonding) }
-func (v Validator) GetOperator() sdk.ValAddress   { return v.OperatorAddress }
-func (v Validator) GetConsPubKey() crypto.PubKey  { return v.ConsPubKey }
-func (v Validator) GetConsAddr() sdk.ConsAddress  { return sdk.ConsAddress(v.ConsPubKey.Address()) }
-func (v Validator) GetBondedTokens() sdk.Int      { return v.BondedTokens() }
-func (v Validator) GetConsensusPower() int64      { return v.ConsensusPower() }
-func (v Validator) GetCommission() sdk.Dec        { return v.Commission.Rate }
-func (v Validator) GetMinSelfDelegation() sdk.Int { return v.MinSelfDelegation }
+func (v Validator) IsJailed() bool                         { return v.Jailed }
+func (v Validator) GetMoniker() string                     { return v.Description.Moniker }
+func (v Validator) GetStatus() sdk.BondStatus              { return v.Status }
+func (v Validator) IsBonded() bool                         { return v.GetStatus().Equal(sdk.Bonded) }
+func (v Validator) IsUnbonded() bool                       { return v.GetStatus().Equal(sdk.Unbonded) }
+func (v Validator) IsUnbonding() bool                      { return v.GetStatus().Equal(sdk.Unbonding) }
+func (v Validator) GetOperator() sdk.ValAddress            { return v.OperatorAddress }
+func (v Validator) GetConsPubKey() crypto.PubKey           { return v.ConsPubKey }
+func (v Validator) GetConsAddr() sdk.ConsAddress           { return sdk.ConsAddress(v.ConsPubKey.Address()) }
+func (v Validator) GetBondedTokens() sdk.Int               { return v.BondedTokens() }
+func (v Validator) GetConsensusPower() int64               { return v.ConsensusPower() }
+func (v Validator) GetCommission() sdk.Dec                 { return v.Commission.Rate }
+func (v Validator) GetMinSelfDelegation() sdk.Int          { return v.MinSelfDelegation }
+func (v Validator) GetScheduledUnbondStartTime() time.Time { return v.ScheduledUnbondStartTime }
 
 //
 func (v Validator) GetBondingDelegatorShares() sdk.Dec { return v.Bonding.DelegatorShares }

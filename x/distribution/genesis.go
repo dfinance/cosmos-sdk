@@ -42,7 +42,7 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, supplyKeeper types.SupplyKeeper
 		keeper.SetValidatorLockedState(ctx, entry.ValidatorAddress, entry.LockedInfo)
 	}
 	for _, entry := range data.RewardBankPool {
-		keeper.SetDelegatorRewardsBankCoins(ctx, entry.AccAddress, entry.Coins)
+		keeper.SetDelegatorRewardsBankCoins(ctx, entry.DelAddress, entry.ValAddress, entry.Coins)
 	}
 	for _, entry := range data.RewardsUnlockQueue {
 		keeper.SetRewardsUnlockQueueValidators(ctx, entry.Timestamp, entry.ValidatorAddresses)
@@ -160,11 +160,12 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 		},
 	)
 
-	rewardsPool := make([]types.RewardsBankPoolRecord, 0)
-	keeper.IterateDelegatorRewardsBankCoins(ctx,
-		func(accAddr sdk.AccAddress, coins sdk.Coins) (stop bool) {
-			rewardsPool = append(rewardsPool, types.RewardsBankPoolRecord{
-				AccAddress: accAddr,
+	bankPool := make([]types.RewardsBankPoolRecord, 0)
+	keeper.IterateRewardsBankCoins(ctx,
+		func(delAddr sdk.AccAddress, valAddr sdk.ValAddress, coins sdk.Coins) (stop bool) {
+			bankPool = append(bankPool, types.RewardsBankPoolRecord{
+				DelAddress: delAddr,
+				ValAddress: valAddr,
 				Coins:      coins,
 			})
 			return false
@@ -194,7 +195,7 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 		dels,
 		slashes,
 		lockedRewards,
-		rewardsPool,
+		bankPool,
 		rewardsUnlockQueue,
 	)
 }

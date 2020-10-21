@@ -1,6 +1,8 @@
 package exported
 
 import (
+	"time"
+
 	"github.com/tendermint/tendermint/crypto"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -44,4 +46,5 @@ type ValidatorI interface {
 	LPTokensFromSharesRoundUp(sdk.Dec) sdk.Dec                     // liquidity tokens: token worth of provided delegator shares, rounded up
 	LPSharesFromTokens(amt sdk.Int) (sdk.Dec, error)               // liquidity tokens: shares worth of delegator's bond
 	LPSharesFromTokensTruncated(amt sdk.Int) (sdk.Dec, error)      // liquidity tokens: truncated shares worth of delegator's bond
+	GetScheduledUnbondStartTime() time.Time                        // force unbond time (if not scheduled, result is time.Time{})
 }

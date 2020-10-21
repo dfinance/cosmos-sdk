@@ -8,7 +8,7 @@ import sdk "github.com/cosmos/cosmos-sdk/types"
 const RewardsBankPoolName = "rewards_bank_pool"
 
 // RewardsBankDelegatorCoins used to store current delegator coins stored in the RewardsBankPool.
-// Delegator address is encoded into the storage key.
+// Delegator address and Validator address are encoded into the storage key.
 type RewardsBankDelegatorCoins struct {
 	Coins sdk.Coins `json:"coins"`
 }

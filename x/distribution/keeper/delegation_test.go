@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	abci "github.com/tendermint/tendermint/abci/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
@@ -701,7 +702,7 @@ func TestRewardsBank(t *testing.T) {
 	var prevDistrAccCoins sdk.Coins
 	{
 		// RewardsBank delegator coins should be empty, as BeforeDelegationSharesModified hook wasn't triggered
-		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr(), val.GetOperator())
 		require.True(t, bankCoins.Empty())
 
 		// RewardsBankPool should be empty
@@ -735,7 +736,7 @@ func TestRewardsBank(t *testing.T) {
 	// post delegation checks
 	{
 		// RewardsBank delegator coins should not be empty
-		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr(), val.GetOperator())
 		require.False(t, bankCoins.Empty())
 
 		// RewardsBankPool acc should not be empty
@@ -751,7 +752,7 @@ func TestRewardsBank(t *testing.T) {
 		cacheCtx, _ := ctx.CacheContext()
 		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
 		curTotalRewards := k.calculateDelegationTotalRewards(cacheCtx, val, del, endingPeriod)
-		curTotalRewards = k.addAccumulatedBankRewards(ctx, del.GetDelegatorAddr(), curTotalRewards)
+		curTotalRewards = k.addAccumulatedBankRewards(ctx, del.GetDelegatorAddr(), val.GetOperator(), curTotalRewards)
 		require.True(t, curTotalRewards.IsEqual(prevTotalRewards))
 
 		// current total rewards should be equal to current bankCoins (as current validator delegator rewards are empty)
@@ -773,7 +774,7 @@ func TestRewardsBank(t *testing.T) {
 		k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
 
 		// check accumulated delegation bank rewards are not empty
-		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr())
+		bankCoins := k.GetDelegatorRewardsBankCoins(ctx, del.GetDelegatorAddr(), val.GetOperator())
 		require.False(t, bankCoins.Empty())
 
 		// check current validator delegation rewards are not empty
@@ -830,6 +831,252 @@ func TestRewardsBank(t *testing.T) {
 	}
 }
 
+// Test RewardsBank operations with multiple delegations.
+func TestRewardsBankMulti(t *testing.T) {
+	ctx, ak, k, sk, _ := CreateTestInputDefault(t, false, 1000)
+	sh := staking.NewHandler(sk)
+
+	checkInvariants := func() {
+		msg, broken := RewardsBankPoolInvariant(k)(ctx)
+		require.False(t, broken, msg)
+	}
+
+	getCurrentRewards := func(del staking.DelegationI, val staking.ValidatorI) sdk.DecCoins {
+		cacheCtx, _ := ctx.CacheContext()
+		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
+		rewards := k.calculateDelegationTotalRewards(cacheCtx, val, del, endingPeriod)
+		return rewards
+	}
+
+	updateVal := func(val staking.ValidatorI) staking.ValidatorI {
+		return sk.Validator(ctx, val.GetOperator())
+	}
+
+	updateDel := func(val staking.ValidatorI, del staking.DelegationI) staking.DelegationI {
+		return sk.Delegation(ctx, del.GetDelegatorAddr(), val.GetOperator())
+	}
+
+	// set module account coins
+	distrAcc := k.GetDistributionAccount(ctx)
+	distrAcc.SetCoins(sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(1000))))
+	k.supplyKeeper.SetModuleAccount(ctx, distrAcc)
+
+	// create validators and endBlock to bond the validator
+	{
+		commission := staking.NewCommissionRates(sdk.NewDecWithPrec(1, 1), sdk.NewDecWithPrec(1, 1), sdk.NewDec(0))
+
+		msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
+			sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, minSelfDelegation)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = staking.NewMsgCreateValidator(valOpAddr2, valConsPk2,
+			sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, minSelfDelegation)
+		res, err = sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		staking.EndBlocker(ctx, sk)
+	}
+
+	val1, val2 := sk.Validator(ctx, valOpAddr1), sk.Validator(ctx, valOpAddr2)
+	del1, del2 := sk.Delegation(ctx, sdk.AccAddress(valOpAddr1), valOpAddr1), sk.Delegation(ctx, sdk.AccAddress(valOpAddr2), valOpAddr2)
+
+	updateAll := func() {
+		ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
+		val1, val2 = updateVal(val1), updateVal(val2)
+		del1, del2 = updateDel(val1, del1), updateDel(val2, del2)
+	}
+
+	// allocate some rewards to both validators (different amount)
+	{
+		tokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(10))}
+		k.AllocateTokensToValidator(ctx, val1, tokens, sdk.DecCoins{})
+
+		tokens = sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(20))}
+		k.AllocateTokensToValidator(ctx, val2, tokens, sdk.DecCoins{})
+
+		updateAll()
+	}
+
+	// pre delegation modifications checks
+	var prevDel1CurRewards, prevDel2CurRewards sdk.DecCoins
+	prevDel1BankRewards, prevDel2BankRewards := sdk.Coins{}, sdk.Coins{}
+	{
+		// check rewards bank is empty
+		{
+			require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del1.GetDelegatorAddr(), val1.GetOperator()).Empty())
+			require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del1.GetDelegatorAddr(), val2.GetOperator()).Empty())
+			require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del2.GetDelegatorAddr(), val2.GetOperator()).Empty())
+			require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del2.GetDelegatorAddr(), val1.GetOperator()).Empty())
+
+			require.True(t, k.GetRewardsBankPoolAccount(ctx).GetCoins().Empty())
+		}
+
+		// current total rewards shouldn't be empty
+		prevDel1CurRewards = getCurrentRewards(del1, val1)
+		require.False(t, prevDel1CurRewards.Empty())
+
+		prevDel2CurRewards = getCurrentRewards(del2, val2)
+		require.False(t, prevDel2CurRewards.Empty())
+
+		// del2 should have more rewards than del1
+		require.True(t, prevDel2CurRewards.AmountOf(sdk.DefaultBondDenom).GT(prevDel1CurRewards.AmountOf(sdk.DefaultBondDenom)))
+	}
+	checkInvariants()
+
+	// increase del1 shares
+	{
+		tokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(10))
+		msg := staking.NewMsgDelegate(del1.GetDelegatorAddr(), val1.GetOperator(), tokens)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		staking.EndBlocker(ctx, sk)
+
+		updateAll()
+	}
+	// checks
+	{
+		// del1
+		{
+			// bank should not be empty
+			bankRewards := k.GetDelegatorRewardsBankCoins(ctx, del1.GetDelegatorAddr(), val1.GetOperator())
+			require.False(t, bankRewards.IsZero())
+			require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del1.GetDelegatorAddr(), val2.GetOperator()).Empty())
+			prevDel1BankRewards = bankRewards
+
+			// bank rewards amount should be equal to prev current rewards
+			require.True(t, bankRewards.AmountOf(sdk.DefaultBondDenom).Equal(prevDel1CurRewards.AmountOf(sdk.DefaultBondDenom).TruncateInt()))
+
+			// current rewards should be empty
+			curRewards := getCurrentRewards(del1, val1)
+			require.True(t, curRewards.IsZero())
+			prevDel1CurRewards = curRewards
+		}
+
+		// del2
+		{
+			// bank should be empty
+			require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del2.GetDelegatorAddr(), val2.GetOperator()).Empty())
+
+			// current rewards should not be empty
+			require.False(t, getCurrentRewards(del2, val2).IsZero())
+		}
+	}
+	checkInvariants()
+
+	// decrease del2 shares
+	{
+		udTokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(50))
+		msg := staking.NewMsgUndelegate(del2.GetDelegatorAddr(), val2.GetOperator(), udTokens)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		staking.EndBlocker(ctx, sk)
+
+		updateAll()
+	}
+	// check
+	{
+		// del1
+		{
+			// state should no change
+			bankRewards := k.GetDelegatorRewardsBankCoins(ctx, del1.GetDelegatorAddr(), val1.GetOperator())
+			require.True(t, bankRewards.IsEqual(prevDel1BankRewards))
+			require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del1.GetDelegatorAddr(), val2.GetOperator()).Empty())
+
+			curRewards := getCurrentRewards(del1, val1)
+			require.True(t, curRewards.IsEqual(prevDel1CurRewards))
+		}
+
+		// del2
+		{
+			// bank should not be empty
+			bankRewards := k.GetDelegatorRewardsBankCoins(ctx, del2.GetDelegatorAddr(), val2.GetOperator())
+			require.False(t, bankRewards.IsZero())
+			require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del2.GetDelegatorAddr(), val1.GetOperator()).Empty())
+			prevDel2BankRewards = bankRewards
+
+			// bank rewards amount should be equal to prev current rewards
+			require.True(t, bankRewards.AmountOf(sdk.DefaultBondDenom).Equal(prevDel2CurRewards.AmountOf(sdk.DefaultBondDenom).TruncateInt()))
+
+			// current rewards should be empty
+			curRewards := getCurrentRewards(del2, val2)
+			require.True(t, curRewards.IsZero())
+			prevDel2CurRewards = curRewards
+		}
+
+		require.True(t, prevDel2BankRewards.IsAllGT(prevDel1BankRewards))
+	}
+	checkInvariants()
+
+	// allocate some rewards to both validators
+	{
+		tokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(10))}
+
+		k.AllocateTokensToValidator(ctx, val1, tokens, sdk.DecCoins{})
+		k.AllocateTokensToValidator(ctx, val2, tokens, sdk.DecCoins{})
+
+		updateAll()
+	}
+	// check
+	{
+		curRewards := getCurrentRewards(del1, val1)
+		require.False(t, curRewards.IsZero())
+		prevDel1CurRewards = curRewards
+
+		curRewards = getCurrentRewards(del2, val2)
+		require.False(t, curRewards.IsZero())
+		prevDel2CurRewards = curRewards
+	}
+	checkInvariants()
+
+	// withdraw all
+	del1InitialBalance, del2InitialBalance := ak.GetAccount(ctx, del1.GetDelegatorAddr()).GetCoins(), ak.GetAccount(ctx, del2.GetDelegatorAddr()).GetCoins()
+	var del1WithdrawAmt, del2WithdrawAmt sdk.Int
+	{
+		coins, err := k.WithdrawDelegationRewards(ctx, del1.GetDelegatorAddr(), val1.GetOperator())
+		require.NoError(t, err)
+		del1WithdrawAmt = coins.AmountOf(sdk.DefaultBondDenom)
+
+		coins, err = k.WithdrawDelegationRewards(ctx, del2.GetDelegatorAddr(), val2.GetOperator())
+		require.NoError(t, err)
+		del2WithdrawAmt = coins.AmountOf(sdk.DefaultBondDenom)
+
+		updateAll()
+	}
+	// check
+	{
+		// banks should be empty
+		require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del1.GetDelegatorAddr(), val1.GetOperator()).Empty())
+		require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del2.GetDelegatorAddr(), val2.GetOperator()).Empty())
+		require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del1.GetDelegatorAddr(), val2.GetOperator()).Empty())
+		require.True(t, k.GetDelegatorRewardsBankCoins(ctx, del2.GetDelegatorAddr(), val1.GetOperator()).Empty())
+
+		// current rewards should be empty
+		require.True(t, getCurrentRewards(del1, val1).IsZero())
+		require.True(t, getCurrentRewards(del2, val2).IsZero())
+
+		del1CurrentBalance, del2CurrentBalance := ak.GetAccount(ctx, del1.GetDelegatorAddr()).GetCoins(), ak.GetAccount(ctx, del2.GetDelegatorAddr()).GetCoins()
+		del1DiffActual, del2DiffActual := del1CurrentBalance.Sub(del1InitialBalance).AmountOf(sdk.DefaultBondDenom), del2CurrentBalance.Sub(del2InitialBalance).AmountOf(sdk.DefaultBondDenom)
+
+		del1DiffExpected := prevDel1CurRewards.AmountOf(sdk.DefaultBondDenom).TruncateInt().Add(prevDel1BankRewards.AmountOf(sdk.DefaultBondDenom))
+		require.True(t, del1WithdrawAmt.Equal(del1DiffActual))
+		require.True(t, del1DiffExpected.Equal(del1DiffActual))
+
+		del2DiffExpected := prevDel2CurRewards.AmountOf(sdk.DefaultBondDenom).TruncateInt().Add(prevDel2BankRewards.AmountOf(sdk.DefaultBondDenom))
+		require.True(t, del2WithdrawAmt.Equal(del2DiffActual))
+		require.True(t, del2DiffExpected.Equal(del2DiffActual))
+	}
+	checkInvariants()
+}
+
 // Test rewards withdraw when delegation is reduced to zero.
 func TestRewardsBankUndelegatingToZero(t *testing.T) {
 	ctx, _, k, sk, _ := CreateTestInputDefault(t, false, 1000)
@@ -867,17 +1114,22 @@ func TestRewardsBankUndelegatingToZero(t *testing.T) {
 		res, err := sh(ctx, msg)
 		require.NoError(t, err)
 		require.NotNil(t, res)
-
 		staking.EndBlocker(ctx, sk)
 
 		del := sk.Delegation(ctx, delAddr, val.GetOperator())
 		require.NotNil(t, del)
+
+		val = sk.Validator(ctx, valOpAddr1)
+		ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 	}
 
 	// allocate some rewards
 	{
 		tokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(10))}
 		k.AllocateTokensToValidator(ctx, val, tokens, sdk.DecCoins{})
+
+		val = sk.Validator(ctx, valOpAddr1)
+		ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 	}
 
 	// undelegate twice (till zero)
@@ -891,15 +1143,20 @@ func TestRewardsBankUndelegatingToZero(t *testing.T) {
 			res, err := sh(ctx, msg)
 			require.NoError(t, err)
 			require.NotNil(t, res)
-
 			staking.EndBlocker(ctx, sk)
+
+			val = sk.Validator(ctx, valOpAddr1)
+			ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
 		}
 	}
 
 	// transfer all rewards
 	{
-		_, err := k.WithdrawDelegationRewards(ctx, delAddr, val.GetOperator())
-		require.Error(t, err)
+		rewards, err := k.WithdrawDelegationRewards(ctx, delAddr, val.GetOperator())
+		require.NoError(t, err)
+
+		// rewards should be zero, as current rewards were to small to truncate to a single Coin
+		require.True(t, rewards.IsZero())
 	}
 }
 
@@ -984,7 +1241,7 @@ func TestLPRewardsWithLock(t *testing.T) {
 
 		endingPeriod := k.incrementValidatorPeriod(ctxCache, val)
 		rewards := k.calculateDelegationTotalRewards(ctxCache, val, del, endingPeriod)
-		rewards = k.addAccumulatedBankRewards(ctxCache, del.GetDelegatorAddr(), rewards)
+		rewards = k.addAccumulatedBankRewards(ctxCache, del.GetDelegatorAddr(), val.GetOperator(), rewards)
 		if rewards == nil {
 			return sdk.DecCoins{}
 		}
@@ -1224,4 +1481,397 @@ func TestLPRewardsWithLock(t *testing.T) {
 		require.True(t, coins.IsZero())
 	}
 	checkInvariants()
+}
+
+// Test query and withdraw rewards that got stucked within validator where delegator has no longer delegations to.
+func TestWithdrawDelegationRewardsMissingVal(t *testing.T) {
+	ctx, _, k, sk, _ := CreateTestInputDefault(t, false, 1000)
+	sh := staking.NewHandler(sk)
+
+	// set module account coins
+	distrAcc := k.GetDistributionAccount(ctx)
+	distrAcc.SetCoins(sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(1000))))
+	k.supplyKeeper.SetModuleAccount(ctx, distrAcc)
+
+	updateVal := func(val staking.ValidatorI) staking.ValidatorI {
+		return sk.Validator(ctx, val.GetOperator())
+	}
+
+	getBankRewards := func(delAdd sdk.AccAddress, val staking.ValidatorI) sdk.Coins {
+		return k.GetDelegatorRewardsBankCoins(ctx, delAddr1, val.GetOperator())
+	}
+
+	getCurrentRewards := func(delAddr sdk.AccAddress, val staking.ValidatorI) sdk.DecCoins {
+		cacheCtx, _ := ctx.CacheContext()
+		del := sk.Delegation(ctx, delAddr, val.GetOperator())
+		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
+		rewards := k.calculateDelegationTotalRewards(cacheCtx, val, del, endingPeriod)
+		return rewards
+	}
+
+	queryRewards := func(delAddr sdk.AccAddress, val staking.ValidatorI) (result types.QueryDelegationRewardsResponse) {
+		queryParams := types.QueryDelegationRewardsParams{
+			DelegatorAddress: delAddr,
+			ValidatorAddress: val.GetOperator(),
+		}
+
+		res, err := queryDelegationRewards(ctx, nil, abci.RequestQuery{Data: k.cdc.MustMarshalJSON(queryParams)}, k)
+		require.NoError(t, err)
+
+		k.cdc.MustUnmarshalJSON(res, &result)
+		return
+	}
+
+	queryTotalRewards := func(delAddr sdk.AccAddress) (result types.QueryDelegatorTotalRewardsResponse) {
+		queryParams := types.QueryDelegatorParams{
+			DelegatorAddress: delAddr,
+		}
+
+		res, err := queryDelegatorTotalRewards(ctx, nil, abci.RequestQuery{Data: k.cdc.MustMarshalJSON(queryParams)}, k)
+		require.NoError(t, err)
+
+		k.cdc.MustUnmarshalJSON(res, &result)
+		return
+	}
+
+	nextBlock := func() {
+		ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
+	}
+
+	// create validators and endBlock to bond the validator
+	{
+		commission := staking.NewCommissionRates(sdk.NewDecWithPrec(1, 1), sdk.NewDecWithPrec(1, 1), sdk.NewDec(0))
+
+		msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
+			sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, minSelfDelegation)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msg = staking.NewMsgCreateValidator(valOpAddr2, valConsPk2,
+			sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100)), staking.Description{}, commission, minSelfDelegation)
+		res, err = sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		staking.EndBlocker(ctx, sk)
+	}
+
+	val1, val2 := sk.Validator(ctx, valOpAddr1), sk.Validator(ctx, valOpAddr2)
+	delAddr := delAddr1
+
+	// delegate to val1 and allocate some rewards
+	{
+		delTokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100))
+		msg := staking.NewMsgDelegate(delAddr, val1.GetOperator(), delTokens)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		staking.EndBlocker(ctx, sk)
+		val1 = updateVal(val1)
+
+		allocTokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(100))}
+		k.AllocateTokensToValidator(ctx, val1, allocTokens, sdk.DecCoins{})
+		val1 = updateVal(val1)
+
+		nextBlock()
+	}
+	// check rewards state
+	{
+		// bank rewards are empty
+		require.True(t, getBankRewards(delAddr1, val1).IsZero())
+		// current rewards aren't empty
+		require.False(t, getCurrentRewards(delAddr1, val1).IsZero())
+	}
+
+	// modify the delegation to val1 (that fills the rewards bank)
+	// allocate some rewards (that fills the current rewards)
+	{
+		tokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100))
+		msg := staking.NewMsgDelegate(delAddr, val1.GetOperator(), tokens)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		staking.EndBlocker(ctx, sk)
+		val1 = updateVal(val1)
+
+		allocTokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(100))}
+		k.AllocateTokensToValidator(ctx, val1, allocTokens, sdk.DecCoins{})
+		val1 = updateVal(val1)
+
+		nextBlock()
+	}
+	// check rewards state
+	{
+		// bank has rewards
+		require.False(t, getBankRewards(delAddr1, val1).IsZero())
+		// current rewards aren't empty
+		require.False(t, getCurrentRewards(delAddr1, val1).IsZero())
+	}
+
+	// redelegate all del tokens from val1 to val2
+	{
+		rdTokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(200))
+		msg := staking.NewMsgBeginRedelegate(delAddr, val1.GetOperator(), val2.GetOperator(), rdTokens)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		staking.EndBlocker(ctx, sk)
+		val1 = updateVal(val1)
+		val2 = updateVal(val2)
+
+		nextBlock()
+	}
+	// check rewards state
+	{
+		// bank for val1 has rewards
+		require.False(t, getBankRewards(delAddr1, val1).IsZero())
+		// bank for val2 has no rewards yet
+		require.True(t, getBankRewards(delAddr1, val2).IsZero())
+	}
+
+	// check queryDelegationRewards
+	{
+		// delegator has no delegation for val1, but Total shouldn't be empty
+		val1Rewards := queryRewards(delAddr1, val1)
+		require.True(t, val1Rewards.Reward.Current.IsZero())
+		require.False(t, val1Rewards.Reward.Total.IsZero())
+
+		// delegator has delegation for val2, but current and zero should be empty
+		val2Rewards := queryRewards(delAddr1, val2)
+		require.True(t, val2Rewards.Reward.Current.IsZero())
+		require.True(t, val2Rewards.Reward.Total.IsZero())
+	}
+
+	// check queryDelegatorTotalRewards
+	{
+		delRewards := queryTotalRewards(delAddr1)
+		require.Len(t, delRewards.Rewards, 2)
+		require.True(t, delRewards.Total.IsEqual(delRewards.Rewards[0].Total.Add(delRewards.Rewards[1].Total...)))
+
+		// existing delegations should go first
+		require.True(t, delRewards.Rewards[0].ValidatorAddress.Equals(val2.GetOperator()))
+		require.True(t, delRewards.Rewards[0].Current.IsZero())
+		require.True(t, delRewards.Rewards[0].Total.IsZero())
+
+		// non-existing delegations should go last
+		require.True(t, delRewards.Rewards[1].ValidatorAddress.Equals(val1.GetOperator()))
+		require.True(t, delRewards.Rewards[1].Current.IsZero())
+		require.False(t, delRewards.Rewards[1].Total.IsZero())
+	}
+
+	// check withdraw rewards from val1 missing delegation
+	{
+		rewards, err := k.WithdrawDelegationRewards(ctx, delAddr, val1.GetOperator())
+		require.NoError(t, err)
+		require.False(t, rewards.IsZero())
+	}
+
+	// check withdraw rewards from val2 (no rewards)
+	{
+		rewards, err := k.WithdrawDelegationRewards(ctx, delAddr, val2.GetOperator())
+		require.NoError(t, err)
+		require.True(t, rewards.IsZero())
+	}
+}
+
+func TestWithdrawWithForceUnbondedValidator(t *testing.T) {
+	ctx, _, k, sk, _ := CreateTestInputDefault(t, false, 1000)
+	sh := staking.NewHandler(sk)
+
+	// set module account coins
+	distrAcc := k.GetDistributionAccount(ctx)
+	distrAcc.SetCoins(sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(1000))))
+	k.supplyKeeper.SetModuleAccount(ctx, distrAcc)
+
+	updateVal := func(val staking.ValidatorI) staking.ValidatorI {
+		return sk.Validator(ctx, val.GetOperator())
+	}
+
+	getBankRewards := func(delAdd sdk.AccAddress, val staking.ValidatorI) sdk.Coins {
+		return k.GetDelegatorRewardsBankCoins(ctx, delAddr1, val.GetOperator())
+	}
+
+	getCurrentRewards := func(delAddr sdk.AccAddress, val staking.ValidatorI) sdk.DecCoins {
+		cacheCtx, _ := ctx.CacheContext()
+		del := sk.Delegation(ctx, delAddr, val.GetOperator())
+		endingPeriod := k.incrementValidatorPeriod(cacheCtx, val)
+		rewards := k.calculateDelegationTotalRewards(cacheCtx, val, del, endingPeriod)
+		return rewards
+	}
+
+	queryRewards := func(delAddr sdk.AccAddress, valAddr sdk.ValAddress) (result types.QueryDelegationRewardsResponse) {
+		queryParams := types.QueryDelegationRewardsParams{
+			DelegatorAddress: delAddr,
+			ValidatorAddress: valAddr,
+		}
+
+		res, err := queryDelegationRewards(ctx, nil, abci.RequestQuery{Data: k.cdc.MustMarshalJSON(queryParams)}, k)
+		require.NoError(t, err)
+
+		k.cdc.MustUnmarshalJSON(res, &result)
+		return
+	}
+
+	queryTotalRewards := func(delAddr sdk.AccAddress) (result types.QueryDelegatorTotalRewardsResponse) {
+		queryParams := types.QueryDelegatorParams{
+			DelegatorAddress: delAddr,
+		}
+
+		res, err := queryDelegatorTotalRewards(ctx, nil, abci.RequestQuery{Data: k.cdc.MustMarshalJSON(queryParams)}, k)
+		require.NoError(t, err)
+
+		k.cdc.MustUnmarshalJSON(res, &result)
+		return
+	}
+
+	nextBlock := func() {
+		ctx = ctx.WithBlockHeight(ctx.BlockHeight() + 1)
+	}
+
+	// create validators and endBlock to bond the validator
+	{
+		// overwrite PowerReduction as otherwise validator won't be bonded
+		sdk.PowerReduction = sdk.NewInt(1)
+
+		commission := staking.NewCommissionRates(sdk.NewDecWithPrec(1, 1), sdk.NewDecWithPrec(1, 1), sdk.NewDec(0))
+
+		msg := staking.NewMsgCreateValidator(valOpAddr1, valConsPk1,
+			sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(10)), staking.Description{}, commission, minSelfDelegation)
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		staking.EndBlocker(ctx, sk)
+	}
+
+	val := sk.Validator(ctx, valOpAddr1)
+	delAddr := delAddr1
+
+	// delegate and allocate some rewards
+	{
+		delTokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(45))
+		msg := staking.NewMsgDelegate(delAddr, val.GetOperator(), delTokens)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		staking.EndBlocker(ctx, sk)
+		val = updateVal(val)
+
+		allocTokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(100))}
+		k.AllocateTokensToValidator(ctx, val, allocTokens, sdk.DecCoins{})
+		val = updateVal(val)
+
+		nextBlock()
+	}
+	// check rewards state
+	{
+		require.True(t, getBankRewards(delAddr1, val).IsZero())
+		require.False(t, getCurrentRewards(delAddr1, val).IsZero())
+	}
+
+	// modify the delegation and allocate some rewards
+	{
+		tokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(45))
+		msg := staking.NewMsgDelegate(delAddr, val.GetOperator(), tokens)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		staking.EndBlocker(ctx, sk)
+		val = updateVal(val)
+
+		allocTokens := sdk.DecCoins{sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, sdk.NewDec(100))}
+		k.AllocateTokensToValidator(ctx, val, allocTokens, sdk.DecCoins{})
+		val = updateVal(val)
+
+		nextBlock()
+	}
+	// check rewards state
+	{
+		// bank has rewards
+		require.False(t, getBankRewards(delAddr1, val).IsZero())
+		// current rewards aren't empty
+		require.False(t, getCurrentRewards(delAddr1, val).IsZero())
+	}
+
+	// produce an "overflow" event to start force unbond
+	var fubTime time.Time
+	{
+		require.Equal(t, val.GetStatus(), sdk.Bonded)
+
+		udTokens := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(5))
+		msg := staking.NewMsgUndelegate(sdk.AccAddress(valOpAddr1), val.GetOperator(), udTokens)
+
+		res, err := sh(ctx, msg)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		staking.EndBlocker(ctx, sk)
+
+		val = updateVal(val)
+
+		nextBlock()
+	}
+	// check force unbond scheduled
+	{
+		fubTime = val.GetScheduledUnbondStartTime()
+		require.False(t, fubTime.IsZero())
+	}
+
+	// emulate time for force unbond and delegation unbond
+	var valAddr sdk.ValAddress
+	{
+		// wait for scheduled force unbond
+		nextBlock()
+		ctx = ctx.WithBlockTime(fubTime)
+		staking.EndBlocker(ctx, sk)
+
+		// check validator is unbonding
+		val = updateVal(val)
+		require.Equal(t, sdk.Unbonding, val.GetStatus())
+		valAddr = val.GetOperator()
+
+		// woit for delegations unbonding
+		nextBlock()
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(sk.GetParams(ctx).UnbondingTime))
+		staking.EndBlocker(ctx, sk)
+
+		// check validator deleted
+		val = updateVal(val)
+		require.Nil(t, val)
+		_, found := k.GetValidatorLockedState(ctx, valAddr)
+		require.False(t, found)
+	}
+
+	// check queryDelegationRewards
+	{
+		rewards := queryRewards(delAddr, valAddr)
+		require.True(t, rewards.Reward.Current.IsZero())
+		require.False(t, rewards.Reward.Total.IsZero())
+	}
+
+	// check queryDelegatorTotalRewards
+	{
+		rewards := queryTotalRewards(delAddr)
+		require.Len(t, rewards.Rewards, 1)
+		require.True(t, rewards.Rewards[0].Current.IsZero())
+		require.False(t, rewards.Rewards[0].Total.IsZero())
+		require.True(t, rewards.Rewards[0].Total.IsEqual(rewards.Total))
+	}
+
+	// withdraw non-existing validator and non-existing delegation rewards
+	{
+		rewards, err := k.WithdrawDelegationRewards(ctx, delAddr, valAddr)
+		require.NoError(t, err)
+		require.False(t, rewards.IsZero())
+	}
+
+	// check queryDelegationRewards (all zeros)
+	{
+		rewards := queryRewards(delAddr, valAddr)
+		require.True(t, rewards.Reward.Current.IsZero())
+		require.True(t, rewards.Reward.Total.IsZero())
+	}
 }

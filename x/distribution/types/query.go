@@ -12,28 +12,19 @@ import (
 // QueryDelegationRewards query's response.
 type QueryDelegationRewardsResponse struct {
 	// Current rewards for a specific validator
-	Rewards DelegationDelegatorReward `json:"rewards" yaml:"rewards"`
-	// All validators rewards accumulated on delegation modification events (shares change, undelegation, redelegation)
-	// This truncated Int value would be transferred to the delegator account on withdraw_delegator_reward Tx
-	Total sdk.DecCoins `json:"total" yaml:"total"`
+	Reward DelegationDelegatorReward `json:"reward" yaml:"reward"`
 }
 
 func (res QueryDelegationRewardsResponse) String() string {
 	out := "Delegation Rewards:\n"
-	out += fmt.Sprintf(`Rewards:
-	ValidatorAddress: %s
-	Reward: %s`, res.Rewards.ValidatorAddress, res.Rewards.Reward)
-	out += fmt.Sprintf("\n  Total: %s\n", res.Total)
+	out += res.Reward.String()
 
 	return strings.TrimSpace(out)
 }
 
 // NewQueryDelegatorTotalRewardsResponse constructs a QueryDelegatorTotalRewardsResponse
-func NewQueryDelegationRewardsResponse(
-	rewards DelegationDelegatorReward, total sdk.DecCoins,
-) QueryDelegationRewardsResponse {
-
-	return QueryDelegationRewardsResponse{Rewards: rewards, Total: total}
+func NewQueryDelegationRewardsResponse(reward DelegationDelegatorReward) QueryDelegationRewardsResponse {
+	return QueryDelegationRewardsResponse{Reward: reward}
 }
 
 // QueryDelegatorTotalRewardsResponse defines the properties of
@@ -55,28 +46,39 @@ func NewQueryDelegatorTotalRewardsResponse(
 
 func (res QueryDelegatorTotalRewardsResponse) String() string {
 	out := "Delegator Total Rewards:\n"
-	out += "  Rewards:"
 	for _, reward := range res.Rewards {
-		out += fmt.Sprintf(`  
-	ValidatorAddress: %s
-	Reward: %s`, reward.ValidatorAddress, reward.Reward)
+		out += reward.String()
 	}
-	out += fmt.Sprintf("\n  Total: %s\n", res.Total)
+	out += fmt.Sprintf("  Total: %s\n", res.Total)
 
 	return strings.TrimSpace(out)
 }
 
-// DelegationDelegatorReward defines the properties
-// of a delegator's delegation reward.
+// DelegationDelegatorReward defines the properties of a delegator's delegation reward.
 type DelegationDelegatorReward struct {
 	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address" swaggertype:"string" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
-	Reward           sdk.DecCoins   `json:"reward" yaml:"reward"`
+	// Current period reward amount
+	Current sdk.DecCoins `json:"current" yaml:"current"`
+	// Sum of current period reward amount and stored in rewards bank amount
+	Total sdk.DecCoins `json:"total" yaml:"total"`
+}
+
+func (res DelegationDelegatorReward) String() string {
+	return fmt.Sprintf(`  ValidatorAddress: %s
+    Current: %s
+    Total:   %s
+`,
+		res.ValidatorAddress, res.Current, res.Total,
+	)
 }
 
 // NewDelegationDelegatorReward constructs a DelegationDelegatorReward.
-func NewDelegationDelegatorReward(valAddr sdk.ValAddress,
-	reward sdk.DecCoins) DelegationDelegatorReward {
-	return DelegationDelegatorReward{ValidatorAddress: valAddr, Reward: reward}
+func NewDelegationDelegatorReward(
+	valAddr sdk.ValAddress,
+	current, total sdk.DecCoins,
+) DelegationDelegatorReward {
+
+	return DelegationDelegatorReward{ValidatorAddress: valAddr, Current: current, Total: total}
 }
 
 // QueryLockedRewardsStateResponse defines the locked_rewards_state query response.
