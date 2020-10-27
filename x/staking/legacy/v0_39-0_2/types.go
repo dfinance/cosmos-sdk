@@ -5,6 +5,7 @@ import (
 
 	"github.com/tendermint/tendermint/crypto"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -62,6 +63,25 @@ type (
 		MinSelfDelegation        sdk.Int         `json:"min_self_delegation"`
 	}
 
+	bechValidator struct {
+		OperatorAddress          sdk.ValAddress `json:"operator_address"`
+		ConsPubKey               string         `json:"consensus_pubkey"`
+		Jailed                   bool           `json:"jailed"`
+		ScheduledToUnbond        bool           `json:"scheduled_to_unbond"`
+		Status                   sdk.BondStatus `json:"status"`
+		BondingDelegatorShares   sdk.Dec        `json:"bonding_delegator_shares"`
+		BondingTokens            sdk.Int        `json:"bonding_tokens"`
+		LPDelegatorShares        sdk.Dec        `json:"lp_delegator_shares"`
+		LPTokens                 sdk.Int        `json:"lp_tokens"`
+		Description              Description    `json:"description"`
+		UnbondingHeight          int64          `json:"unbonding_height" `
+		UnbondingCompletionTime  time.Time      `json:"unbonding_time"`
+		ScheduledUnbondHeight    int64          `json:"scheduled_unbond_height"`
+		ScheduledUnbondStartTime time.Time      `json:"scheduled_unbond_time"`
+		Commission               Commission     `json:"commission"`
+		MinSelfDelegation        sdk.Int        `json:"min_self_delegation"`
+	}
+
 	Description struct {
 		Moniker         string `json:"moniker"`
 		Identity        string `json:"identity"`
@@ -76,10 +96,14 @@ type (
 	}
 
 	Commission struct {
-		Rate          sdk.Dec   `json:"rate"`
-		MaxRate       sdk.Dec   `json:"max_rate"`
-		MaxChangeRate sdk.Dec   `json:"max_change_rate"`
-		UpdateTime    time.Time `json:"update_time"`
+		CommissionRates `json:"commission_rates"`
+		UpdateTime      time.Time `json:"update_time"`
+	}
+
+	CommissionRates struct {
+		Rate          sdk.Dec `json:"rate"`
+		MaxRate       sdk.Dec `json:"max_rate"`
+		MaxChangeRate sdk.Dec `json:"max_change_rate"`
 	}
 
 	Delegations []Delegation
@@ -148,3 +172,65 @@ type (
 		BanHeight  int64          `json:"ban_height"`
 	}
 )
+
+// MarshalJSON marshals the validator to JSON using Bech32.
+func (v Validator) MarshalJSON() ([]byte, error) {
+	bechConsPubKey, err := sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return codec.Cdc.MarshalJSON(bechValidator{
+		OperatorAddress:          v.OperatorAddress,
+		ConsPubKey:               bechConsPubKey,
+		Jailed:                   v.Jailed,
+		ScheduledToUnbond:        v.ScheduledToUnbond,
+		Status:                   v.Status,
+		BondingDelegatorShares:   v.Bonding.DelegatorShares,
+		BondingTokens:            v.Bonding.Tokens,
+		LPDelegatorShares:        v.LP.DelegatorShares,
+		LPTokens:                 v.LP.Tokens,
+		Description:              v.Description,
+		UnbondingHeight:          v.UnbondingHeight,
+		UnbondingCompletionTime:  v.UnbondingCompletionTime,
+		ScheduledUnbondHeight:    v.ScheduledUnbondHeight,
+		ScheduledUnbondStartTime: v.ScheduledUnbondStartTime,
+		MinSelfDelegation:        v.MinSelfDelegation,
+		Commission:               v.Commission,
+	})
+}
+
+// UnmarshalJSON unmarshals the validator from JSON using Bech32.
+func (v *Validator) UnmarshalJSON(data []byte) error {
+	bv := &bechValidator{}
+	if err := codec.Cdc.UnmarshalJSON(data, bv); err != nil {
+		return err
+	}
+	consPubKey, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, bv.ConsPubKey)
+	if err != nil {
+		return err
+	}
+	*v = Validator{
+		OperatorAddress:   bv.OperatorAddress,
+		ConsPubKey:        consPubKey,
+		Jailed:            bv.Jailed,
+		ScheduledToUnbond: bv.ScheduledToUnbond,
+		Status:            bv.Status,
+		Bonding: ValidatorTokens{
+			DelegatorShares: bv.BondingDelegatorShares,
+			Tokens:          bv.BondingTokens,
+		},
+		LP: ValidatorTokens{
+			DelegatorShares: bv.LPDelegatorShares,
+			Tokens:          bv.LPTokens,
+		},
+		Description:              bv.Description,
+		UnbondingHeight:          bv.UnbondingHeight,
+		UnbondingCompletionTime:  bv.UnbondingCompletionTime,
+		ScheduledUnbondHeight:    bv.ScheduledUnbondHeight,
+		ScheduledUnbondStartTime: bv.ScheduledUnbondStartTime,
+		Commission:               bv.Commission,
+		MinSelfDelegation:        bv.MinSelfDelegation,
+	}
+	return nil
+}
