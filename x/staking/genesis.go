@@ -194,7 +194,6 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 	})
 	var stakingStates []types.StakingStateEntry
 	keeper.IterateValidatorStakingStates(ctx, func(valAddr sdk.ValAddress, state types.ValidatorStakingState) (stop bool) {
-		fmt.Printf("ExportGenesis: %s: %v\n", valAddr, state.Delegators)
 		stakingStates = append(stakingStates, types.StakingStateEntry{
 			ValAddr: valAddr,
 			State:   state,
