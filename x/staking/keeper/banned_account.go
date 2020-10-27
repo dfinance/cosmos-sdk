@@ -41,10 +41,10 @@ func (k Keeper) IterateBannedAccounts(ctx sdk.Context, handler func(accAddr sdk.
 
 	for ; iterator.Valid(); iterator.Next() {
 		accAddr := types.ParseBannedAccKey(iterator.Key())
-		var banHeight int64
-		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &banHeight)
+		info := types.BannedAccInfo{}
+		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &info)
 
-		if handler(accAddr, banHeight) {
+		if handler(accAddr, info.Height) {
 			break
 		}
 	}
