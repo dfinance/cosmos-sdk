@@ -39,6 +39,8 @@ var (
 	DefaultGenesisState   = types.DefaultGenesisState
 	NewSupply             = types.NewSupply
 	DefaultSupply         = types.DefaultSupply
+	//
+	NewEmptySquashOptions = keeper.NewEmptySquashOptions
 
 	// variable aliases
 	ModuleCdc = types.ModuleCdc
@@ -51,4 +53,6 @@ type (
 	Supply        = types.Supply
 	//
 	QueryTotalSupplyParams = types.QueryTotalSupplyParams
+	//
+	SquashOptions = keeper.SquashOptions
 )
