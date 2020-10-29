@@ -181,6 +181,8 @@ var (
 	MustUnmarshalValidator             = types.MustUnmarshalValidator
 	UnmarshalValidator                 = types.UnmarshalValidator
 	NewDescription                     = types.NewDescription
+	//
+	NewEmptySquashOptions = keeper.NewEmptySquashOptions
 
 	// variable aliases
 	ModuleCdc                        = types.ModuleCdc
@@ -248,4 +250,6 @@ type (
 	Description               = types.Description
 	DelegationI               = exported.DelegationI
 	ValidatorI                = exported.ValidatorI
+	//
+	SquashOptions = keeper.SquashOptions
 )
