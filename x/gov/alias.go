@@ -110,6 +110,8 @@ var (
 	NewVote                       = types.NewVote
 	VoteOptionFromString          = types.VoteOptionFromString
 	ValidVoteOption               = types.ValidVoteOption
+	//
+	NewEmptySquashOptions = keeper.NewEmptySquashOptions
 
 	// variable aliases
 	ModuleCdc                   = types.ModuleCdc
@@ -152,4 +154,6 @@ type (
 	Vote                 = types.Vote
 	Votes                = types.Votes
 	VoteOption           = types.VoteOption
+	//
+	SquashOptions = keeper.SquashOptions
 )
