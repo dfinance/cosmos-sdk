@@ -22,7 +22,7 @@ type (
 
 	slashOperations struct {
 		// Remove all slash events
-		removeAll bool
+		RemoveAll bool
 	}
 
 	decCoinOperation struct {
@@ -39,7 +39,7 @@ type (
 
 func (opts *SquashOptions) SetSlashOp(removeAll bool) error {
 	op := slashOperations{
-		removeAll: removeAll,
+		RemoveAll: removeAll,
 	}
 	opts.slashOps = op
 
@@ -81,7 +81,7 @@ func NewEmptySquashOptions() SquashOptions {
 func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error {
 	// slashOps
 	{
-		if opts.slashOps.removeAll {
+		if opts.slashOps.RemoveAll {
 			// TODO: implement
 			// we can't remove all slash event as it will corrupt currentStake calculation (calculateDelegationRewards func)
 			// rewriting history is a hell of a task

@@ -33,6 +33,8 @@ var (
 	ParamKeyTable        = types.ParamKeyTable
 	NewParams            = types.NewParams
 	DefaultParams        = types.DefaultParams
+	//
+	NewEmptySquashOptions = keeper.NewEmptySquashOptions
 
 	// variable aliases
 	ModuleCdc                         = types.ModuleCdc
@@ -55,4 +57,6 @@ type (
 	Params         = types.Params
 	BlockDurFilter = types.BlockDurFilter
 	MinterExtended = types.MintInfo
+	//
+	SquashOptions = keeper.SquashOptions
 )
