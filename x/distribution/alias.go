@@ -110,6 +110,8 @@ var (
 	NewValidatorCurrentRewards                 = types.NewValidatorCurrentRewards
 	InitialValidatorAccumulatedCommission      = types.InitialValidatorAccumulatedCommission
 	NewValidatorSlashEvent                     = types.NewValidatorSlashEvent
+	//
+	NewEmptySquashOptions = keeper.NewEmptySquashOptions
 
 	// variable aliases
 	RewardPoolsKey                       = types.RewardPoolsKey
@@ -190,4 +192,6 @@ type (
 	ABCIVote                               = types.ABCIVote
 	ABCIVotes                              = types.ABCIVotes
 	ValidatorResp                          = types.ValidatorResp
+	//
+	SquashOptions = keeper.SquashOptions
 )

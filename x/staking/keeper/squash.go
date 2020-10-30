@@ -10,14 +10,24 @@ import (
 )
 
 type (
+	// Operations order:
+	//   1: paramsOps
+	//   2: addValidatorOps
+	//   3: main squash ops (including jailWhitelist handling)
 	SquashOptions struct {
-		// Squash order: after zero-height ops
-		addValidatorOps []addValidatorOperation
 		// Slice of valAddrs not to be jailed (no jailing if empty)
 		jailWhitelist []sdk.ValAddress
+		// Params modification operation
+		paramsOps paramsOperation
+		// New validator operations
+		addValidatorOps []addValidatorOperation
 	}
 
-	// New validator operation
+	paramsOperation struct {
+		// Modify bonding denom (empty - no modification)
+		BondingDenom string
+	}
+
 	addValidatorOperation struct {
 		// Operator account address
 		OperatorAddress sdk.AccAddress
@@ -29,6 +39,19 @@ type (
 		SelfDelegationAmount sdk.Int
 	}
 )
+
+func (opts *SquashOptions) SetParamsOp(bondingDenomRaw string) error {
+	op := paramsOperation{}
+	if bondingDenomRaw != "" {
+		if err := sdk.ValidateDenom(bondingDenomRaw); err != nil {
+			return fmt.Errorf("bondingDenom (%s): invalid: %w", bondingDenomRaw, err)
+		}
+		op.BondingDenom = bondingDenomRaw
+	}
+	opts.paramsOps = op
+
+	return nil
+}
 
 func (opts *SquashOptions) SetAddValidatorOp(operatorAddrRaw, moniker, pubKeyRaw, selfDelegationAmountRaw string) error {
 	op := addValidatorOperation{}
@@ -76,61 +99,24 @@ func (opts *SquashOptions) SetJailWhitelistSquashOption(jailWhitelist []string) 
 
 func NewEmptySquashOptions() SquashOptions {
 	return SquashOptions{
-		addValidatorOps: nil,
 		jailWhitelist:   nil,
+		paramsOps:       paramsOperation{},
+		addValidatorOps: nil,
 	}
 }
 
 // PrepareForZeroHeight squashes current context state to fit zero-height (used on genesis export).
 func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error {
-	// check if whitelist should be applied
-	applyWhiteList := false
-	if len(opts.jailWhitelist) > 0 {
-		applyWhiteList = true
-	}
-	whiteListMap := make(map[string]bool)
-	for _, addr := range opts.jailWhitelist {
-		whiteListMap[addr.String()] = true
-	}
-
-	// reset banned accounts height
-	k.IterateBannedAccounts(ctx, func(accAddr sdk.AccAddress, _ int64) (stop bool) {
-		k.BanAccount(ctx, accAddr, 0)
-		return false
-	})
-
-	// reset redelegations  creation height
-	k.IterateRedelegations(ctx, func(_ int64, red types.Redelegation) (stop bool) {
-		for i := range red.Entries {
-			red.Entries[i].CreationHeight = 0
-		}
-		k.SetRedelegation(ctx, red)
-		return false
-	})
-
-	// reset unbonding delegations creation height
-	k.IterateUnbondingDelegations(ctx, func(_ int64, ubd types.UnbondingDelegation) (stop bool) {
-		for i := range ubd.Entries {
-			ubd.Entries[i].CreationHeight = 0
-		}
-		k.SetUnbondingDelegation(ctx, ubd)
-		return false
-	})
-
-	// reset validators bond height and scheduled unbond height
-	// jail if jailing is enabled and validator is not in the whitelist
-	for _, val := range k.GetAllValidators(ctx) {
-		val.UnbondingHeight = 0
-		val.ScheduledUnbondHeight = 0
-		k.SetValidator(ctx, val)
-
-		if applyWhiteList && !whiteListMap[val.OperatorAddress.String()] {
-			if !val.Jailed {
-				k.jailValidator(ctx, val)
-			}
+	// paramsOps
+	{
+		if opts.paramsOps.BondingDenom != "" {
+			params := k.GetParams(ctx)
+			params.BondDenom = opts.paramsOps.BondingDenom
+			k.SetParams(ctx, params)
 		}
 	}
 
+	// addValidatorOps
 	for i, valOp := range opts.addValidatorOps {
 		description := types.NewDescription(valOp.Moniker, "", "", "", "")
 		validator := types.NewValidator(sdk.ValAddress(valOp.OperatorAddress), valOp.PubKey, description)
@@ -156,6 +142,57 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 		)
 		if err != nil {
 			return fmt.Errorf("addValidatorOps[%d]: Delegate: %w", i, err)
+		}
+	}
+
+	// main squash operations
+	{
+		// check if whitelist should be applied
+		applyWhiteList := false
+		if len(opts.jailWhitelist) > 0 {
+			applyWhiteList = true
+		}
+		whiteListMap := make(map[string]bool)
+		for _, addr := range opts.jailWhitelist {
+			whiteListMap[addr.String()] = true
+		}
+
+		// reset banned accounts height
+		k.IterateBannedAccounts(ctx, func(accAddr sdk.AccAddress, _ int64) (stop bool) {
+			k.BanAccount(ctx, accAddr, 0)
+			return false
+		})
+
+		// reset redelegations  creation height
+		k.IterateRedelegations(ctx, func(_ int64, red types.Redelegation) (stop bool) {
+			for i := range red.Entries {
+				red.Entries[i].CreationHeight = 0
+			}
+			k.SetRedelegation(ctx, red)
+			return false
+		})
+
+		// reset unbonding delegations creation height
+		k.IterateUnbondingDelegations(ctx, func(_ int64, ubd types.UnbondingDelegation) (stop bool) {
+			for i := range ubd.Entries {
+				ubd.Entries[i].CreationHeight = 0
+			}
+			k.SetUnbondingDelegation(ctx, ubd)
+			return false
+		})
+
+		// reset validators bond height and scheduled unbond height
+		// jail if jailing is enabled and validator is not in the whitelist
+		for _, val := range k.GetAllValidators(ctx) {
+			val.UnbondingHeight = 0
+			val.ScheduledUnbondHeight = 0
+			k.SetValidator(ctx, val)
+
+			if applyWhiteList && !whiteListMap[val.OperatorAddress.String()] {
+				if !val.Jailed {
+					k.jailValidator(ctx, val)
+				}
+			}
 		}
 	}
 
