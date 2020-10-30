@@ -95,7 +95,6 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeep
 	}
 
 	for _, entry := range data.StakingStates {
-		fmt.Printf("InitGenesis: %s: %v\n", entry.ValAddr, entry.State.Delegators)
 		keeper.SetValidatorStakingState(ctx, entry.ValAddr, entry.State)
 	}
 
@@ -225,6 +224,7 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 		Delegations:          delegations,
 		UnbondingDelegations: unbondingDelegations,
 		Redelegations:        redelegations,
+		StakingStates:        stakingStates,
 		ScheduledUnbonds:     scheduledUnbonds,
 		BannedAccounts:       bannedAccounts,
 		Exported:             true,

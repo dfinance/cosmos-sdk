@@ -61,8 +61,6 @@ var (
 	MakeSignature                     = types.MakeSignature
 	ValidateGenAccounts               = types.ValidateGenAccounts
 	GetGenesisStateFromAppState       = types.GetGenesisStateFromAppState
-	//
-	NewEmptySquashOptions = keeper.NewEmptySquashOptions
 
 	// variable aliases
 	ModuleCdc                 = types.ModuleCdc
@@ -91,6 +89,4 @@ type (
 	StdSignature                     = types.StdSignature
 	TxBuilder                        = types.TxBuilder
 	GenesisAccountIterator           = types.GenesisAccountIterator
-	//
-	SquashOptions = keeper.SquashOptions
 )
