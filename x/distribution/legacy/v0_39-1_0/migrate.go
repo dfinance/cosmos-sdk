@@ -2,11 +2,10 @@ package v0_39_1_0
 
 import v03902 "github.com/cosmos/cosmos-sdk/x/distribution/legacy/v0_39-0_2"
 
-// MigrateBase accepts exported genesis state from
+// Migrate accepts exported genesis state from
 // Dfinance v0.2 based on Cosmos SDK v0.39.1 and migrates it to
 // Dfinance v1.0 based on Cosmos SDK v0.39.1 genesis state.
-// Base migration performs only necessary operations, so state would be identical.
-func MigrateBase(oldState v03902.GenesisState) GenesisState {
+func Migrate(oldState v03902.GenesisState) GenesisState {
 	return GenesisState{
 		Params:                          oldState.Params,
 		RewardPools:                     oldState.RewardPools,

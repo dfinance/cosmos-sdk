@@ -5,16 +5,15 @@ import (
 	v03902 "github.com/cosmos/cosmos-sdk/x/staking/legacy/v0_39-0_2"
 )
 
-// MigrateBaseOptions defines base migration inputs.
-type MigrateBaseOptions struct {
+// MigrateOptions defines migration inputs.
+type MigrateOptions struct {
 	ParamsMaxSelfDelegationLvl sdk.Int
 }
 
-// MigrateBase accepts exported genesis state from
+// Migrate accepts exported genesis state from
 // Dfinance v0.2 based on Cosmos SDK v0.39.1 and migrates it to
 // Dfinance v1.0 based on Cosmos SDK v0.39.1 genesis state.
-// Base migration performs only necessary operations, so state would be identical.
-func MigrateBase(oldState v03902.GenesisState, migrateOpts MigrateBaseOptions) GenesisState {
+func Migrate(oldState v03902.GenesisState, migrateOpts MigrateOptions) GenesisState {
 	return GenesisState{
 		Params:               migrateParams(oldState.Params, migrateOpts),
 		LastTotalPower:       oldState.LastTotalPower,
@@ -31,7 +30,7 @@ func MigrateBase(oldState v03902.GenesisState, migrateOpts MigrateBaseOptions) G
 }
 
 // migrateParams adds a new param field.
-func migrateParams(oldParams v03902.Params, migrateOpts MigrateBaseOptions) Params {
+func migrateParams(oldParams v03902.Params, migrateOpts MigrateOptions) Params {
 	return Params{
 		UnbondingTime:            oldParams.UnbondingTime,
 		MaxValidators:            oldParams.MaxValidators,
