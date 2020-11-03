@@ -140,6 +140,11 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 				k.SetDelegatorRewardsBankCoins(ctx, delAddr, coins)
 				return false
 			})
+			k.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, period uint64, rewards types.ValidatorHistoricalRewards) (stop bool) {
+				rewards.CumulativeBondingRewardRatio, rewards.CumulativeLPRewardRatio = removeDecCoin(op.Denom, rewards.CumulativeBondingRewardRatio), removeDecCoin(op.Denom, rewards.CumulativeLPRewardRatio)
+				k.SetValidatorHistoricalRewards(ctx, val, period, rewards)
+				return false
+			})
 
 			rewardPools := k.GetRewardPools(ctx)
 			rewardPools.LiquidityProvidersPool = removeDecCoin(op.Denom, rewardPools.LiquidityProvidersPool)
@@ -206,6 +211,11 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 				k.SetDelegatorRewardsBankCoins(ctx, delAddr, coins)
 				return false
 			})
+			k.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, period uint64, rewards types.ValidatorHistoricalRewards) (stop bool) {
+				rewards.CumulativeBondingRewardRatio, rewards.CumulativeLPRewardRatio = renameDecCoin(op.Denom, op.RenameTo, rewards.CumulativeBondingRewardRatio), renameDecCoin(op.Denom, op.RenameTo, rewards.CumulativeLPRewardRatio)
+				k.SetValidatorHistoricalRewards(ctx, val, period, rewards)
+				return false
+			})
 
 			rewardPools := k.GetRewardPools(ctx)
 			rewardPools.LiquidityProvidersPool = renameDecCoin(op.Denom, op.RenameTo, rewardPools.LiquidityProvidersPool)
@@ -224,7 +234,6 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 		// that makes all slash event and historical rewards ready to be deleted
 		for _, del := range dels {
 			val := k.stakingKeeper.Validator(ctx, del.ValidatorAddress)
-			del := k.stakingKeeper.Delegation(ctx, del.DelegatorAddress, del.ValidatorAddress)
 			if _, err := k.transferDelegationRewardsToRewardsBankPool(ctx, val, del); err != nil {
 				return fmt.Errorf("transferring delegator %s rewards for validator %s to rewards bank pool: %w",
 					del.GetDelegatorAddr(), val.GetOperator(), err)
