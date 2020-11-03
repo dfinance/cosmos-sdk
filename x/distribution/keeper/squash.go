@@ -135,9 +135,9 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 				k.SetValidatorCurrentRewards(ctx, val, rewards)
 				return false
 			})
-			k.IterateDelegatorRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, bankCoins sdk.Coins) (stop bool) {
+			k.IterateRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, valAddr sdk.ValAddress, bankCoins sdk.Coins) (stop bool) {
 				coins := removeCoin(op.Denom, bankCoins)
-				k.SetDelegatorRewardsBankCoins(ctx, delAddr, coins)
+				k.SetDelegatorRewardsBankCoins(ctx, delAddr, valAddr, coins)
 				return false
 			})
 			k.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, period uint64, rewards types.ValidatorHistoricalRewards) (stop bool) {
@@ -206,9 +206,9 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 				k.SetValidatorCurrentRewards(ctx, val, rewards)
 				return false
 			})
-			k.IterateDelegatorRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, bankCoins sdk.Coins) (stop bool) {
+			k.IterateRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, valAddr sdk.ValAddress, bankCoins sdk.Coins) (stop bool) {
 				coins := renameCoin(op.Denom, op.RenameTo, bankCoins)
-				k.SetDelegatorRewardsBankCoins(ctx, delAddr, coins)
+				k.SetDelegatorRewardsBankCoins(ctx, delAddr, valAddr, coins)
 				return false
 			})
 			k.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, period uint64, rewards types.ValidatorHistoricalRewards) (stop bool) {
