@@ -38,6 +38,6 @@ var (
 )
 
 func init() {
-	zeroAddrBytes := make([]byte, sdk.AddrLen, sdk.AddrLen)
+	zeroAddrBytes := make([]byte, sdk.AddrLen)
 	CommonRewardBankValAddr = sdk.ValAddress(zeroAddrBytes)
 }

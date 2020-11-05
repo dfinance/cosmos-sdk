@@ -832,6 +832,7 @@ func TestRewardsBank(t *testing.T) {
 }
 
 // Test RewardsBank operations with multiple delegations.
+// nolint: staticcheck
 func TestRewardsBankMulti(t *testing.T) {
 	ctx, ak, k, sk, _ := CreateTestInputDefault(t, false, 1000)
 	sh := staking.NewHandler(sk)

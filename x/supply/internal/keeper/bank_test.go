@@ -24,6 +24,7 @@ var (
 	initCoins  = sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, initTokens))
 )
 
+// nolint: interfacer
 func getCoinsByName(ctx sdk.Context, sk keep.Keeper, ak types.AccountKeeper, moduleName string) sdk.Coins {
 	moduleAddress := sk.GetModuleAddress(moduleName)
 	macc := ak.GetAccount(ctx, moduleAddress)

@@ -81,11 +81,11 @@ func NewEmptySquashOptions() SquashOptions {
 func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error {
 	// slashOps
 	{
-		if opts.slashOps.RemoveAll {
-			// TODO: implement
-			// we can't remove all slash event as it will corrupt currentStake calculation (calculateDelegationRewards func)
-			// rewriting history is a hell of a task
-		}
+		// TODO: implement
+		// we can't remove all slash event as it will corrupt currentStake calculation (calculateDelegationRewards func)
+		// rewriting history is a hell of a task
+		//if opts.slashOps.RemoveAll {
+		//}
 	}
 
 	// decCoinsOps
@@ -120,37 +120,38 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 				continue
 			}
 
+			denom := op.Denom
 			k.IterateValidatorAccumulatedCommissions(ctx, func(val sdk.ValAddress, commission types.ValidatorAccumulatedCommission) (stop bool) {
-				coins := removeDecCoin(op.Denom, commission)
-				k.SetValidatorAccumulatedCommission(ctx, val, types.ValidatorAccumulatedCommission(coins))
+				coins := removeDecCoin(denom, commission)
+				k.SetValidatorAccumulatedCommission(ctx, val, coins)
 				return false
 			})
 			k.IterateValidatorOutstandingRewards(ctx, func(val sdk.ValAddress, rewards types.ValidatorOutstandingRewards) (stop bool) {
-				coins := removeDecCoin(op.Denom, rewards)
-				k.SetValidatorOutstandingRewards(ctx, val, types.ValidatorOutstandingRewards(coins))
+				coins := removeDecCoin(denom, rewards)
+				k.SetValidatorOutstandingRewards(ctx, val, coins)
 				return false
 			})
 			k.IterateValidatorCurrentRewards(ctx, func(val sdk.ValAddress, rewards types.ValidatorCurrentRewards) (stop bool) {
-				rewards.BondingRewards, rewards.LPRewards = removeDecCoin(op.Denom, rewards.BondingRewards), removeDecCoin(op.Denom, rewards.LPRewards)
+				rewards.BondingRewards, rewards.LPRewards = removeDecCoin(denom, rewards.BondingRewards), removeDecCoin(denom, rewards.LPRewards)
 				k.SetValidatorCurrentRewards(ctx, val, rewards)
 				return false
 			})
 			k.IterateRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, valAddr sdk.ValAddress, bankCoins sdk.Coins) (stop bool) {
-				coins := removeCoin(op.Denom, bankCoins)
+				coins := removeCoin(denom, bankCoins)
 				k.SetDelegatorRewardsBankCoins(ctx, delAddr, valAddr, coins)
 				return false
 			})
 			k.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, period uint64, rewards types.ValidatorHistoricalRewards) (stop bool) {
-				rewards.CumulativeBondingRewardRatio, rewards.CumulativeLPRewardRatio = removeDecCoin(op.Denom, rewards.CumulativeBondingRewardRatio), removeDecCoin(op.Denom, rewards.CumulativeLPRewardRatio)
+				rewards.CumulativeBondingRewardRatio, rewards.CumulativeLPRewardRatio = removeDecCoin(denom, rewards.CumulativeBondingRewardRatio), removeDecCoin(denom, rewards.CumulativeLPRewardRatio)
 				k.SetValidatorHistoricalRewards(ctx, val, period, rewards)
 				return false
 			})
 
 			rewardPools := k.GetRewardPools(ctx)
-			rewardPools.LiquidityProvidersPool = removeDecCoin(op.Denom, rewardPools.LiquidityProvidersPool)
-			rewardPools.PublicTreasuryPool = removeDecCoin(op.Denom, rewardPools.PublicTreasuryPool)
-			rewardPools.HARP = removeDecCoin(op.Denom, rewardPools.HARP)
-			rewardPools.FoundationPool = removeDecCoin(op.Denom, rewardPools.FoundationPool)
+			rewardPools.LiquidityProvidersPool = removeDecCoin(denom, rewardPools.LiquidityProvidersPool)
+			rewardPools.PublicTreasuryPool = removeDecCoin(denom, rewardPools.PublicTreasuryPool)
+			rewardPools.HARP = removeDecCoin(denom, rewardPools.HARP)
+			rewardPools.FoundationPool = removeDecCoin(denom, rewardPools.FoundationPool)
 			k.SetRewardPools(ctx, rewardPools)
 		}
 
@@ -191,37 +192,38 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 				continue
 			}
 
+			srcDenom, dstDenom := op.Denom, op.RenameTo
 			k.IterateValidatorAccumulatedCommissions(ctx, func(val sdk.ValAddress, commission types.ValidatorAccumulatedCommission) (stop bool) {
-				coins := renameDecCoin(op.Denom, op.RenameTo, commission)
-				k.SetValidatorAccumulatedCommission(ctx, val, types.ValidatorAccumulatedCommission(coins))
+				coins := renameDecCoin(srcDenom, dstDenom, commission)
+				k.SetValidatorAccumulatedCommission(ctx, val, coins)
 				return false
 			})
 			k.IterateValidatorOutstandingRewards(ctx, func(val sdk.ValAddress, rewards types.ValidatorOutstandingRewards) (stop bool) {
-				coins := renameDecCoin(op.Denom, op.RenameTo, rewards)
-				k.SetValidatorOutstandingRewards(ctx, val, types.ValidatorOutstandingRewards(coins))
+				coins := renameDecCoin(srcDenom, dstDenom, rewards)
+				k.SetValidatorOutstandingRewards(ctx, val, coins)
 				return false
 			})
 			k.IterateValidatorCurrentRewards(ctx, func(val sdk.ValAddress, rewards types.ValidatorCurrentRewards) (stop bool) {
-				rewards.BondingRewards, rewards.LPRewards = renameDecCoin(op.Denom, op.RenameTo, rewards.BondingRewards), renameDecCoin(op.Denom, op.RenameTo, rewards.LPRewards)
+				rewards.BondingRewards, rewards.LPRewards = renameDecCoin(srcDenom, dstDenom, rewards.BondingRewards), renameDecCoin(srcDenom, dstDenom, rewards.LPRewards)
 				k.SetValidatorCurrentRewards(ctx, val, rewards)
 				return false
 			})
 			k.IterateRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, valAddr sdk.ValAddress, bankCoins sdk.Coins) (stop bool) {
-				coins := renameCoin(op.Denom, op.RenameTo, bankCoins)
+				coins := renameCoin(srcDenom, dstDenom, bankCoins)
 				k.SetDelegatorRewardsBankCoins(ctx, delAddr, valAddr, coins)
 				return false
 			})
 			k.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, period uint64, rewards types.ValidatorHistoricalRewards) (stop bool) {
-				rewards.CumulativeBondingRewardRatio, rewards.CumulativeLPRewardRatio = renameDecCoin(op.Denom, op.RenameTo, rewards.CumulativeBondingRewardRatio), renameDecCoin(op.Denom, op.RenameTo, rewards.CumulativeLPRewardRatio)
+				rewards.CumulativeBondingRewardRatio, rewards.CumulativeLPRewardRatio = renameDecCoin(srcDenom, dstDenom, rewards.CumulativeBondingRewardRatio), renameDecCoin(srcDenom, dstDenom, rewards.CumulativeLPRewardRatio)
 				k.SetValidatorHistoricalRewards(ctx, val, period, rewards)
 				return false
 			})
 
 			rewardPools := k.GetRewardPools(ctx)
-			rewardPools.LiquidityProvidersPool = renameDecCoin(op.Denom, op.RenameTo, rewardPools.LiquidityProvidersPool)
-			rewardPools.PublicTreasuryPool = renameDecCoin(op.Denom, op.RenameTo, rewardPools.PublicTreasuryPool)
-			rewardPools.HARP = renameDecCoin(op.Denom, op.RenameTo, rewardPools.HARP)
-			rewardPools.FoundationPool = renameDecCoin(op.Denom, op.RenameTo, rewardPools.FoundationPool)
+			rewardPools.LiquidityProvidersPool = renameDecCoin(srcDenom, dstDenom, rewardPools.LiquidityProvidersPool)
+			rewardPools.PublicTreasuryPool = renameDecCoin(srcDenom, dstDenom, rewardPools.PublicTreasuryPool)
+			rewardPools.HARP = renameDecCoin(srcDenom, dstDenom, rewardPools.HARP)
+			rewardPools.FoundationPool = renameDecCoin(srcDenom, dstDenom, rewardPools.FoundationPool)
 			k.SetRewardPools(ctx, rewardPools)
 		}
 	}
