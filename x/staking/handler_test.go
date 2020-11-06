@@ -3173,3 +3173,299 @@ func TestMinMaxSelfDelegation(t *testing.T) {
 		require.True(t, types.ErrMaxSelfDelegationLimit.Is(err))
 	}
 }
+
+func TestForceRemoveDelegations(t *testing.T) {
+	initPower := int64(100000)
+	ctx, ak, keeper, sk := keep.CreateTestInput(t, false, initPower)
+
+	// fix non-bonded pool supply
+	nbPoolAcc := sk.GetModuleAccount(ctx, types.NotBondedPoolName)
+	nbPoolAcc.SetCoins(sdk.Coins{})
+	sk.SetModuleAccount(ctx, nbPoolAcc)
+
+	val1OpAddr, val2OpAddr := keep.Addrs[0], keep.Addrs[1]
+	val1Addr, val1PubKey := sdk.ValAddress(val1OpAddr), keep.PKs[0]
+	val2Addr, val2PubKey := sdk.ValAddress(val2OpAddr), keep.PKs[1]
+	del1Addr, del2Addr := keep.Addrs[2], keep.Addrs[3]
+
+	checkInvariants := func() {
+		msg, broken := AllInvariants(keeper)(ctx)
+		require.False(t, broken, msg)
+	}
+
+	// create validators
+	{
+		selfStakeAmt := sdk.TokensFromConsensusPower(10)
+
+		msgCreateValidator := NewTestMsgCreateValidator(val1Addr, val1PubKey, selfStakeAmt)
+		res, err := handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		msgCreateValidator = NewTestMsgCreateValidator(val2Addr, val2PubKey, selfStakeAmt)
+		res, err = handleMsgCreateValidator(ctx, msgCreateValidator, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		ctx = ctx.WithBlockTime(ctx.BlockTime().Add(5 * time.Second))
+		EndBlocker(ctx, keeper)
+	}
+	checkInvariants()
+
+	// get initial del1, del2 balances
+	initCoins := sdk.NewCoins(
+		sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(100000)),
+		sdk.NewCoin(sdk.DefaultLiquidityDenom, sdk.NewInt(100000)),
+	)
+	del1Acc, del2Acc := ak.GetAccount(ctx, del1Addr), ak.GetAccount(ctx, del2Addr)
+	require.NoError(t, del1Acc.SetCoins(initCoins))
+	require.NoError(t, del2Acc.SetCoins(initCoins))
+	ak.SetAccount(ctx, del1Acc)
+	ak.SetAccount(ctx, del2Acc)
+
+	// del1: initial delegations
+	// val1: 1/4 Bonding, 1/2 LP
+	// val2: 1/4 Bonding, 1/2 LP
+	del1Val1BAmt := initCoins.AmountOf(sdk.DefaultBondDenom).QuoRaw(4)
+	del1Val2BAmt := del1Val1BAmt
+	del1Val1LPAmt := initCoins.AmountOf(sdk.DefaultLiquidityDenom).QuoRaw(2)
+	del1Val2LPAmt := del1Val1LPAmt.QuoRaw(2)
+	{
+		msg := NewMsgDelegate(del1Addr, val1Addr, sdk.NewCoin(sdk.DefaultBondDenom, del1Val1BAmt))
+		_, err := handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		msg = NewMsgDelegate(del1Addr, val2Addr, sdk.NewCoin(sdk.DefaultBondDenom, del1Val2BAmt))
+		_, err = handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		msg = NewMsgDelegate(del1Addr, val1Addr, sdk.NewCoin(sdk.DefaultLiquidityDenom, del1Val1LPAmt))
+		_, err = handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		msg = NewMsgDelegate(del1Addr, val2Addr, sdk.NewCoin(sdk.DefaultLiquidityDenom, del1Val2LPAmt))
+		_, err = handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check delegations
+		del, found := keeper.GetDelegation(ctx, del1Addr, val1Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsPositive())
+		require.True(t, del.LPShares.IsPositive())
+
+		del, found = keeper.GetDelegation(ctx, del1Addr, val2Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsPositive())
+		require.True(t, del.LPShares.IsPositive())
+	}
+	checkInvariants()
+
+	// del2: initial delegations
+	// val1: 1/2 Bonding
+	// val2: 1/2 LP
+	del2Val1BAmt := initCoins.AmountOf(sdk.DefaultBondDenom).QuoRaw(2)
+	del2Val2LPAmt := initCoins.AmountOf(sdk.DefaultLiquidityDenom).QuoRaw(2)
+	{
+		msg := NewMsgDelegate(del2Addr, val1Addr, sdk.NewCoin(sdk.DefaultBondDenom, del2Val1BAmt))
+		_, err := handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		msg = NewMsgDelegate(del2Addr, val2Addr, sdk.NewCoin(sdk.DefaultLiquidityDenom, del2Val2LPAmt))
+		_, err = handleMsgDelegate(ctx, msg, keeper)
+		require.NoError(t, err)
+
+		// check delegations
+		del, found := keeper.GetDelegation(ctx, del2Addr, val1Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsPositive())
+		require.True(t, del.LPShares.IsZero())
+
+		del, found = keeper.GetDelegation(ctx, del2Addr, val2Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsZero())
+		require.True(t, del.LPShares.IsPositive())
+	}
+	checkInvariants()
+
+	// del1: set undelegations / redelegations
+	// val1:
+	//   Del: 4/4 Bonding
+	//   Del: 1/2 LP
+	//   UD:  1/2 LP
+	// val2:
+	//   Del: 3/4 Bonding
+	//   Del: 2/4 LP
+	//   UD:  1/4 Bonding
+	//   UD:  1/4 LP
+	//   RED: 1/4 LP -> val1
+	{
+		// REDs
+		redAmt := sdk.NewCoin(sdk.DefaultLiquidityDenom, del1Val2LPAmt.QuoRaw(4))
+		msgBeginRED := NewMsgBeginRedelegate(del1Addr, val2Addr, val1Addr, redAmt)
+		res, err := handleMsgBeginRedelegate(ctx, msgBeginRED, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// UDs
+		udAmt := sdk.NewCoin(sdk.DefaultLiquidityDenom, del1Val1LPAmt.QuoRaw(2))
+		msgBeginUD := NewMsgUndelegate(del1Addr, val1Addr, udAmt)
+		res, err = handleMsgUndelegate(ctx, msgBeginUD, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		udAmt = sdk.NewCoin(sdk.DefaultBondDenom, del1Val2BAmt.QuoRaw(4))
+		msgBeginUD = NewMsgUndelegate(del1Addr, val2Addr, udAmt)
+		res, err = handleMsgUndelegate(ctx, msgBeginUD, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		udAmt = sdk.NewCoin(sdk.DefaultLiquidityDenom, del1Val2LPAmt.QuoRaw(4))
+		msgBeginUD = NewMsgUndelegate(del1Addr, val2Addr, udAmt)
+		res, err = handleMsgUndelegate(ctx, msgBeginUD, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// check REDs
+		_, found := keeper.GetRedelegation(ctx, del1Addr, val1Addr, val2Addr)
+		require.False(t, found)
+
+		red, found := keeper.GetRedelegation(ctx, del1Addr, val2Addr, val1Addr)
+		require.True(t, found)
+		require.Len(t, red.Entries, 1)
+		require.Equal(t, red.Entries[0].OpType, types.LiquidityDelOpType)
+
+		// check UDs
+		ud, found := keeper.GetUnbondingDelegation(ctx, del1Addr, val1Addr)
+		require.True(t, found)
+		require.Len(t, ud.Entries, 1)
+		require.Equal(t, ud.Entries[0].OpType, types.LiquidityDelOpType)
+
+		ud, found = keeper.GetUnbondingDelegation(ctx, del1Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, ud.Entries, 2)
+		require.Equal(t, ud.Entries[0].OpType, types.BondingDelOpType)
+		require.Equal(t, ud.Entries[1].OpType, types.LiquidityDelOpType)
+	}
+	checkInvariants()
+
+	// del2: set undelegations / redelegations
+	// val1:
+	//   Del: 3/4 Bonding
+	//   RED: 1/4 Bonding -> val2
+	// val2:
+	//   Del: 2/4 LP
+	//   UD:  2/4 LP
+	{
+		// REDs
+		redAmt := sdk.NewCoin(sdk.DefaultBondDenom, del2Val1BAmt.QuoRaw(4))
+		msgBeginRED := NewMsgBeginRedelegate(del2Addr, val1Addr, val2Addr, redAmt)
+		res, err := handleMsgBeginRedelegate(ctx, msgBeginRED, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// UDs
+		udAmt := sdk.NewCoin(sdk.DefaultLiquidityDenom, del2Val2LPAmt.QuoRaw(2))
+		msgBeginUD := NewMsgUndelegate(del2Addr, val2Addr, udAmt)
+		res, err = handleMsgUndelegate(ctx, msgBeginUD, keeper)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// check REDs
+		red, found := keeper.GetRedelegation(ctx, del2Addr, val1Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, red.Entries, 1)
+		require.Equal(t, red.Entries[0].OpType, types.BondingDelOpType)
+
+		_, found = keeper.GetRedelegation(ctx, del2Addr, val2Addr, val1Addr)
+		require.False(t, found)
+
+		// check UDs
+		_, found = keeper.GetUnbondingDelegation(ctx, del2Addr, val1Addr)
+		require.False(t, found)
+
+		ud, found := keeper.GetUnbondingDelegation(ctx, del2Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, ud.Entries, 1)
+		require.Equal(t, ud.Entries[0].OpType, types.LiquidityDelOpType)
+	}
+	checkInvariants()
+
+	// del1: ForceRemoveTypedDelegations for LPs
+	require.NoError(t, keeper.ForceRemoveTypedDelegations(ctx, del1Addr, types.LiquidityDelOpType))
+	checkInvariants()
+
+	// check del1 Dels, REDs and UDs (only Bonding should exist)
+	{
+		// Dels
+		del, found := keeper.GetDelegation(ctx, del1Addr, val1Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsPositive())
+		require.True(t, del.LPShares.IsZero())
+
+		del, found = keeper.GetDelegation(ctx, del1Addr, val2Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsPositive())
+		require.True(t, del.LPShares.IsZero())
+
+		// REDs
+		_, found = keeper.GetRedelegation(ctx, del1Addr, val1Addr, val2Addr)
+		require.False(t, found)
+
+		_, found = keeper.GetRedelegation(ctx, del1Addr, val2Addr, val1Addr)
+		require.False(t, found)
+
+		// UDs
+		_, found = keeper.GetUnbondingDelegation(ctx, del1Addr, val1Addr)
+		require.False(t, found)
+
+		ud, found := keeper.GetUnbondingDelegation(ctx, del1Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, ud.Entries, 1)
+		require.Equal(t, ud.Entries[0].OpType, types.BondingDelOpType)
+	}
+
+	// check del2 Dels, REDs and UDs (Bonding and LP should be untouched)
+	{
+		// Dels
+		del, found := keeper.GetDelegation(ctx, del2Addr, val1Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsPositive())
+		require.True(t, del.LPShares.IsZero())
+
+		del, found = keeper.GetDelegation(ctx, del2Addr, val2Addr)
+		require.True(t, found)
+		require.True(t, del.BondingShares.IsPositive())
+		require.True(t, del.LPShares.IsPositive())
+
+		// REDs
+		red, found := keeper.GetRedelegation(ctx, del2Addr, val1Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, red.Entries, 1)
+		require.Equal(t, red.Entries[0].OpType, types.BondingDelOpType)
+
+		_, found = keeper.GetRedelegation(ctx, del2Addr, val2Addr, val1Addr)
+		require.False(t, found)
+
+		// UDs
+		_, found = keeper.GetUnbondingDelegation(ctx, del2Addr, val1Addr)
+		require.False(t, found)
+
+		ud, found := keeper.GetUnbondingDelegation(ctx, del2Addr, val2Addr)
+		require.True(t, found)
+		require.Len(t, ud.Entries, 1)
+		require.Equal(t, ud.Entries[0].OpType, types.LiquidityDelOpType)
+	}
+
+	// check final balances
+	{
+		// del1
+		curCoins := ak.GetAccount(ctx, del1Addr).GetCoins()
+		require.True(t, curCoins.AmountOf(sdk.DefaultBondDenom).Equal(initCoins.AmountOf(sdk.DefaultBondDenom).QuoRaw(2)))
+		require.True(t, curCoins.AmountOf(sdk.DefaultLiquidityDenom).Equal(initCoins.AmountOf(sdk.DefaultLiquidityDenom)))
+
+		// del2
+		curCoins = ak.GetAccount(ctx, del2Addr).GetCoins()
+		require.True(t, curCoins.AmountOf(sdk.DefaultBondDenom).Equal(initCoins.AmountOf(sdk.DefaultBondDenom).QuoRaw(2)))
+		require.True(t, curCoins.AmountOf(sdk.DefaultLiquidityDenom).Equal(initCoins.AmountOf(sdk.DefaultLiquidityDenom).QuoRaw(2)))
+	}
+}
