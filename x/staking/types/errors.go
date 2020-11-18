@@ -61,4 +61,5 @@ var (
 	ErrMaxDelegationsLimit             = sdkerrors.Register(ModuleName, 47, "validator max delegations level reached")
 	ErrDeniedStakingOps                = sdkerrors.Register(ModuleName, 48, "account cannot perform any staking operations (banned)")
 	ErrMaxSelfDelegationLimit          = sdkerrors.Register(ModuleName, 49, "validator max self-delegation level reached")
+	ErrDeniedChangingParam             = sdkerrors.Register(ModuleName, 50, "cannot change parameter")
 )

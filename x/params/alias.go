@@ -31,6 +31,7 @@ var (
 	NewParameterChangeProposal = types.NewParameterChangeProposal
 	NewParamChange             = types.NewParamChange
 	ValidateChanges            = types.ValidateChanges
+	NewMultiParamsHooks        = types.NewMultiParamsHooks
 
 	// variable aliases
 	ModuleCdc = types.ModuleCdc
@@ -47,4 +48,6 @@ type (
 	ParamChange             = types.ParamChange
 	RestrictedParams        = types.RestrictedParams
 	RestrictedParam         = types.RestrictedParam
+	MultiParamsHooks        = types.MultiParamsHooks
+	ParametersHooks         = types.ParamsHooks
 )

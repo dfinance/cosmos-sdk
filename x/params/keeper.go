@@ -12,6 +12,9 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 )
 
+// Implements ParametersHooks interface
+var _ types.ParamsHooks = Keeper{}
+
 // Keeper of the global paramstore
 type Keeper struct {
 	cdc              *codec.Codec
@@ -19,6 +22,7 @@ type Keeper struct {
 	tkey             sdk.StoreKey
 	spaces           map[string]*Subspace
 	restrictedParams RestrictedParams
+	hooks            ParametersHooks
 }
 
 // NewKeeper constructs a params keeper
@@ -76,4 +80,31 @@ func (k Keeper) CheckRestrictions(subspace, key string) error {
 	}
 
 	return nil
+}
+
+// AfterParamChanged - call hook after changed a parameter
+func (k Keeper) AfterParamChanged(ctx sdk.Context, c ParamChange) error {
+	if k.hooks != nil {
+		return k.hooks.AfterParamChanged(ctx, c)
+	}
+
+	return nil
+}
+
+// BeforeParamChanged - call hook after changed a parameter
+func (k Keeper) BeforeParamChanged(ctx sdk.Context, c ParamChange) error {
+	if k.hooks != nil {
+		return k.hooks.BeforeParamChanged(ctx, c)
+	}
+
+	return nil
+}
+
+// SetHooks sets hooks for call on the param update
+func (k *Keeper) SetHooks(h ParametersHooks) *Keeper {
+	if k.hooks != nil {
+		panic("cannot set hooks twice")
+	}
+	k.hooks = h
+	return k
 }
