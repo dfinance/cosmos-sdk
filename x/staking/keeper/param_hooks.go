@@ -1,44 +1,43 @@
 package keeper
 
 import (
+	"strconv"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/params"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/pkg/errors"
-	"strconv"
 )
 
 type ParamHooks struct {
 	k Keeper
 }
 
-var _ params.ParamsHooks = ParamHooks{}
+var _ params.ParametersHooks = ParamHooks{}
 
 func (k Keeper) ParamHooks() ParamHooks { return ParamHooks{k} }
 
+// nolint:gocritic
 // BeforeParamChanged Implements BeforeParamChanged
 func (h ParamHooks) BeforeParamChanged(ctx sdk.Context, c params.ParamChange) (err error) {
-	if c.Subspace != DefaultParamspace {
-		return nil
-	}
-
-	switch c.Key {
-	case string(types.KeyMaxValidators):
-		err = beforeChangedMaxValidators(ctx, h.k, c)
+	if c.Subspace == DefaultParamspace {
+		switch c.Key {
+		case string(types.KeyMaxValidators):
+			err = beforeChangedMaxValidators(ctx, h.k, c)
+		}
 	}
 
 	return
 }
 
+// nolint:gocritic
 // AfterParamChanged Implements AfterParamChanged
 func (h ParamHooks) AfterParamChanged(ctx sdk.Context, c params.ParamChange) (err error) {
-	if c.Subspace != DefaultParamspace {
-		return nil
-	}
-
-	switch c.Key {
-	case string(types.KeyMaxDelegationsRatio):
-		err = afterChangedMaxDelegationsRatio(ctx, h.k)
+	if c.Subspace == DefaultParamspace {
+		switch c.Key {
+		case string(types.KeyMaxDelegationsRatio):
+			err = afterChangedMaxDelegationsRatio(ctx, h.k)
+		}
 	}
 
 	return

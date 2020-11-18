@@ -49,5 +49,5 @@ type (
 	RestrictedParams        = types.RestrictedParams
 	RestrictedParam         = types.RestrictedParam
 	MultiParamsHooks        = types.MultiParamsHooks
-	ParamsHooks             = types.ParamsHooks
+	ParametersHooks         = types.ParamsHooks
 )
