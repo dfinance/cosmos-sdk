@@ -36,8 +36,16 @@ func handleParameterChangeProposal(ctx sdk.Context, k Keeper, p ParameterChangeP
 			fmt.Sprintf("attempt to set new parameter value; key: %s, value: %s", c.Key, c.Value),
 		)
 
+		if err := k.hooks.BeforeParamChanged(ctx, c); err != nil {
+			return sdkerrors.Wrapf(ErrSettingParameter, err.Error())
+		}
+
 		if err := ss.Update(ctx, []byte(c.Key), []byte(c.Value)); err != nil {
 			return sdkerrors.Wrapf(ErrSettingParameter, "key: %s, value: %s, err: %s", c.Key, c.Value, err.Error())
+		}
+
+		if err := k.hooks.AfterParamChanged(ctx, c); err != nil {
+			return sdkerrors.Wrapf(ErrSettingParameter, err.Error())
 		}
 	}
 
