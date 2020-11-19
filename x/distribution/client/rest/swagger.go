@@ -58,7 +58,7 @@ type (
 		Result string `json:"result" format:"bech32" example:"wallet13jyjuz3kkdvqw8u4qfkwd94emdl3vx394kn07h"`
 	}
 
-	QueryParamsResp struct {
+	QueryDistributionParamsResp struct {
 		Height int64        `json:"height"`
 		Result types.Params `json:"result"`
 	}
