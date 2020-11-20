@@ -40,7 +40,7 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 // @ID mintingGetParams
 // @Accept  json
 // @Produce json
-// @Success 200 {object} QueryParamsResp
+// @Success 200 {object} QueryMinterParamsResp
 // @Failure 400 {object} rest.ErrorResponse "Returned if the request doesn't have valid query params"
 // @Failure 500 {object} rest.ErrorResponse "Returned on server error"
 // @Router /minting/parameters [get]

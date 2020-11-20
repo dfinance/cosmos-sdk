@@ -11,7 +11,7 @@ type (
 		Result string `json:"result" format:"number" example:"0.123"`
 	}
 
-	QueryParamsResp struct {
+	QueryMinterParamsResp struct {
 		Height int64        `json:"height"`
 		Result types.Params `json:"result"`
 	}

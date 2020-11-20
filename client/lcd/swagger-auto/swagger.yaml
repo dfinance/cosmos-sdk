@@ -867,6 +867,14 @@ definitions:
         $ref: '#/definitions/types.QueryDelegatorTotalRewardsResponse'
         type: object
     type: object
+  rest.QueryDistributionParamsResp:
+    properties:
+      height:
+        type: integer
+      result:
+        $ref: '#/definitions/DistributionParams'
+        type: object
+    type: object
   rest.QueryExtendedValidatorResp:
     properties:
       height:
@@ -900,12 +908,12 @@ definitions:
         $ref: '#/definitions/types.MintInfo'
         type: object
     type: object
-  rest.QueryParamsResp:
+  rest.QueryMinterParamsResp:
     properties:
       height:
         type: integer
       result:
-        $ref: '#/definitions/StakingParams'
+        $ref: '#/definitions/MintParams'
         type: object
     type: object
   rest.QueryPoolResp:
@@ -924,6 +932,14 @@ definitions:
         items:
           $ref: '#/definitions/types.RedelegationResponse'
         type: array
+    type: object
+  rest.QueryStakingParamsResp:
+    properties:
+      height:
+        type: integer
+      result:
+        $ref: '#/definitions/StakingParams'
+        type: object
     type: object
   rest.QuerySwaggerValidatorDistInfoResp:
     properties:
@@ -2193,7 +2209,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.QueryParamsResp'
+            $ref: '#/definitions/rest.QueryDistributionParamsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3012,7 +3028,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.QueryParamsResp'
+            $ref: '#/definitions/rest.QueryMinterParamsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:
@@ -3577,7 +3593,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rest.QueryParamsResp'
+            $ref: '#/definitions/rest.QueryStakingParamsResp'
         "400":
           description: Returned if the request doesn't have valid query params
           schema:

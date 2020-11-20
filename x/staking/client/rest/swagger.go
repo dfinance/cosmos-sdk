@@ -28,7 +28,7 @@ type (
 		Memo       string              `json:"memo" yaml:"memo"`
 	}
 
-	QueryParamsResp struct {
+	QueryStakingParamsResp struct {
 		Height int64        `json:"height"`
 		Result types.Params `json:"result"`
 	}
