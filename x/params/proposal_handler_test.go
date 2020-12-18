@@ -90,7 +90,7 @@ func TestProposalHandlerPassed(t *testing.T) {
 	)
 
 	tp := testProposal(proposal.NewParamChange(testSubspace, keyMaxValidators, "1"))
-	hdlr := params.NewParamChangeProposalHandler(input.keeper)
+	hdlr := params.NewParamChangeProposalHandler(input.keeper, proposal.RestrictedParams{})
 	require.NoError(t, hdlr(input.ctx, tp))
 
 	var param uint16
@@ -105,7 +105,7 @@ func TestProposalHandlerFailed(t *testing.T) {
 	)
 
 	tp := testProposal(proposal.NewParamChange(testSubspace, keyMaxValidators, "invalidType"))
-	hdlr := params.NewParamChangeProposalHandler(input.keeper)
+	hdlr := params.NewParamChangeProposalHandler(input.keeper, proposal.RestrictedParams{})
 	require.Error(t, hdlr(input.ctx, tp))
 
 	require.False(t, ss.Has(input.ctx, []byte(keyMaxValidators)))
@@ -117,7 +117,7 @@ func TestProposalHandlerUpdateOmitempty(t *testing.T) {
 		types.NewKeyTable().RegisterParamSet(&testParams{}),
 	)
 
-	hdlr := params.NewParamChangeProposalHandler(input.keeper)
+	hdlr := params.NewParamChangeProposalHandler(input.keeper, proposal.RestrictedParams{})
 	var param testParamsSlashingRate
 
 	tp := testProposal(proposal.NewParamChange(testSubspace, keySlashingRate, `{"downtime": 7}`))
@@ -127,6 +127,31 @@ func TestProposalHandlerUpdateOmitempty(t *testing.T) {
 	require.Equal(t, testParamsSlashingRate{0, 7}, param)
 
 	tp = testProposal(proposal.NewParamChange(testSubspace, keySlashingRate, `{"double_sign": 10}`))
+	require.NoError(t, hdlr(input.ctx, tp))
+
+	ss.Get(input.ctx, []byte(keySlashingRate), &param)
+	require.Equal(t, testParamsSlashingRate{10, 7}, param)
+}
+
+func TestProposalHandlerUpdateWithRestrictedParams(t *testing.T) {
+	input := newTestInput(t)
+	ss := input.keeper.Subspace(testSubspace).WithKeyTable(
+		types.NewKeyTable().RegisterParamSet(&testParams{}),
+	)
+
+	var param testParamsSlashingRate
+
+	hdlr := params.NewParamChangeProposalHandler(input.keeper, proposal.RestrictedParams{
+		proposal.RestrictedParam{Subspace: testSubspace, Key: keyMaxValidators},
+	})
+
+	tp := testProposal(proposal.NewParamChange(testSubspace, keyMaxValidators, "1"))
+	err := hdlr(input.ctx, tp)
+	require.Error(t, err)
+
+	require.False(t, ss.Has(input.ctx, []byte(keyMaxValidators)))
+
+	tp = testProposal(proposal.NewParamChange(testSubspace, keySlashingRate, `{"double_sign": 10, "downtime": 7}`))
 	require.NoError(t, hdlr(input.ctx, tp))
 
 	ss.Get(input.ctx, []byte(keySlashingRate), &param)

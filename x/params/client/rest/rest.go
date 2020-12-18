@@ -8,6 +8,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/rest"
 	govrest "github.com/cosmos/cosmos-sdk/x/gov/client/rest"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	"github.com/cosmos/cosmos-sdk/x/params/client/config"
 	paramscutils "github.com/cosmos/cosmos-sdk/x/params/client/utils"
 	"github.com/cosmos/cosmos-sdk/x/params/types/proposal"
 )
@@ -31,6 +32,13 @@ func postProposalHandlerFn(clientCtx client.Context) http.HandlerFunc {
 		req.BaseReq = req.BaseReq.Sanitize()
 		if !req.BaseReq.ValidateBasic(w) {
 			return
+		}
+
+		for _, param := range req.Changes {
+			if err := config.RestrictedParams.CheckRestrictions(param.Subspace, param.Key); err != nil {
+				rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
+				return
+			}
 		}
 
 		content := proposal.NewParameterChangeProposal(req.Title, req.Description, req.Changes.ToParamChanges())

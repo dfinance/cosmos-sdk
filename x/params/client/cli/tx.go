@@ -11,6 +11,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	"github.com/cosmos/cosmos-sdk/x/params/client/config"
 	paramscutils "github.com/cosmos/cosmos-sdk/x/params/client/utils"
 	paramproposal "github.com/cosmos/cosmos-sdk/x/params/types/proposal"
 )
@@ -74,6 +75,12 @@ Where proposal.json contains:
 			deposit, err := sdk.ParseCoinsNormalized(proposal.Deposit)
 			if err != nil {
 				return err
+			}
+
+			for _, param := range proposal.Changes {
+				if err := config.RestrictedParams.CheckRestrictions(param.Subspace, param.Key); err != nil {
+					return err
+				}
 			}
 
 			msg, err := govtypes.NewMsgSubmitProposal(content, deposit, from)
