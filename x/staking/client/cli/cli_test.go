@@ -861,12 +861,13 @@ func (s *IntegrationTestSuite) TestGetCmdQueryParams() {
 historical_entries: 100
 max_entries: 7
 max_validators: 100
+min_self_delegation_lvl: "10000"
 unbonding_time: 1814400s`,
 		},
 		{
 			"with json output",
 			[]string{fmt.Sprintf("--%s=json", tmcli.OutputFlag)},
-			`{"unbonding_time":"1814400s","max_validators":100,"max_entries":7,"historical_entries":100,"bond_denom":"stake"}`,
+			`{"unbonding_time":"1814400s","max_validators":100,"max_entries":7,"historical_entries":100,"bond_denom":"stake","min_self_delegation_lvl":"10000"}`,
 		},
 	}
 	for _, tc := range testCases {

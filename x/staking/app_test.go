@@ -44,6 +44,7 @@ func TestStakingMsgs(t *testing.T) {
 	bondTokens := sdk.TokensFromConsensusPower(10)
 	genCoin := sdk.NewCoin(sdk.DefaultBondDenom, genTokens)
 	bondCoin := sdk.NewCoin(sdk.DefaultBondDenom, bondTokens)
+	minSelfDelegation := sdk.NewInt(types.DefaultMinSelfDelegationLvl)
 
 	acc1 := &authtypes.BaseAccount{Address: addr1.String()}
 	acc2 := &authtypes.BaseAccount{Address: addr2.String()}

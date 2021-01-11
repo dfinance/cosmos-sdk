@@ -1186,6 +1186,7 @@ func TestInvalidCoinDenom(t *testing.T) {
 	invalidCoin := sdk.NewCoin("churros", valTokens)
 	validCoin := sdk.NewCoin(sdk.DefaultBondDenom, valTokens)
 	oneCoin := sdk.NewCoin(sdk.DefaultBondDenom, sdk.OneInt())
+	minSelfDelegation := sdk.NewInt(types.DefaultMinSelfDelegationLvl)
 
 	commission := types.NewCommissionRates(sdk.OneDec(), sdk.OneDec(), sdk.ZeroDec())
 	msgCreate, err := types.NewMsgCreateValidator(valA, PKs[0], invalidCoin, types.Description{}, commission, sdk.OneInt())

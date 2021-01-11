@@ -2,6 +2,7 @@ package v040_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -55,6 +56,7 @@ func TestMigrate(t *testing.T) {
     "historical_entries": 0,
     "max_entries": 0,
     "max_validators": 0,
+    "min_self_delegation_lvl": "0",
     "unbonding_time": "0s"
   },
   "redelegations": [],
@@ -91,6 +93,6 @@ func TestMigrate(t *testing.T) {
     }
   ]
 }`
-
+	fmt.Println(string(indentedBz))
 	require.Equal(t, expected, string(indentedBz))
 }
