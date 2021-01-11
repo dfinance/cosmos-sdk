@@ -39,3 +39,39 @@ func NewHandler(k keeper.Keeper) sdk.Handler {
 		}
 	}
 }
+
+// These functions assume everything has been authenticated,
+// now we just perform action and save
+
+//func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k keeper.Keeper) (*sdk.Result, error) {
+//	// check to see if the pubkey or sender has been registered before
+//	if _, found := k.GetValidator(ctx, msg.ValidatorAddress); found {
+//		return nil, ErrValidatorOwnerExists
+//	}
+//
+//	if _, found := k.GetValidatorByConsAddr(ctx, sdk.GetConsAddress(msg.PubKey)); found {
+//		return nil, ErrValidatorPubKeyExists
+//	}
+//
+//	if msg.Value.Denom != k.BondDenom(ctx) {
+//		return nil, ErrBadDenom
+//	}
+//
+//	if _, err := msg.Description.EnsureLength(); err != nil {
+//		return nil, err
+//	}
+//
+//	if minValue := k.MinSelfDelegationLvl(ctx); msg.MinSelfDelegation.LT(minValue) {
+//		return nil, sdkerrors.Wrapf(ErrInvalidMinSelfDelegation, "should be GTE to %s (%s)", minValue.String(), msg.MinSelfDelegation.String())
+//	}
+//
+//	if ctx.ConsensusParams() != nil {
+//		tmPubKey := tmtypes.TM2PB.PubKey(msg.PubKey)
+//		if !tmstrings.StringInSlice(tmPubKey.Type, ctx.ConsensusParams().Validator.PubKeyTypes) {
+//			return nil, sdkerrors.Wrapf(
+//				ErrValidatorPubKeyTypeNotSupported,
+//				"got: %s, valid: %s", tmPubKey.Type, ctx.ConsensusParams().Validator.PubKeyTypes,
+//			)
+//		}
+//	}
+//}
