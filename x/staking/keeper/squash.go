@@ -200,3 +200,11 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 
 	return nil
 }
+
+func (k Keeper) ForceUnbondValidator(ctx sdk.Context, val types.Validator) error {
+	if updVal := k.completeForceUnbondValidator(ctx, val); updVal != nil {
+		k.SetValidator(ctx, updVal.UnscheduleValidatorForceUnbond())
+	}
+
+	return nil
+}

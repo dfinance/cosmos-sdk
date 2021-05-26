@@ -21,6 +21,7 @@ const (
 	flagHeight        = "height"
 	flagForZeroHeight = "for-zero-height"
 	flagJailWhitelist = "jail-whitelist"
+	flagOutputPath    = "output"
 )
 
 // ExportCmd dumps app state to JSON.
@@ -49,7 +50,10 @@ func ExportCmd(ctx *Context, cdc *codec.Codec, appExporter AppExporter) *cobra.C
 					return err
 				}
 
-				fmt.Println(string(genesis))
+				if err := processOutput(genesis); err != nil {
+					return err
+				}
+
 				return nil
 			}
 
@@ -80,7 +84,10 @@ func ExportCmd(ctx *Context, cdc *codec.Codec, appExporter AppExporter) *cobra.C
 				return err
 			}
 
-			fmt.Println(string(sdk.MustSortJSON(encoded)))
+			if err := processOutput(sdk.MustSortJSON(encoded)); err != nil {
+				return err
+			}
+
 			return nil
 		},
 	}
@@ -88,7 +95,22 @@ func ExportCmd(ctx *Context, cdc *codec.Codec, appExporter AppExporter) *cobra.C
 	cmd.Flags().Int64(flagHeight, -1, "Export state from a particular height (-1 means latest height)")
 	cmd.Flags().Bool(flagForZeroHeight, false, "Export state to start at height zero (perform preproccessing)")
 	cmd.Flags().StringSlice(flagJailWhitelist, []string{}, "List of validators to not jail state export")
+	cmd.Flags().String(flagOutputPath, "./exported.json", "Export file path (print to stdout if empty)")
 	return cmd
+}
+
+func processOutput(stateBz []byte) error {
+	outputPath := viper.GetString(flagOutputPath)
+	if outputPath == "" {
+		fmt.Println(string(stateBz))
+		return nil
+	}
+
+	if err := ioutil.WriteFile(outputPath, stateBz, 0644); err != nil {
+		return fmt.Errorf("write to file (%s): %w", outputPath, err)
+	}
+
+	return nil
 }
 
 func isEmptyState(db dbm.DB) bool {

@@ -5,19 +5,21 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution/types"
-	"github.com/cosmos/cosmos-sdk/x/staking/exported"
 )
 
 type (
 	// Operations order:
-	//   1: slashOp
-	//   2: decCoinsOps
+	//   1: slashOperations
+	//   2: decCoinOperation
 	//   3: main squash ops
+	//   4: rewardOperations
 	SquashOptions struct {
 		// Slash event operations
 		slashOps slashOperations
 		// DecCoins / Coins operations (all rewards and pools)
 		decCoinsOps []decCoinOperation
+		// Reward operations (after the main squash)
+		rewardOps rewardOperations
 	}
 
 	slashOperations struct {
@@ -34,6 +36,13 @@ type (
 		// Rename coin / move balance (empty - no renaming)
 		// 2nd priority
 		RenameTo string
+	}
+
+	rewardOperations struct {
+		// Transfer all banked rewards to account
+		BankTransfer bool
+		// Transfer all validator commissions to operator
+		CommissionTransfer bool
 	}
 )
 
@@ -67,6 +76,13 @@ func (opts *SquashOptions) SetDecCoinOp(denomRaw string, remove bool, renameToRa
 	}
 
 	opts.decCoinsOps = append(opts.decCoinsOps, op)
+
+	return nil
+}
+
+func (opts *SquashOptions) SetRewardOps(bankTransfer, commissionTransfer bool) error {
+	opts.rewardOps.BankTransfer = bankTransfer
+	opts.rewardOps.CommissionTransfer = commissionTransfer
 
 	return nil
 }
@@ -227,48 +243,108 @@ func (k Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error 
 	}
 
 	// main squash operation
-	{
-		dels := k.stakingKeeper.GetAllSDKDelegations(ctx)
+	//{
+	//	dels := k.stakingKeeper.GetAllSDKDelegations(ctx)
+	//
+	//	// transfer all current rewards to the rewards bank
+	//	// that makes all slash event and historical rewards ready to be deleted
+	//	for _, del := range dels {
+	//		val := k.stakingKeeper.Validator(ctx, del.ValidatorAddress)
+	//		if _, err := k.transferDelegationRewardsToRewardsBankPool(ctx, val, del); err != nil {
+	//			return fmt.Errorf("transferring delegator %s rewards for validator %s to rewards bank pool: %w",
+	//				del.GetDelegatorAddr(), val.GetOperator(), err)
+	//		}
+	//	}
+	//
+	//	// clear validator slash events and historical rewards
+	//	k.DeleteAllValidatorSlashEvents(ctx)
+	//	k.DeleteAllValidatorHistoricalRewards(ctx)
+	//
+	//	// partially reinitialize validators
+	//	k.stakingKeeper.IterateValidators(ctx, func(_ int64, val exported.ValidatorI) (stop bool) {
+	//		// set initial historical rewards (period 0) with reference count of 1
+	//		k.SetValidatorHistoricalRewards(ctx, val.GetOperator(), 0, types.NewValidatorHistoricalRewards(sdk.DecCoins{}, sdk.DecCoins{}, 1))
+	//
+	//		// update current rewards period (starting at period 1)
+	//		curRewards := k.GetValidatorCurrentRewards(ctx, val.GetOperator())
+	//		curRewards.Period = 1
+	//		k.SetValidatorCurrentRewards(ctx, val.GetOperator(), curRewards)
+	//
+	//		return false
+	//	})
+	//
+	//	// reinitialize all delegations (recreate DelegatorStartingInfo as they were deleted during the withdraw)
+	//	for _, del := range dels {
+	//		k.Hooks().BeforeDelegationCreated(ctx, del.DelegatorAddress, del.ValidatorAddress)
+	//		k.Hooks().AfterDelegationModified(ctx, del.DelegatorAddress, del.ValidatorAddress)
+	//	}
+	//
+	//	// reset locked rewards state lock height
+	//	k.IterateValidatorLockedRewards(ctx, func(valAddr sdk.ValAddress, info types.ValidatorLockedRewardsState) (stop bool) {
+	//		info.LockHeight = 0
+	//		k.SetValidatorLockedState(ctx, valAddr, info)
+	//		return false
+	//	})
+	//}
 
-		// transfer all current rewards to the rewards bank
-		// that makes all slash event and historical rewards ready to be deleted
-		for _, del := range dels {
-			val := k.stakingKeeper.Validator(ctx, del.ValidatorAddress)
-			if _, err := k.transferDelegationRewardsToRewardsBankPool(ctx, val, del); err != nil {
-				return fmt.Errorf("transferring delegator %s rewards for validator %s to rewards bank pool: %w",
-					del.GetDelegatorAddr(), val.GetOperator(), err)
+	// after main squash operations
+	{
+		// Transfer all current (and banked) rewards to accounts
+		if opts.rewardOps.BankTransfer {
+			// Registered delegations (with StartingInfo)
+			{
+				var opErr error
+				k.IterateDelegatorStartingInfos(ctx, func(val sdk.ValAddress, del sdk.AccAddress, info types.DelegatorStartingInfo) (stop bool) {
+					if _, err := k.WithdrawDelegationRewards(ctx, del, val); err != nil {
+						opErr = fmt.Errorf("transferring delegator %s rewards for validator %s to account: %w",
+							del, val, err,
+						)
+						return true
+					}
+
+					return false
+				})
+				if opErr != nil {
+					return opErr
+				}
+			}
+
+			// Banked leftovers
+			{
+				var opErr error
+				k.IterateDelegatorRewardsBankCoins(ctx, func(delAddr sdk.AccAddress, coins sdk.Coins) (stop bool) {
+					withdrawAddr := k.GetDelegatorWithdrawAddr(ctx, delAddr)
+
+					if err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.RewardsBankPoolName, withdrawAddr, coins); err != nil {
+						opErr = fmt.Errorf("transferring delegator %s rewards from rewardsBank: %w", delAddr, err)
+						return true
+					}
+					k.DeleteDelegatorRewardsBankCoins(ctx, delAddr)
+
+					return false
+				})
+				if opErr != nil {
+					return opErr
+				}
 			}
 		}
 
-		// clear validator slash events and historical rewards
-		k.DeleteAllValidatorSlashEvents(ctx)
-		k.DeleteAllValidatorHistoricalRewards(ctx)
-
-		// partially reinitialize validators
-		k.stakingKeeper.IterateValidators(ctx, func(_ int64, val exported.ValidatorI) (stop bool) {
-			// set initial historical rewards (period 0) with reference count of 1
-			k.SetValidatorHistoricalRewards(ctx, val.GetOperator(), 0, types.NewValidatorHistoricalRewards(sdk.DecCoins{}, sdk.DecCoins{}, 1))
-
-			// update current rewards period (starting at period 1)
-			curRewards := k.GetValidatorCurrentRewards(ctx, val.GetOperator())
-			curRewards.Period = 1
-			k.SetValidatorCurrentRewards(ctx, val.GetOperator(), curRewards)
-
-			return false
-		})
-
-		// reinitialize all delegations (recreate DelegatorStartingInfo as they were deleted during the withdraw)
-		for _, del := range dels {
-			k.Hooks().BeforeDelegationCreated(ctx, del.DelegatorAddress, del.ValidatorAddress)
-			k.Hooks().AfterDelegationModified(ctx, del.DelegatorAddress, del.ValidatorAddress)
+		// Transfer all validator commissions to operators
+		if opts.rewardOps.CommissionTransfer {
+			valAddrs := make([]sdk.ValAddress, 0)
+			k.IterateValidatorAccumulatedCommissions(ctx, func(val sdk.ValAddress, value types.ValidatorAccumulatedCommission) (stop bool) {
+				if !value.IsZero() {
+					valAddrs = append(valAddrs, val)
+				}
+				return false
+			})
+			for _, valAddr := range valAddrs {
+				if _, err := k.WithdrawValidatorCommission(ctx, valAddr); err != nil {
+					return fmt.Errorf("transferring validator %s commissions to operator account: %w",
+						valAddr, err)
+				}
+			}
 		}
-
-		// reset locked rewards state lock height
-		k.IterateValidatorLockedRewards(ctx, func(valAddr sdk.ValAddress, info types.ValidatorLockedRewardsState) (stop bool) {
-			info.LockHeight = 0
-			k.SetValidatorLockedState(ctx, valAddr, info)
-			return false
-		})
 	}
 
 	return nil

@@ -42,7 +42,7 @@ func NewEmptySquashOptions() SquashOptions {
 func (keeper Keeper) PrepareForZeroHeight(ctx sdk.Context, opts SquashOptions) error {
 	// paramsOps
 	{
-		if !opts.paramsOps.MinDeposit.IsZero() {
+		if opts.paramsOps.MinDeposit.Denom != "" {
 			params := keeper.GetDepositParams(ctx)
 			params.MinDeposit = sdk.NewCoins(opts.paramsOps.MinDeposit)
 			keeper.SetDepositParams(ctx, params)
