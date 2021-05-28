@@ -187,7 +187,7 @@ func (s Subspace) Set(ctx sdk.Context, key []byte, value interface{}) {
 func (s Subspace) Update(ctx sdk.Context, key, value []byte) error {
 	attr, ok := s.table.m[string(key)]
 	if !ok {
-		panic(fmt.Sprintf("parameter %s not registered", string(key)))
+		return fmt.Errorf("parameter %s not registered", string(key))
 	}
 
 	ty := attr.ty
